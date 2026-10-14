@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { startSyncSchedule } from './abgleich.ts';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, migrate } from './db/index.ts';
@@ -31,6 +32,9 @@ server.listen(config.port, config.host, () => {
   if (config.mail.mode === 'console') console.log('Hinweis: MAIL_MODE=console – Anmelde-Links erscheinen hier im Protokoll statt per E-Mail.');
   if (!config.adminEmails.size) console.log('Hinweis: ADMIN_EMAILS ist leer – niemand kann Turniere und Ergebnisse pflegen.');
 });
+
+// Champions und Spielerkader regelmäßig von Riot holen
+if (config.dataSync) startSyncSchedule(db, (m) => console.log(m));
 
 let stopping = false;
 function stop() {

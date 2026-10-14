@@ -13,7 +13,9 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { runSync } from './abgleich.ts';
 import { importTournament, type TournamentData } from './daten.ts';
+import { fakeRiot, lolesports } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
 
@@ -120,7 +122,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       APP_SECRET: 'test-geheimnis',
     });
     mailer = createMailer(config);
-    const app = createApp({ db, config, mailer, publicDir: join(root, 'public'), log: process.env.TEST_LOG ? (m) => console.error(m) : () => {} });
+    const app = createApp({
+      db, config, mailer, publicDir: join(root, 'public'), fetchJson: fakeRiot(),
+      log: process.env.TEST_LOG ? (m) => console.error(m) : () => {},
+    });
     server = createServer(app.listener);
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -495,5 +500,61 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const adopted = await importTournament(db, { tournament: { key: 'hand-cup', name: 'Hand Cup' }, teams: [], matches: [] });
     assert.equal(adopted.tournamentNew, false);
     assert.equal((await db.one<{ external_id: string }>('select external_id from tournaments where id = $1', [manual!.id]))!.external_id, 'hand-cup');
+  });
+
+  test('Datenabgleich: Champions und Kader; Sonderfragen mit Champion- und Spielerauswahl', async () => {
+    // Worlds 2026 ist aus dem vorigen Test eingespielt; die Tipprunde hat das Turnier und den Admin als Mitglied
+    const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
+    const league = (await db.one<{ id: string }>('select id from leagues where slug = $1', [slug]))!.id;
+    const before = await admin.get('/admin');
+    assert.match(before.text, /Datenabgleich mit Riot/);
+    assert.match(before.text, /noch nie/);
+
+    const r = await admin.post('/admin/abgleich');
+    assert.equal(r.status, 303, r.text);
+    assert.equal(r.location, '/admin?hinweis=abgeglichen');
+    const n = (await db.one<{ c: number; p: number; t: number }>(
+      `select (select count(*)::int from champions) as c, (select count(*)::int from players where active) as p,
+              (select count(*)::int from teams where external_id is not null) as t`,
+    ))!;
+    // Die vier Teams aus dem Admin-Test haben die Region "X" – sie werden trotzdem über Name und Kürzel gefunden
+    assert.deepEqual([n.c, n.t], [120, 19]);
+    assert.ok(n.p > 19 * 5, `${n.p} Spieler`);
+    assert.match((await admin.get('/admin')).text, /Spieler aus 19 von 19 Teams/);
+
+    // Fragen mit Spieler- und Champion-Auswahl
+    const mvp = (await db.one<{ id: string }>(
+      `insert into bonus_questions (league_id, tournament_id, question, points, answer_type) values ($1, $2, 'Wer wird Finals-MVP?', 3, 'player') returning id`,
+      [league, tid],
+    ))!.id;
+    const champ = (await db.one<{ id: string }>(
+      `insert into bonus_questions (league_id, tournament_id, question, points, answer_type, choices) values ($1, $2, 'Meistgebannt?', 3, 'champion', '{}') returning id`,
+      [league, tid],
+    ))!.id;
+    const page = await admin.get(`/r/${slug}/sonderfragen`);
+    assert.match(page.text, /<optgroup label="T1">/);
+    assert.match(page.text, /<option value="Faker">Faker \(Mid\)<\/option>/);
+    assert.match(page.text, /<option value="Wukong">Wukong<\/option>/);
+    assert.match(page.text, /<option value="Kai&#39;Sa">Kai&#39;Sa<\/option>/);
+    const saved = await admin.post(`/r/${slug}/sonderfragen`, { [`antwort_${mvp}`]: 'Faker', [`antwort_${champ}`]: 'Wukong' });
+    assert.equal(saved.location, `/r/${slug}/sonderfragen?hinweis=antworten-gespeichert`);
+
+    // Faker verlässt den Kader: nicht mehr in der Liste, die abgegebene Antwort bleibt
+    const changed = structuredClone(lolesports);
+    const t1 = changed.data.teams.find((t: { slug: string }) => t.slug === 't1');
+    t1.players = t1.players.filter((p: { summonerName: string }) => p.summonerName !== 'Faker');
+    const base = fakeRiot();
+    await runSync(db, async (url, headers) => (url.includes('/getTeams') ? changed : base(url, headers)));
+    const after = await admin.get(`/r/${slug}/sonderfragen`);
+    assert.doesNotMatch(after.text, /Faker \(Mid\)/);
+    assert.match(after.text, /<option value="Faker" selected>Faker<\/option>/);
+
+    // Quelle nicht erreichbar: Fehler wird angezeigt, vorhandene Listen bleiben
+    const failed = await runSync(db, async () => {
+      throw new Error('offline');
+    });
+    assert.ok(failed.every((x) => !x.ok));
+    assert.equal((await db.one<{ c: number }>('select count(*)::int as c from champions'))!.c, 120);
+    assert.match((await admin.get('/admin')).text, /Fehler: offline/);
   });
 });

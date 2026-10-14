@@ -195,6 +195,11 @@ case "${1:-hilfe}" in
     cli daten "$2"
     ;;
 
+  abgleich)
+    # Champions und Spielerkader jetzt von Riot holen (läuft sonst automatisch alle 6 Stunden)
+    cli abgleich
+    ;;
+
   login-link)
     [[ -n ${2:-} ]] || die "Bitte E-Mail-Adresse angeben:  tippspiel login-link name@example.de"
     cli login-link "$2"
@@ -229,6 +234,7 @@ LoL-Tippspiel – Befehle:
   tippspiel mail-test <E-Mail>      Test-Mail verschicken
   tippspiel daten <Name>            Turnierdaten einspielen, z. B.  tippspiel daten worlds-2026
                                     (mehrfach ausführbar; ohne Namen: Liste der vorhandenen Daten)
+  tippspiel abgleich                Champions und Spielerkader jetzt von Riot holen (sonst alle 6 Stunden)
   tippspiel login-link <E-Mail>     Anmelde-Link erzeugen, ohne Mail (falls der Versand mal klemmt)
   tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
   tippspiel sicherungen             Vorhandene Sicherungen anzeigen

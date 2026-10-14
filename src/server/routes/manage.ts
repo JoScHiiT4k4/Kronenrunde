@@ -21,7 +21,7 @@ interface QuestionRow {
   position: number;
   question: string;
   points: number;
-  answer_type: 'text' | 'team' | 'choice';
+  answer_type: 'text' | 'team' | 'choice' | 'champion' | 'player';
   choices: string[];
   hint: string | null;
   correct_answers: string[];
@@ -30,6 +30,8 @@ interface QuestionRow {
 
 const ANSWER_TYPES: Record<QuestionRow['answer_type'], string> = {
   team: 'Team aus dem Turnier auswählen',
+  player: 'Spieler aus den Turnier-Teams auswählen',
+  champion: 'Champion auswählen',
   choice: 'Aus eigener Liste auswählen',
   text: 'Freitext',
 };
@@ -37,11 +39,11 @@ const ANSWER_TYPES: Record<QuestionRow['answer_type'], string> = {
 /** Die Fragen, die in der bisherigen Tipprunde jedes Jahr dabei waren. Punkte sind änderbar. */
 const TYPICAL_QUESTIONS: { question: string; points: number; type: QuestionRow['answer_type']; choices?: string[]; hint?: string }[] = [
   { question: 'Wer wird Weltmeister?', points: 5, type: 'team' },
-  { question: 'Wer wird Finals-MVP?', points: 3, type: 'text', hint: 'Spielername, z. B. Faker' },
-  { question: 'Welcher Champion wird am häufigsten gebannt?', points: 3, type: 'text' },
+  { question: 'Wer wird Finals-MVP?', points: 3, type: 'player' },
+  { question: 'Welcher Champion wird am häufigsten gebannt?', points: 3, type: 'champion' },
   { question: 'Welches Team verliert das kürzeste Spiel?', points: 3, type: 'team' },
   { question: 'Welches Team holt den ersten Pentakill?', points: 3, type: 'team', choices: ['Kein Pentakill'] },
-  { question: 'Welcher Spieler holt den ersten Pentakill?', points: 3, type: 'text', hint: 'Spielername oder „Kein Pentakill“' },
+  { question: 'Welcher Spieler holt den ersten Pentakill?', points: 3, type: 'player', choices: ['Kein Pentakill'] },
 ];
 
 function lines(value: string | null, maxItems = 50, maxLen = 200): string[] {
@@ -80,7 +82,7 @@ function questionFields(q: Partial<QuestionRow>, tournaments: { id: string; name
           (k) => html`<option value="${k}"${attr((q.answer_type ?? 'team') === k, 'selected')}>${ANSWER_TYPES[k]}</option>`,
         )}
       </select></label>
-    <label class="field"><span>Auswahl-Möglichkeiten <small class="muted">(eine pro Zeile; bei „Team“ zusätzlich zu den Teams, z. B. „Kein Pentakill“)</small></span>
+    <label class="field"><span>Auswahl-Möglichkeiten <small class="muted">(eine pro Zeile; bei Team, Spieler oder Champion zusätzlich zur Liste, z. B. „Kein Pentakill“)</small></span>
       <textarea name="choices" rows="2">${(q.choices ?? []).join('\n')}</textarea></label>
     <label class="field"><span>Hinweis für die Tipper <small class="muted">(optional)</small></span>
       <input type="text" name="hint" value="${q.hint ?? ''}" maxlength="200"></label>

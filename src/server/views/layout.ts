@@ -9,6 +9,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
+  abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },
   beigetreten: { text: 'Willkommen in der Tipprunde!', kind: 'ok' },
   erstellt: { text: 'Die Tipprunde ist angelegt. Lade jetzt deine Leute mit dem Einladungslink ein.', kind: 'ok' },
   'tipps-gespeichert': { text: 'Deine Tipps sind gespeichert.', kind: 'ok' },

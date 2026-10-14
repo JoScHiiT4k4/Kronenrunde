@@ -1,0 +1,1216 @@
+{
+ "_info": "Ausschnitt aus lolesports.com getTeams (14.10.2026) – Testdaten für den Abgleich",
+ "data": {
+  "teams": [
+   {
+    "id": "100205573495116443",
+    "slug": "geng",
+    "code": "GEN",
+    "name": "Gen.G Esports",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "99871276342168416",
+      "summonerName": "Chovy",
+      "role": "mid"
+     },
+     {
+      "id": "113740943728096233",
+      "summonerName": "SIRIUSS",
+      "role": "support"
+     },
+     {
+      "id": "115740909072304963",
+      "summonerName": "Ripple",
+      "role": "top"
+     },
+     {
+      "id": "108366460978884097",
+      "summonerName": "Courage",
+      "role": "jungle"
+     },
+     {
+      "id": "115740899235923933",
+      "summonerName": "MUDAI",
+      "role": "bottom"
+     },
+     {
+      "id": "115740899326939236",
+      "summonerName": "Lumos",
+      "role": "support"
+     },
+     {
+      "id": "113560610683314243",
+      "summonerName": "Kemish",
+      "role": "mid"
+     },
+     {
+      "id": "98767975906852059",
+      "summonerName": "Ruler",
+      "role": "bottom"
+     },
+     {
+      "id": "107454956790371682",
+      "summonerName": "Duro",
+      "role": "support"
+     },
+     {
+      "id": "99566404532924465",
+      "summonerName": "Kiin",
+      "role": "top"
+     },
+     {
+      "id": "100725844994345151",
+      "summonerName": "Canyon",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "100205573496804586",
+    "slug": "hanwha-life-esports",
+    "code": "HLE",
+    "name": "Hanwha Life Esports",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "105501709748188393",
+      "summonerName": "Delight",
+      "role": "support"
+     },
+     {
+      "id": "115740899104327635",
+      "summonerName": "Cracker",
+      "role": "mid"
+     },
+     {
+      "id": "115740899171305432",
+      "summonerName": "Valiant",
+      "role": "mid"
+     },
+     {
+      "id": "115807595873361833",
+      "summonerName": "Panther",
+      "role": "top"
+     },
+     {
+      "id": "101671284628761661",
+      "summonerName": "Kanavi",
+      "role": "jungle"
+     },
+     {
+      "id": "103495716775975785",
+      "summonerName": "Gumayusi",
+      "role": "bottom"
+     },
+     {
+      "id": "113740952132760566",
+      "summonerName": "Bluffing",
+      "role": "support"
+     },
+     {
+      "id": "113740953522201854",
+      "summonerName": "Jackal",
+      "role": "jungle"
+     },
+     {
+      "id": "113740949736514801",
+      "summonerName": "Pyeonsik",
+      "role": "bottom"
+     },
+     {
+      "id": "103478281361900912",
+      "summonerName": "Zeka",
+      "role": "mid"
+     },
+     {
+      "id": "105320680474347057",
+      "summonerName": "Zeus",
+      "role": "top"
+     }
+    ]
+   },
+   {
+    "id": "100205576309502431",
+    "slug": "furia",
+    "code": "FUR",
+    "name": "FURIA",
+    "status": "active",
+    "homeLeague": {
+     "name": "CBLOL",
+     "region": "BRASILIEN"
+    },
+    "players": [
+     {
+      "id": "103478281329357326",
+      "summonerName": "Tutsz",
+      "role": "mid"
+     },
+     {
+      "id": "108613483446049530",
+      "summonerName": "Ayu",
+      "role": "bottom"
+     },
+     {
+      "id": "108494063372887027",
+      "summonerName": "Tatu",
+      "role": "jungle"
+     },
+     {
+      "id": "100131733430915231",
+      "summonerName": "Guigo",
+      "role": "top"
+     },
+     {
+      "id": "99566408211536727",
+      "summonerName": "JoJo",
+      "role": "support"
+     },
+     {
+      "id": "99566407782209288",
+      "summonerName": "Shini",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "100725845018863243",
+    "slug": "dwg-kia",
+    "code": "DK",
+    "name": "Dplus KIA",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "100725844988653773",
+      "summonerName": "ShowMaker",
+      "role": "mid"
+     },
+     {
+      "id": "105501707243664614",
+      "summonerName": "Wayne",
+      "role": "bottom"
+     },
+     {
+      "id": "113543956179181753",
+      "summonerName": "Jaehyuk",
+      "role": "top"
+     },
+     {
+      "id": "112822770322732675",
+      "summonerName": "Garden",
+      "role": "mid"
+     },
+     {
+      "id": "108205129774185945",
+      "summonerName": "Smash",
+      "role": "bottom"
+     },
+     {
+      "id": "108284721867904137",
+      "summonerName": "Career",
+      "role": "support"
+     },
+     {
+      "id": "107492028745476512",
+      "summonerName": "Loopy",
+      "role": "support"
+     },
+     {
+      "id": "114697949393287385",
+      "summonerName": "Nevid",
+      "role": "top"
+     },
+     {
+      "id": "111658292064356964",
+      "summonerName": "Siwoo",
+      "role": "top"
+     },
+     {
+      "id": "106267599829820917",
+      "summonerName": "Lucid",
+      "role": "jungle"
+     },
+     {
+      "id": "116907472040667554",
+      "summonerName": "Solid",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "103461966965149786",
+    "slug": "mad-lions",
+    "code": "MKOI",
+    "name": "Movistar KOI",
+    "status": "active",
+    "homeLeague": {
+     "name": "LEC",
+     "region": "EMEA"
+    },
+    "players": [
+     {
+      "id": "103877629120745120",
+      "summonerName": "Elyoya",
+      "role": "jungle"
+     },
+     {
+      "id": "105504920899018806",
+      "summonerName": "Jojopyun",
+      "role": "mid"
+     },
+     {
+      "id": "110350224593953686",
+      "summonerName": "Myrwn",
+      "role": "top"
+     },
+     {
+      "id": "103536968833612789",
+      "summonerName": "Supa",
+      "role": "bottom"
+     },
+     {
+      "id": "107564404490889053",
+      "summonerName": "Alvaro",
+      "role": "support"
+     },
+     {
+      "id": "112455030195807491",
+      "summonerName": "NightSlayer",
+      "role": "top"
+     }
+    ]
+   },
+   {
+    "id": "105549991104165282",
+    "slug": "furia-academy",
+    "code": "FUR",
+    "name": "FURIA Academy",
+    "status": "active",
+    "homeLeague": null,
+    "players": []
+   },
+   {
+    "id": "105550026570060790",
+    "slug": "dwg-kia-challengers",
+    "code": "DK",
+    "name": "DK Challengers",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK Challengers",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "108205129774185945",
+      "summonerName": "Smash",
+      "role": "bottom"
+     },
+     {
+      "id": "108284721867904137",
+      "summonerName": "Career",
+      "role": "support"
+     },
+     {
+      "id": "114697949393287385",
+      "summonerName": "Nevid",
+      "role": "top"
+     },
+     {
+      "id": "107492028745476512",
+      "summonerName": "Loopy",
+      "role": "support"
+     },
+     {
+      "id": "112822770322732675",
+      "summonerName": "Garden",
+      "role": "mid"
+     },
+     {
+      "id": "105501707243664614",
+      "summonerName": "Wayne",
+      "role": "bottom"
+     },
+     {
+      "id": "113543956179181753",
+      "summonerName": "Jaehyuk",
+      "role": "top"
+     },
+     {
+      "id": "116907472040667554",
+      "summonerName": "Solid",
+      "role": "jungle"
+     },
+     {
+      "id": "106267599829820917",
+      "summonerName": "Lucid",
+      "role": "jungle"
+     },
+     {
+      "id": "100725844988653773",
+      "summonerName": "ShowMaker",
+      "role": "mid"
+     },
+     {
+      "id": "111658292064356964",
+      "summonerName": "Siwoo",
+      "role": "top"
+     }
+    ]
+   },
+   {
+    "id": "105550047979361273",
+    "slug": "hle-challengers",
+    "code": "HLE",
+    "name": "HLE Challengers",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK Challengers",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "113740949736514801",
+      "summonerName": "Pyeonsik",
+      "role": "bottom"
+     },
+     {
+      "id": "113740952132760566",
+      "summonerName": "Bluffing",
+      "role": "support"
+     },
+     {
+      "id": "113740953522201854",
+      "summonerName": "Jackal",
+      "role": "jungle"
+     },
+     {
+      "id": "105320680474347057",
+      "summonerName": "Zeus",
+      "role": "top"
+     },
+     {
+      "id": "115740899104327635",
+      "summonerName": "Cracker",
+      "role": "mid"
+     },
+     {
+      "id": "115740899171305432",
+      "summonerName": "Valiant",
+      "role": "mid"
+     },
+     {
+      "id": "115807595873361833",
+      "summonerName": "Panther",
+      "role": "top"
+     },
+     {
+      "id": "101671284628761661",
+      "summonerName": "Kanavi",
+      "role": "jungle"
+     },
+     {
+      "id": "103495716775975785",
+      "summonerName": "Gumayusi",
+      "role": "bottom"
+     },
+     {
+      "id": "103478281361900912",
+      "summonerName": "Zeka",
+      "role": "mid"
+     },
+     {
+      "id": "105501709748188393",
+      "summonerName": "Delight",
+      "role": "support"
+     }
+    ]
+   },
+   {
+    "id": "107251245690956393",
+    "slug": "saigon-buffalo-esports",
+    "code": "MVK",
+    "name": "MVK Esports",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCP",
+     "region": "PAZIFIK"
+    },
+    "players": [
+     {
+      "id": "113628612494074867",
+      "summonerName": "SanSan",
+      "role": "jungle"
+     },
+     {
+      "id": "109828407662355333",
+      "summonerName": "Kratos",
+      "role": "top"
+     },
+     {
+      "id": "109828289393968653",
+      "summonerName": "Gury",
+      "role": "jungle"
+     },
+     {
+      "id": "109828431746365782",
+      "summonerName": "Harky",
+      "role": "bottom"
+     },
+     {
+      "id": "112834609700454416",
+      "summonerName": "SiuLoong",
+      "role": "support"
+     },
+     {
+      "id": "113628612585554951",
+      "summonerName": "Chika",
+      "role": "mid"
+     }
+    ]
+   },
+   {
+    "id": "107700199633958891",
+    "slug": "ctbc-flying-oyster",
+    "code": "CFO",
+    "name": "CTBC Flying Oyster",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCP",
+     "region": "PAZIFIK"
+    },
+    "players": [
+     {
+      "id": "99566406483009320",
+      "summonerName": "Rest",
+      "role": "top"
+     },
+     {
+      "id": "104573129055417270",
+      "summonerName": "Doggo",
+      "role": "bottom"
+     },
+     {
+      "id": "100668757020706361",
+      "summonerName": "Kino",
+      "role": "support"
+     },
+     {
+      "id": "108443043135317375",
+      "summonerName": "POUT",
+      "role": "mid"
+     },
+     {
+      "id": "102808727762706248",
+      "summonerName": "Shad0w",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "108203154514683518",
+    "slug": "t1-rookies",
+    "code": "T1",
+    "name": "T1 Rookies",
+    "status": "archived",
+    "homeLeague": null,
+    "players": [
+     {
+      "id": "108205129336536529",
+      "summonerName": "Dal",
+      "role": "top"
+     },
+     {
+      "id": "108205129569969840",
+      "summonerName": "Test JG1",
+      "role": "jungle"
+     },
+     {
+      "id": "108205129661988309",
+      "summonerName": "Test JG2",
+      "role": "jungle"
+     },
+     {
+      "id": "108284716582083176",
+      "summonerName": "Test MID1",
+      "role": "mid"
+     },
+     {
+      "id": "107492068702410338",
+      "summonerName": "Peyz",
+      "role": "bottom"
+     }
+    ]
+   },
+   {
+    "id": "108203173414485265",
+    "slug": "hle-academy",
+    "code": "HLE",
+    "name": "HLE Academy",
+    "status": "active",
+    "homeLeague": null,
+    "players": [
+     {
+      "id": "108284725207846646",
+      "summonerName": "star",
+      "role": "top"
+     },
+     {
+      "id": "108284732073917232",
+      "summonerName": "Tempester",
+      "role": "mid"
+     },
+     {
+      "id": "105501823725188459",
+      "summonerName": "LJM",
+      "role": "bottom"
+     },
+     {
+      "id": "108284737161263694",
+      "summonerName": "Poo",
+      "role": "support"
+     },
+     {
+      "id": "108294251236841079",
+      "summonerName": "Jg Test0",
+      "role": "jungle"
+     },
+     {
+      "id": "108205132706659849",
+      "summonerName": "Raccoon",
+      "role": "top"
+     },
+     {
+      "id": "108205133177136879",
+      "summonerName": "Chang",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "109480204628225868",
+    "slug": "los",
+    "code": "LOS",
+    "name": "LOS",
+    "status": "active",
+    "homeLeague": {
+     "name": "CBLOL",
+     "region": "BRASILIEN"
+    },
+    "players": [
+     {
+      "id": "110434822594728434",
+      "summonerName": "Curse",
+      "role": "jungle"
+     },
+     {
+      "id": "107492099069012459",
+      "summonerName": "Zest",
+      "role": "top"
+     },
+     {
+      "id": "107492030596737445",
+      "summonerName": "Feisty",
+      "role": "mid"
+     },
+     {
+      "id": "112462169706118570",
+      "summonerName": "Duduhh",
+      "role": "bottom"
+     },
+     {
+      "id": "105506922297942200",
+      "summonerName": "Ackerman",
+      "role": "support"
+     }
+    ]
+   },
+   {
+    "id": "109485351596724390",
+    "slug": "los-academy",
+    "code": "LOS",
+    "name": "LOS Academy",
+    "status": "archived",
+    "homeLeague": null,
+    "players": []
+   },
+   {
+    "id": "111692118851466302",
+    "slug": "karmine-corp",
+    "code": "KC",
+    "name": "Karmine Corp",
+    "status": "active",
+    "homeLeague": {
+     "name": "LEC",
+     "region": "EMEA"
+    },
+    "players": [
+     {
+      "id": "103495716771322725",
+      "summonerName": "Canna",
+      "role": "top"
+     },
+     {
+      "id": "105537190986692036",
+      "summonerName": "Yike",
+      "role": "jungle"
+     },
+     {
+      "id": "109461265532592848",
+      "summonerName": "Caliste",
+      "role": "bottom"
+     },
+     {
+      "id": "108205130709313212",
+      "summonerName": "kyeahoo",
+      "role": "mid"
+     },
+     {
+      "id": "106625308523122120",
+      "summonerName": "Busio",
+      "role": "support"
+     }
+    ]
+   },
+   {
+    "id": "113661839307879869",
+    "slug": "team-secret-whales",
+    "code": "TSW",
+    "name": "Team Secret Whales",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCP",
+     "region": "PAZIFIK"
+    },
+    "players": [
+     {
+      "id": "113661875306288886",
+      "summonerName": "Dire",
+      "role": "mid"
+     },
+     {
+      "id": "107251694749147163",
+      "summonerName": "Eddie",
+      "role": "bottom"
+     },
+     {
+      "id": "113662600335177587",
+      "summonerName": "Hizto",
+      "role": "jungle"
+     },
+     {
+      "id": "107251574398720447",
+      "summonerName": "Bie",
+      "role": "support"
+     },
+     {
+      "id": "107251636998679351",
+      "summonerName": "Pun",
+      "role": "top"
+     }
+    ]
+   },
+   {
+    "id": "114194110230896602",
+    "slug": "lyon-gaming-academy",
+    "code": "LYON",
+    "name": "Lyon Academy",
+    "status": "active",
+    "homeLeague": {
+     "name": "LRN",
+     "region": "LATEINAMERIKA (NORD)"
+    },
+    "players": [
+     {
+      "id": "116096201222260410",
+      "summonerName": "Ticky",
+      "role": "none"
+     },
+     {
+      "id": "112088558868149498",
+      "summonerName": "Winder",
+      "role": "top"
+     },
+     {
+      "id": "109716192364259988",
+      "summonerName": "Kase",
+      "role": "jungle"
+     },
+     {
+      "id": "114272171711748454",
+      "summonerName": "Sweeho",
+      "role": "mid"
+     },
+     {
+      "id": "116843568067228246",
+      "summonerName": "NANINI",
+      "role": "bottom"
+     },
+     {
+      "id": "112088580416620285",
+      "summonerName": "Starhide",
+      "role": "support"
+     },
+     {
+      "id": "114194738161643175",
+      "summonerName": "Zhayend",
+      "role": "top"
+     },
+     {
+      "id": "116346045449965933",
+      "summonerName": "Razel",
+      "role": "none"
+     }
+    ]
+   },
+   {
+    "id": "98767991853197861",
+    "slug": "t1",
+    "code": "T1",
+    "name": "T1",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCK",
+     "region": "KOREA"
+    },
+    "players": [
+     {
+      "id": "115643633313408264",
+      "summonerName": "Guardian",
+      "role": "top"
+     },
+     {
+      "id": "113560604011392262",
+      "summonerName": "Haetae",
+      "role": "top"
+     },
+     {
+      "id": "108205131230834705",
+      "summonerName": "Carim",
+      "role": "jungle"
+     },
+     {
+      "id": "109523134874809981",
+      "summonerName": "Guti",
+      "role": "mid"
+     },
+     {
+      "id": "108205155000821521",
+      "summonerName": "Cypher",
+      "role": "bottom"
+     },
+     {
+      "id": "116884197729505782",
+      "summonerName": "Eclipse",
+      "role": "bottom"
+     },
+     {
+      "id": "111658292000001586",
+      "summonerName": "Jinbeom",
+      "role": "bottom"
+     },
+     {
+      "id": "111658337799244461",
+      "summonerName": "Cloud ",
+      "role": "support"
+     },
+     {
+      "id": "115643633228772231",
+      "summonerName": "Painter",
+      "role": "jungle"
+     },
+     {
+      "id": "107492068702410338",
+      "summonerName": "Peyz",
+      "role": "bottom"
+     },
+     {
+      "id": "102186485482484390",
+      "summonerName": "Doran",
+      "role": "top"
+     },
+     {
+      "id": "98767991747728851",
+      "summonerName": "Faker",
+      "role": "mid"
+     },
+     {
+      "id": "105320682452092471",
+      "summonerName": "Oner",
+      "role": "jungle"
+     },
+     {
+      "id": "103495716561790834",
+      "summonerName": "Keria",
+      "role": "support"
+     }
+    ]
+   },
+   {
+    "id": "98767991877340524",
+    "slug": "cloud9",
+    "code": "C9",
+    "name": "Cloud9 Kia",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCS",
+     "region": "NORDAMERIKA"
+    },
+    "players": [
+     {
+      "id": "99101098218071815",
+      "summonerName": "Blaber",
+      "role": "jungle"
+     },
+     {
+      "id": "108567314915334762",
+      "summonerName": "Loki ",
+      "role": "mid"
+     },
+     {
+      "id": "101383793877071109",
+      "summonerName": "Tactical",
+      "role": "bottom"
+     },
+     {
+      "id": "98767991801635485",
+      "summonerName": "Zven",
+      "role": "bottom"
+     },
+     {
+      "id": "99101098208825497",
+      "summonerName": "Vulcan",
+      "role": "support"
+     },
+     {
+      "id": "105501816646382923",
+      "summonerName": "Thanatos",
+      "role": "top"
+     },
+     {
+      "id": "105957619949286329",
+      "summonerName": "APA",
+      "role": "mid"
+     }
+    ]
+   },
+   {
+    "id": "98767991926151025",
+    "slug": "g2-esports",
+    "code": "G2",
+    "name": "G2 Esports",
+    "status": "active",
+    "homeLeague": {
+     "name": "LEC",
+     "region": "EMEA"
+    },
+    "players": [
+     {
+      "id": "98767975961872793",
+      "summonerName": "Hans Sama",
+      "role": "bottom"
+     },
+     {
+      "id": "105554439426664062",
+      "summonerName": "Rodrigo",
+      "role": "none"
+     },
+     {
+      "id": "107128052280762804",
+      "summonerName": "SkewMond",
+      "role": "jungle"
+     },
+     {
+      "id": "102787200059605684",
+      "summonerName": "Labrov",
+      "role": "support"
+     },
+     {
+      "id": "99566406047571736",
+      "summonerName": "BrokenBlade",
+      "role": "top"
+     },
+     {
+      "id": "98767975968177297",
+      "summonerName": "Caps",
+      "role": "mid"
+     }
+    ]
+   },
+   {
+    "id": "98926509885559666",
+    "slug": "team-liquid",
+    "code": "TLAW",
+    "name": "Team Liquid Alienware",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCS",
+     "region": "NORDAMERIKA"
+    },
+    "players": [
+     {
+      "id": "107492071007218117",
+      "summonerName": "Quid",
+      "role": "mid"
+     },
+     {
+      "id": "99566408350815597",
+      "summonerName": "Josedeodo",
+      "role": "jungle"
+     },
+     {
+      "id": "103103696693473944",
+      "summonerName": "Morgan",
+      "role": "top"
+     },
+     {
+      "id": "98767991789638893",
+      "summonerName": "CoreJJ",
+      "role": "support"
+     },
+     {
+      "id": "105510944671654183",
+      "summonerName": "Yeon",
+      "role": "bottom"
+     }
+    ]
+   },
+   {
+    "id": "99566404848691211",
+    "slug": "invictus-gaming",
+    "code": "IG",
+    "name": "Invictus Gaming",
+    "status": "active",
+    "homeLeague": {
+     "name": "LPL",
+     "region": "CHINA"
+    },
+    "players": [
+     {
+      "id": "99566404810113891",
+      "summonerName": "TheShy",
+      "role": "top"
+     },
+     {
+      "id": "106368497875598272",
+      "summonerName": "Assum",
+      "role": "bottom"
+     },
+     {
+      "id": "103461966880868232",
+      "summonerName": "Wei",
+      "role": "jungle"
+     },
+     {
+      "id": "99566404811346612",
+      "summonerName": "Rookie",
+      "role": "mid"
+     },
+     {
+      "id": "98767991785832912",
+      "summonerName": "Meiko",
+      "role": "support"
+     },
+     {
+      "id": "113662801804437510",
+      "summonerName": "JiaQi",
+      "role": "bottom"
+     }
+    ]
+   },
+   {
+    "id": "99566404853854212",
+    "slug": "bilibili-gaming",
+    "code": "BLG",
+    "name": "BILIBILI GAMING",
+    "status": "active",
+    "homeLeague": {
+     "name": "LPL",
+     "region": "CHINA"
+    },
+    "players": [
+     {
+      "id": "103478281356330346",
+      "summonerName": "Bin",
+      "role": "top"
+     },
+     {
+      "id": "110547957837987327",
+      "summonerName": "ON",
+      "role": "support"
+     },
+     {
+      "id": "99566404803543690",
+      "summonerName": "Knight",
+      "role": "mid"
+     },
+     {
+      "id": "99871276340698623",
+      "summonerName": "Viper",
+      "role": "bottom"
+     },
+     {
+      "id": "105516152837078491",
+      "summonerName": "Xun",
+      "role": "jungle"
+     },
+     {
+      "id": "99566404805093717",
+      "summonerName": "Wenbo",
+      "role": "top"
+     },
+     {
+      "id": "99566404812254466",
+      "summonerName": "Flandre",
+      "role": "top"
+     }
+    ]
+   },
+   {
+    "id": "99566404854685458",
+    "slug": "top-esports",
+    "code": "TES",
+    "name": "TOP ESPORTS",
+    "status": "active",
+    "homeLeague": {
+     "name": "LPL",
+     "region": "CHINA"
+    },
+    "players": [
+     {
+      "id": "105516599464787723",
+      "summonerName": "Zhuo",
+      "role": "support"
+     },
+     {
+      "id": "101388912796120370",
+      "summonerName": "369",
+      "role": "top"
+     },
+     {
+      "id": "106368556422916908",
+      "summonerName": "Creme",
+      "role": "mid"
+     },
+     {
+      "id": "99566404820654675",
+      "summonerName": "Tian",
+      "role": "jungle"
+     },
+     {
+      "id": "112540645110902751",
+      "summonerName": "ZUIAN",
+      "role": "top"
+     },
+     {
+      "id": "99566404823220763",
+      "summonerName": "JackeyLove",
+      "role": "bottom"
+     }
+    ]
+   },
+   {
+    "id": "99566404856367466",
+    "slug": "anyones-legend",
+    "code": "AL",
+    "name": "Anyone's Legend",
+    "status": "active",
+    "homeLeague": {
+     "name": "LPL",
+     "region": "CHINA"
+    },
+    "players": [
+     {
+      "id": "105516622825169657",
+      "summonerName": "Breathe",
+      "role": "top"
+     },
+     {
+      "id": "104287400430814502",
+      "summonerName": "Shanks",
+      "role": "mid"
+     },
+     {
+      "id": "99566404819916503",
+      "summonerName": "Hope",
+      "role": "bottom"
+     },
+     {
+      "id": "105530584812980593",
+      "summonerName": "Kael",
+      "role": "support"
+     },
+     {
+      "id": "99871276342823057",
+      "summonerName": "Tarzan",
+      "role": "jungle"
+     }
+    ]
+   },
+   {
+    "id": "99566405130451785",
+    "slug": "c9-academy",
+    "code": "C9",
+    "name": "Cloud9 Challengers",
+    "status": "active",
+    "homeLeague": null,
+    "players": [
+     {
+      "id": "103524169393525450",
+      "summonerName": "EMENES",
+      "role": "mid"
+     }
+    ]
+   },
+   {
+    "id": "99566405941863385",
+    "slug": "lyon-gaming",
+    "code": "LYON",
+    "name": "LYON",
+    "status": "active",
+    "homeLeague": {
+     "name": "LCS",
+     "region": "NORDAMERIKA"
+    },
+    "players": [
+     {
+      "id": "107492059066783320",
+      "summonerName": "Saint",
+      "role": "mid"
+     },
+     {
+      "id": "99322408701435122",
+      "summonerName": "Dhokla",
+      "role": "top"
+     },
+     {
+      "id": "101389713966873995",
+      "summonerName": "Inspired",
+      "role": "jungle"
+     },
+     {
+      "id": "105388936922706146",
+      "summonerName": "Berserker",
+      "role": "bottom"
+     },
+     {
+      "id": "103103578076943629",
+      "summonerName": "Isles",
+      "role": "support"
+     }
+    ]
+   }
+  ]
+ }
+}

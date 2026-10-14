@@ -30,6 +30,8 @@ export interface Config {
   secureCookies: boolean;
   /** Fehlende Datenbank-Migrationen beim Start automatisch einspielen. */
   autoMigrate: boolean;
+  /** Champions und Spielerkader regelmäßig von Riot holen (DATENABGLEICH=1/0; in Produktion standardmäßig an). */
+  dataSync: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -76,5 +78,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
     secureCookies: appUrl.startsWith('https://'),
     autoMigrate: env.AUTO_MIGRATE !== '0' && env.AUTO_MIGRATE !== 'false',
+    dataSync: env.DATENABGLEICH ? env.DATENABGLEICH === '1' || env.DATENABGLEICH === 'true' : env.NODE_ENV === 'production',
   };
 }

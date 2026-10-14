@@ -3,6 +3,7 @@
 
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
+import { runSync, SYNC_LABELS } from '../abgleich.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, isLocalInput, toLocalInput } from '../format.ts';
@@ -80,7 +81,7 @@ function resultSelect(m: MatchRow, name = 'ergebnis'): Html {
 
 async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   const { db } = ctx.deps;
-  const [tournaments, teamList] = await Promise.all([
+  const [tournaments, teamList, syncRows, counts] = await Promise.all([
     db.query<{ id: string; name: string; starts_on: string | null; ends_on: string | null; matches: number; open_results: number }>(
       `select t.id, t.name, t.starts_on, t.ends_on,
               (select count(*)::int from matches m where m.tournament_id = t.id) as matches,
@@ -89,7 +90,12 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
          from tournaments t order by t.starts_on desc nulls last, t.name`,
     ),
     teams(ctx),
+    db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),
+    db.one<{ champions: number; players: number }>(
+      'select (select count(*)::int from champions) as champions, (select count(*)::int from players where active) as players',
+    ),
   ]);
+  const tz = ctx.deps.config.timeZone;
   const body = html`<section class="panel">
   <h1>Admin</h1>
   <p class="muted">Turniere, Teams, Spiele und Ergebnisse gelten für alle Tipprunden.</p>
@@ -115,6 +121,26 @@ Viertelfinale
 Halbfinale
 Finale</textarea></label>
     <button type="submit" class="btn btn-primary">Turnier anlegen</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Datenabgleich mit Riot</h2>
+  <p class="muted">Champions und Spielerkader für die Auswahl bei Sonderfragen. Läuft automatisch alle 6 Stunden.
+    Bisher: ${counts!.champions} Champions, ${counts!.players} Spieler.</p>
+  <table class="table compact"><tbody>
+    ${Object.entries(SYNC_LABELS).map(([key, label]) => {
+      const r = syncRows.find((x) => x.name === key);
+      return html`<tr><td>${label}</td><td>${
+        !r ? html`<span class="muted">noch nie</span>`
+        : r.error ? html`<strong class="warn">Fehler: ${r.error}</strong>${r.ok_at ? html`<br><small class="muted">zuletzt gut: ${formatDateTime(r.ok_at, tz)} Uhr</small>` : nothing}`
+        : html`${formatDateTime(r.ok_at!, tz)} Uhr<br><small class="muted">${r.details}</small>`
+      }</td></tr>`;
+    })}
+  </tbody></table>
+  <form method="post" action="/admin/abgleich" class="inline-form">
+    ${csrfField(ctx)}
+    <button type="submit" class="btn">Jetzt abgleichen</button>
   </form>
 </section>
 
@@ -399,6 +425,13 @@ export function registerAdminRoutes(router: Router<Ctx>) {
       return tournamentPage(ctx, dbError(e));
     }
     return redirect(`/admin/turnier/${ctx.params.id}?hinweis=gespeichert`);
+  });
+
+  post('/admin/abgleich', async (ctx) => {
+    const results = await runSync(ctx.deps.db, ctx.deps.fetchJson);
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length) return adminHome(ctx, `Abgleich fehlgeschlagen: ${failed.map((r) => `${SYNC_LABELS[r.name]} – ${r.details}`).join('; ')}`);
+    return redirect('/admin?hinweis=abgeglichen');
   });
 
   post('/admin/turnier/:id/teams', async (ctx) => {

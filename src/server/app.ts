@@ -5,6 +5,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
 import { csrfToken, csrfValid, loadSession, sessionCookieName, SESSION_DAYS, type User } from './auth.ts';
+import { type FetchJson, fetchJson } from './abgleich.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
 import { html } from './html.ts';
@@ -32,6 +33,8 @@ export interface Deps {
   db: Db;
   config: Config;
   mailer: Mailer;
+  /** Daten aus dem Internet holen (Champions, Spielerkader); in Tests ersetzbar */
+  fetchJson: FetchJson;
   log: (msg: string) => void;
   /** Adresse einer Datei aus public/ mit Versionskennung, z. B. /static/app.css?v=1a2b3c4d */
   asset: (name: string) => string;
@@ -96,10 +99,11 @@ export function errorPage(ctx: Ctx, status: number, message: string): Res {
   return htmlResponse(layout(ctx, { title: titles[status] ?? 'Fehler', body }), status);
 }
 
-export function createApp(opts: { db: Db; config: Config; mailer: Mailer; publicDir: string; log?: (msg: string) => void }) {
+export function createApp(opts: { db: Db; config: Config; mailer: Mailer; publicDir: string; log?: (msg: string) => void; fetchJson?: FetchJson }) {
   const statics = loadStatic(opts.publicDir);
   const deps: Deps = {
     db: opts.db,
+    fetchJson: opts.fetchJson ?? fetchJson,
     config: opts.config,
     mailer: opts.mailer,
     log: opts.log ?? ((m) => console.log(m)),

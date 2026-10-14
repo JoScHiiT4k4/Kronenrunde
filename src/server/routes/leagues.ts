@@ -657,11 +657,14 @@ interface QuestionRow {
   tournament_id: string;
   question: string;
   points: number;
-  answer_type: 'text' | 'team' | 'choice';
+  answer_type: 'text' | 'team' | 'choice' | 'champion' | 'player';
   choices: string[];
   hint: string | null;
   correct_answers: string[];
 }
+
+const ROLE_LABELS: Record<string, string> = { top: 'Top', jungle: 'Jungle', mid: 'Mid', bottom: 'Bot', support: 'Support' };
+const ROLE_ORDER = ['top', 'jungle', 'mid', 'bottom', 'support'];
 
 async function bonusPage(ctx: Ctx): Promise<Res> {
   if (!ctx.user) return loginRedirect(ctx);
@@ -670,7 +673,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
   const tournaments = await leagueTournaments(db, league.id);
-  const [questions, answers, members, teams] = await Promise.all([
+  const [questions, answers, members, teams, champions, players] = await Promise.all([
     db.query<QuestionRow>(
       `select id, tournament_id, question, points, answer_type, choices, hint, correct_answers
          from bonus_questions where league_id = $1 order by position, created_at`,
@@ -695,7 +698,18 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
         order by t.name`,
       [league.id],
     ),
+    db.query<{ name: string }>('select name from champions'),
+    db.query<{ tournament_id: string; team: string; name: string; role: string | null }>(
+      `select distinct tt.tournament_id, t.name as team, p.name, p.role
+         from players p
+         join teams t on t.id = p.team_id
+         join tournament_teams tt on tt.team_id = t.id
+         join league_tournaments lt on lt.tournament_id = tt.tournament_id and lt.league_id = $1
+        where p.active`,
+      [league.id],
+    ),
   ]);
+  const championNames = champions.map((c) => c.name).sort((a, b) => a.localeCompare(b, 'de'));
   const myAnswers = new Map(answers.filter((a) => a.user_id === ctx.user!.id).map((a) => [a.question_id, a.answer]));
 
   const sections = tournaments.map((t) => {
@@ -717,10 +731,33 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
       const current = myAnswers.get(q.id) ?? '';
       const name = `antwort_${q.id}`;
       let input: Html;
-      if (q.answer_type === 'text') {
-        input = html`<input type="text" name="${name}" value="${current}" maxlength="200" autocomplete="off">`;
+      const freeText = html`<input type="text" name="${name}" value="${current}" maxlength="200" autocomplete="off">`;
+      const roster = q.answer_type === 'player' ? players.filter((p) => p.tournament_id === t.id) : [];
+      if (q.answer_type === 'text' || (q.answer_type === 'champion' && !championNames.length) || (q.answer_type === 'player' && !roster.length)) {
+        // Freitext – auch als Ersatz, solange die Champion- oder Spielerliste noch nicht geladen ist
+        input = freeText;
+      } else if (q.answer_type === 'player') {
+        // Spieler nach Team gruppiert, innerhalb des Teams nach Position
+        const byTeam = new Map<string, typeof roster>();
+        for (const p of roster) byTeam.set(p.team, [...(byTeam.get(p.team) ?? []), p]);
+        const teamsSorted = [...byTeam.keys()].sort((a, b) => a.localeCompare(b, 'de'));
+        const rank = (r: string | null) => (r && ROLE_ORDER.includes(r) ? ROLE_ORDER.indexOf(r) : 9);
+        const known = roster.some((p) => p.name === current) || q.choices.includes(current);
+        input = html`<select name="${name}">
+          <option value="">Noch keine Antwort</option>
+          ${!known && current ? html`<option value="${current}" selected>${current}</option>` : nothing}
+          ${q.choices.map((o) => html`<option value="${o}"${attr(o === current, 'selected')}>${o}</option>`)}
+          ${teamsSorted.map(
+            (team) => html`<optgroup label="${team}">
+            ${byTeam
+              .get(team)!
+              .sort((a, b) => rank(a.role) - rank(b.role) || a.name.localeCompare(b.name, 'de'))
+              .map((p) => html`<option value="${p.name}"${attr(p.name === current, 'selected')}>${p.name}${p.role ? ` (${ROLE_LABELS[p.role] ?? p.role})` : ''}</option>`)}
+          </optgroup>`,
+          )}
+        </select>`;
       } else {
-        const opts = q.answer_type === 'team' ? [...teamNames, ...q.choices] : q.choices;
+        const opts = q.answer_type === 'team' ? [...teamNames, ...q.choices] : q.answer_type === 'champion' ? [...q.choices, ...championNames] : q.choices;
         const known = opts.includes(current);
         input = html`<select name="${name}">
           <option value="">Noch keine Antwort</option>

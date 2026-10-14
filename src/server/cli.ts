@@ -4,12 +4,14 @@
 //   npm run db:seed                    Beispieldaten (Worlds 2026) einspielen – nur zum Ausprobieren
 //   npm run mail-test -- name@mail.de  Test-E-Mail verschicken (prüft die E-Mail-Einstellungen)
 //   npm run daten -- worlds-2026       Turnier aus db/daten/worlds-2026.json einspielen (mehrfach ausführbar)
+//   npm run abgleich                   Champions und Spielerkader jetzt von Riot holen
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashToken, LOGIN_TOKEN_MINUTES, newToken, normalizeEmail } from './auth.ts';
 import { loadConfig } from './config.ts';
+import { runSync, SYNC_LABELS } from './abgleich.ts';
 import { describeSummary, importTournament, type TournamentData } from './daten.ts';
 import { createDb, migrate } from './db/index.ts';
 import { html } from './html.ts';
@@ -50,6 +52,12 @@ try {
       if (flags.includes('--nur-vorhandene') && !known) console.log(`${data.tournament.name}: noch nicht eingespielt – übersprungen.`);
       else console.log(describeSummary(await importTournament(db, data)));
     }
+  } else if (command === 'abgleich') {
+    await migrate(db, join(root, 'db', 'migrations'));
+    for (const r of await runSync(db)) {
+      console.log(`${SYNC_LABELS[r.name]}: ${r.ok ? r.details : `Fehler – ${r.details}`}`);
+      if (!r.ok) process.exitCode = 1;
+    }
   } else if (command === 'login-link') {
     const email = normalizeEmail(arg ?? '');
     if (!email) throw new Error('Bitte E-Mail-Adresse angeben:  npm run login-link -- name@example.de');
@@ -71,7 +79,7 @@ try {
     });
     console.log(config.mail.mode === 'console' ? 'Fertig (nur angezeigt, MAIL_MODE=console).' : 'Verschickt. Schau in dein Postfach (notfalls auch im Spam-Ordner).');
   } else {
-    console.log('Befehle: migrate | seed | daten <name> | login-link <email> | mail-test <email>');
+    console.log('Befehle: migrate | seed | daten <name> | abgleich | login-link <email> | mail-test <email>');
     process.exitCode = 1;
   }
 } catch (e) {

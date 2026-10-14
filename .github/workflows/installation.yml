@@ -88,6 +88,12 @@ jobs:
           grep -q '46 unverändert' /tmp/daten
           test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) from matches')" = 46
 
+      - name: Datenabgleich mit Riot (echte Quellen)
+        run: |
+          docker exec pi tippspiel abgleich | tee /tmp/abgleich
+          grep -q 'Spieler aus 19 von 19 Teams' /tmp/abgleich
+          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) >= 150 from champions')" = t
+
       - name: Zweiter Lauf behält Einstellungen
         run: |
           docker exec pi sha256sum /opt/lol-tippspiel/.env > /tmp/env-vorher
