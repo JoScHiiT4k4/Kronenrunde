@@ -34,7 +34,9 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 - **Riot-Regeln** ([Legal Jibber Jabber](https://www.riotgames.com/de/rechtliches), [Developer Policies](https://developer.riotgames.com/policies/general)), Stand Okt. 2026 – keine Rechtsberatung:
   - Gut sichtbarer Hinweis, dass Riot das Projekt nicht unterstützt (steht in der Fußzeile).
   - Keine Riot-Logos, -Marken, -Schriften oder Spielgrafiken; das Design nutzt nur eigene Formen und freie Schriften.
-  - **Domain und App-Name ohne Riot-Marken** (also z. B. nicht `lol-…`); vor Stufe 2 umbenennen.
+  - **Domain und App-Name**: „League of Legends“ ist als Marke eingetragen (u. a. EU Nr. 008243487), „LoL“ allein
+    offenbar nicht (nur „LOL ESPORTS“ in den USA angemeldet) – gilt aber als Abkürzung der Marke. Riot verbietet
+    seine Marken in Fan-Domains. Für Stufe 2 daher am sichersten ein neutraler Name ohne LoL/League; vorher prüfen (TMview).
   - Werbung („passiv“) ist erlaubt, Paywalls/Crowdfunding nur mit Lizenz; keine Wetten oder Geldeinsätze.
   - App Store / Play Store nur mit Lizenz oder registriertem API-Key – vor Stufe 3 bei Riot anfragen.
 - **Datenquelle lolesports.com**: Die Seite nutzt eine inoffizielle, nicht dokumentierte Schnittstelle
