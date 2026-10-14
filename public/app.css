@@ -127,6 +127,8 @@ p { margin: 0 0 0.9em; }
   white-space: nowrap;
 }
 .brand:hover { color: var(--gold-bright); }
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+.brand img { flex: none; width: 30px; height: 30px; filter: drop-shadow(0 0 8px rgb(200 170 110 / 30%)); }
 .top-nav { display: flex; gap: 18px; min-width: 0; }
 .top-nav a {
   color: var(--text);

@@ -138,7 +138,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keine Verbindung – ${appNameHtml}</title><meta name="theme-color" content="#07111c">
 <link rel="icon" href="${deps.asset('icon.svg')}" type="image/svg+xml"><link rel="stylesheet" href="${deps.asset('app.css')}">
-</head><body><header class="top"><span class="brand">${appNameHtml}</span></header>
+</head><body><header class="top"><span class="brand"><img src="${deps.asset('logo.svg')}" alt="" width="30" height="30">${appNameHtml}</span></header>
 <main class="main"><section class="panel"><h1>Keine Verbindung</h1>
 <p>Gerade gibt es keine Verbindung zum Internet. Sobald sie wieder da ist, lade die Seite neu.</p>
 <p><a class="btn btn-primary" href="/">Neu laden</a></p></section></main></body></html>`;

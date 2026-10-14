@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 56 56">
+  <!-- Logo „Duell-Raute“: Blau gegen Rot, in der Mitte der Haken für einen richtigen Tipp -->
+  <path d="M32 6 6 32l26 26z" fill="#55a3f0"/>
+  <path d="M32 6l26 26-26 26z" fill="#ec5b52"/>
+  <path d="M32 6l26 26-26 26L6 32z" fill="none" stroke="#c8aa6e" stroke-width="3"/>
+  <path d="M32 19l13 13-13 13-13-13z" fill="#07111c" stroke="#c8aa6e" stroke-width="2"/>
+  <path d="M26 32.5l4.2 4.2L38.5 28" fill="none" stroke="#f0e2b6" stroke-width="3.2"/>
+</svg>

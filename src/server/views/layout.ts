@@ -59,7 +59,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 </head>
 <body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
-  <a class="brand" href="/">${appName}</a>
+  <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
   <nav class="top-nav">
     ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
     ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
