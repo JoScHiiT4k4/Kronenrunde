@@ -23,6 +23,7 @@ Was die App kann:
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen.
+- **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
 - **Konto löschen** jederzeit, mit allen Daten.
 - Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; helles und dunkles Design.
 

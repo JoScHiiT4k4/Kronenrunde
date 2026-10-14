@@ -119,7 +119,8 @@ Am Ende steht **„Fertig! Deine App: https://lol-tippspiel.….ts.net“**, und
 ## 5. Ausprobieren
 
 1. Die Adresse im Browser öffnen, deine E-Mail-Adresse eingeben, in der Mail auf **Jetzt anmelden** tippen.
-2. Oben auf **Admin**: Teams, Turnier und Spiele eintragen.
+2. Teams, Turnier und Spiele eintragen – für die Worlds 2026 geht das mit einem Befehl auf dem Pi:
+   `tippspiel daten worlds-2026` (sonst oben auf **Admin** von Hand).
 3. **Tipprunde erstellen** und den Einladungslink an deine Runde schicken.
 4. Auf dem Handy die Seite zum Startbildschirm hinzufügen (iPhone: Teilen → *Zum Home-Bildschirm*; Android: ⋮ → *Zum Startbildschirm hinzufügen*).
 
