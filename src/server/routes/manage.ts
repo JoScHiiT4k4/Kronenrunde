@@ -8,6 +8,7 @@ import { HttpError, htmlResponse, redirect, type Res, type Router } from '../htt
 import { csrfField, layout, postButton } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
 import { type LeagueAccess, leagueTournaments, loadLeague } from './league-data.ts';
+import { lockModeOptions, parseLockMode } from './leagues.ts';
 
 async function manageAccess(ctx: Ctx): Promise<LeagueAccess> {
   const access = await loadLeague(ctx, ctx.params.slug, { allowAdmin: true });
@@ -146,10 +147,7 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     </div>
     <fieldset class="field">
       <legend>Tippschluss</legend>
-      <label class="check"><input type="radio" name="lock_mode" value="matchday"${attr(league.lock_mode === 'matchday', 'checked')}>
-        Beim ersten Spiel des Tages für alle Spiele dieses Tages</label>
-      <label class="check"><input type="radio" name="lock_mode" value="match"${attr(league.lock_mode === 'match', 'checked')}>
-        Für jedes Spiel einzeln bei dessen Anstoß</label>
+      ${lockModeOptions(league.lock_mode)}
     </fieldset>
     <button type="submit" class="btn btn-primary">Einstellungen speichern</button>
   </form>
@@ -308,7 +306,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
     if (pw === null || pe === null) return 'Bitte gib bei den Punkten Zahlen von 0 bis 20 ein.';
     await ctx.deps.db.run(
       'update leagues set name = $2, points_winner = $3, points_exact = $4, lock_mode = $5 where id = $1',
-      [league.id, name, pw, pe, f.get('lock_mode') === 'match' ? 'match' : 'matchday'],
+      [league.id, name, pw, pe, parseLockMode(f.get('lock_mode'))],
     );
   });
 

@@ -49,8 +49,8 @@ insert into matches (id, tournament_id, team_a_id, team_b_id, best_of, scheduled
   ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000f1',
    null, null, 5, now() + interval '30 hours');
 
-insert into leagues (id, name, slug, owner_id) values
-  ('00000000-0000-0000-0000-0000000000d1', 'Testrunde', 'testrunde', '00000000-0000-0000-0000-0000000000a1');
+insert into leagues (id, name, slug, owner_id, lock_mode) values
+  ('00000000-0000-0000-0000-0000000000d1', 'Testrunde', 'testrunde', '00000000-0000-0000-0000-0000000000a1', 'matchday');
 insert into league_members (league_id, user_id, role) values
   ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1', 'owner'),
   ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000b1', 'member');

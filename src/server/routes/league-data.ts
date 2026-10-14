@@ -79,11 +79,19 @@ export interface MatchRow {
   team_b: string | null;
   team_a_short: string | null;
   team_b_short: string | null;
+  live_at: Date | null;
+  /** Ende des vorherigen Spiels desselben Spieltags (für den Tippschluss "automatisch") */
+  prev_finished_at: Date | null;
+  /** Gibt es an diesem Spieltag ein Spiel davor? */
+  has_prev: boolean;
 }
 
 const MATCH_SELECT = `
   select m.id, m.tournament_id, t.name as tournament, s.name as stage, m.best_of, m.scheduled_at,
          m.matchday_starts_at, m.wins_a, m.wins_b, m.status, m.team_a_id, m.team_b_id,
+         m.live_at, previous_match_finished_at(m.id) as prev_finished_at,
+         exists (select 1 from matches p where p.tournament_id = m.tournament_id and p.matchday_starts_at = m.matchday_starts_at
+                   and p.status <> 'cancelled' and (p.scheduled_at, p.id) < (m.scheduled_at, m.id)) as has_prev,
          ta.name as team_a, tb.name as team_b, ta.short_name as team_a_short, tb.short_name as team_b_short
     from matches m
     join tournaments t on t.id = m.tournament_id
@@ -120,6 +128,8 @@ export function toDomainMatch(m: MatchRow): Match {
     teamB: m.team_b_id,
     winsA: m.wins_a,
     winsB: m.wins_b,
+    liveAt: m.live_at,
+    previousFinishedAt: m.prev_finished_at,
   };
 }
 

@@ -92,6 +92,23 @@ test('Tippschluss je Einstellung', () => {
   assert.ok(arePredictionsPublic(m, 'matchday', nachher));
 });
 
+test('Tippschluss automatisch: Anstoß, oder früher, sobald das Spiel davor vorbei ist oder es läuft', () => {
+  const zweites = (extra: Partial<Parameters<typeof match>[0]> = {}) =>
+    match({ id: 'pi2', scheduledAt: at('2026-10-16T01:00:00+02:00'), matchdayStartsAt: at('2026-10-15T20:00:00+02:00'), ...extra });
+  // Spiel davor läuft noch: offen bis zum angesetzten Anstoß
+  assert.equal(lockTime(zweites(), 'auto')?.toISOString(), at('2026-10-16T01:00:00+02:00').toISOString());
+  assert.ok(isOpen(zweites(), 'auto', at('2026-10-15T23:30:00+02:00')));
+  // Spiel davor um 23:10 vorbei → ab dann zu, obwohl der Anstoß erst für 01:00 angesetzt war
+  const frueh = zweites({ previousFinishedAt: at('2026-10-15T23:10:00+02:00') });
+  assert.equal(lockTime(frueh, 'auto')?.toISOString(), at('2026-10-15T23:10:00+02:00').toISOString());
+  assert.ok(!isOpen(frueh, 'auto', at('2026-10-15T23:30:00+02:00')));
+  assert.ok(arePredictionsPublic(frueh, 'auto', at('2026-10-15T23:30:00+02:00')));
+  // Spiel davor läuft über die Zeit → spätestens zum angesetzten Anstoß zu (Sicherheitsnetz)
+  assert.ok(!isOpen(zweites({ previousFinishedAt: at('2026-10-16T01:30:00+02:00') }), 'auto', at('2026-10-16T01:00:00+02:00')));
+  // Als "läuft" gemeldet → zu
+  assert.ok(!isOpen(zweites({ liveAt: at('2026-10-15T23:50:00+02:00') }), 'auto', at('2026-10-15T23:55:00+02:00')));
+});
+
 test('Ohne Teams oder ohne Anstoßzeit kann nicht getippt werden', () => {
   const jetzt = at('2026-10-14T12:00:00+02:00');
   assert.ok(!isOpen(match({ id: 'x', teamA: null, scheduledAt: at('2026-10-20T20:00:00+02:00') }), 'matchday', jetzt));

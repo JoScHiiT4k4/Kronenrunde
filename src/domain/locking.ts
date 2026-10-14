@@ -29,9 +29,20 @@ export function computeMatchdayStarts(
   return result;
 }
 
-/** Tippschluss eines Spiels je nach Einstellung der Tipprunde. */
-export function lockTime(match: Pick<Match, 'scheduledAt' | 'matchdayStartsAt'>, mode: LockMode): Date | null {
+/**
+ * Tippschluss eines Spiels je nach Einstellung der Tipprunde. Muss zur Datenbank-Funktion
+ * prediction_lock_time() passen – die Datenbank setzt den Tippschluss durch, hier geht es um die Anzeige.
+ */
+export function lockTime(
+  match: Pick<Match, 'scheduledAt' | 'matchdayStartsAt' | 'liveAt' | 'previousFinishedAt'>,
+  mode: LockMode,
+): Date | null {
   if (mode === 'match') return match.scheduledAt;
+  if (mode === 'auto') {
+    // Das früheste von: Anstoß, "läuft", Ende des Spiels davor
+    const times = [match.scheduledAt, match.liveAt ?? null, match.previousFinishedAt ?? null].filter((t): t is Date => t !== null);
+    return times.length ? new Date(Math.min(...times.map((t) => t.getTime()))) : null;
+  }
   return match.matchdayStartsAt ?? match.scheduledAt;
 }
 

@@ -21,7 +21,7 @@ reset() { run -c "set client_min_messages = warning; drop schema public cascade;
 
 echo "1/2 Migrationen + Tests"
 for f in db/migrations/*.sql; do run -f "$f"; done
-run -f db/tests/0001_grundgeruest_test.sql
+for f in db/tests/*.sql; do run -f "$f"; done
 
 echo "2/2 Migrationen + Beispieldaten"
 reset

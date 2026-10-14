@@ -1,6 +1,7 @@
 // Startseite, Tipprunde anlegen/beitreten, Tippen, Spiel-Details, Rangliste, Sonderfragen.
 
 import { isBonusCorrect } from '../../domain/bonus.ts';
+import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
 import { isValidResult, matchResult, resultOptions, type ResultOption } from '../../domain/results.ts';
 import { computeStandings, scorePrediction } from '../../domain/scoring.ts';
@@ -166,10 +167,7 @@ async function createPage(ctx: Ctx, values: URLSearchParams, error?: string): Pr
     </fieldset>
     <fieldset class="field">
       <legend>Tippschluss</legend>
-      <label class="check"><input type="radio" name="lock_mode" value="matchday"${attr(v('lock_mode', 'matchday') === 'matchday', 'checked')}>
-        Beim ersten Spiel des Tages für alle Spiele dieses Tages <span class="muted">(empfohlen, weil spätere Anstoßzeiten nur geschätzt sind)</span></label>
-      <label class="check"><input type="radio" name="lock_mode" value="match"${attr(v('lock_mode') === 'match', 'checked')}>
-        Für jedes Spiel einzeln bei dessen Anstoß</label>
+      ${lockModeOptions(v('lock_mode', 'auto'))}
     </fieldset>
     <button type="submit" class="btn btn-primary">Tipprunde erstellen</button>
   </form>
@@ -183,7 +181,7 @@ async function createLeague(ctx: Ctx): Promise<Res> {
   const name = cleanName(f.get('name'), 60);
   const pw = intField(f.get('points_winner'), 0, 20);
   const pe = intField(f.get('points_exact'), 0, 20);
-  const lockMode = f.get('lock_mode') === 'match' ? 'match' : 'matchday';
+  const lockMode = parseLockMode(f.get('lock_mode'));
   const tournamentId = f.get('tournament_id') || null;
   if (!name) return createPage(ctx, f, 'Bitte gib einen Namen mit 1 bis 60 Zeichen ein.');
   if (pw === null || pe === null) return createPage(ctx, f, 'Bitte gib bei den Punkten Zahlen von 0 bis 20 ein.');
@@ -276,6 +274,20 @@ interface Matchday {
   matches: MatchRow[];
 }
 
+/** Auswahl für den Tippschluss (Tipprunde erstellen und Verwalten) */
+export function lockModeOptions(current: string): Html {
+  const opt = (value: string, label: string, hint?: string) =>
+    html`<label class="check"><input type="radio" name="lock_mode" value="${value}"${attr(current === value, 'checked')}>
+        <span>${label}${hint ? html` <span class="muted">${hint}</span>` : nothing}</span></label>`;
+  return html`${opt('auto', 'Automatisch: jedes Spiel einzeln – zum Anstoß oder schon früher, sobald das Spiel davor vorbei ist', '(empfohlen – Spiele beginnen oft früher als angesetzt)')}
+      ${opt('matchday', 'Beim ersten Spiel des Tages für alle Spiele dieses Tages')}
+      ${opt('match', 'Für jedes Spiel einzeln bei dessen angesetztem Anstoß')}`;
+}
+
+export function parseLockMode(value: string | null): LockMode {
+  return value === 'match' || value === 'matchday' ? value : 'auto';
+}
+
 /** Phase eines Spiels: der Teil des Phasennamens vor dem Doppelpunkt („Swiss: Runde 2“ → „Swiss“). */
 export function phaseName(m: { stage: string | null }): string {
   return (m.stage ?? '').split(':')[0].trim() || 'Weitere Spiele';
@@ -301,12 +313,15 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
   const tz = ctx.deps.config.timeZone;
   const match = toDomainMatch(m);
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
+  // Bei "automatisch" schließen die weiteren Spiele eines Tages, sobald das Spiel davor vorbei ist
+  const autoLock = open && league.lock_mode === 'auto' && m.has_prev && m.scheduled_at;
   const meta = html`<div class="match-meta">
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : 'Termin offen'}</span>
     <span class="bo">Bo${m.best_of}</span>
     ${m.stage ? html`<span>${m.stage}</span>` : nothing}
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
-  </div>`;
+  </div>
+  ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
   const teams = html`<div class="teams">
     <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ?? 'Steht noch nicht fest'}</span>
     <span class="vs">VS</span>
@@ -421,10 +436,15 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const dayHeader = (d: Matchday, closed: boolean) => {
     const first = d.matches[0];
     const lock = lockTime(toDomainMatch(first), league.lock_mode);
+    const nextOpen = d.matches.find(beforeLock);
     return html`<header class="day-head">
       <h2>${d.start ? formatDayLong(d.start, tz) : 'Noch ohne Termin'}</h2>
       ${
-        !closed && lock && league.lock_mode === 'matchday'
+        !closed && league.lock_mode === 'auto' && d.start
+          ? nextOpen && !nextOpen.has_prev && nextOpen.scheduled_at
+            ? html`<p class="lock">Tippschluss je Spiel – das erste um ${formatTime(nextOpen.scheduled_at, tz)} Uhr <span class="muted">(${formatRemaining(nextOpen.scheduled_at, ctx.now)})</span></p>`
+            : html`<p class="lock">Tippschluss je Spiel, sobald das Spiel davor vorbei ist</p>`
+          : !closed && lock && league.lock_mode !== 'match'
           ? html`<p class="lock">Tippschluss ${formatTime(lock, tz)} Uhr <span class="muted">(${formatRemaining(lock, ctx.now)})</span></p>`
           : !closed && league.lock_mode === 'match'
             ? html`<p class="lock">Tippschluss jeweils beim Anstoß</p>`
@@ -566,7 +586,10 @@ async function matchPage(ctx: Ctx): Promise<Res> {
 
   let content: Html;
   if (!isPublic) {
-    content = html`<p>Die Tipps der anderen siehst du ab Tippschluss${lock ? html` (${formatDateTime(lock, config.timeZone)} Uhr)` : nothing}. So kann niemand abschreiben.</p>`;
+    const early = league.lock_mode === 'auto' && m.has_prev;
+    content = html`<p>Die Tipps der anderen siehst du ab Tippschluss${
+      lock ? html` (${early ? 'sobald das Spiel davor vorbei ist, spätestens ' : ''}${formatDateTime(lock, config.timeZone)} Uhr)` : nothing
+    }. So kann niemand abschreiben.</p>`;
   } else {
     const rows = await db.query<{ display_name: string; user_id: string; winner: 'A' | 'B' | null; winner_wins: number | null; loser_wins: number | null }>(
       `select u.display_name, u.id as user_id, p.winner, p.winner_wins, p.loser_wins

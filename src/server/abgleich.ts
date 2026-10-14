@@ -4,7 +4,7 @@
 // - Champions: Data Dragon, Riots offizielle, frei nutzbare Datenquelle (deutsche Namen).
 // - Spieler:   lolesports.com (inoffizielle Schnittstelle der Seite – kann sich ändern; siehe docs/ARCHITEKTUR.md).
 //
-// Läuft in der App (DATENABGLEICH, in Produktion an): Spielplan alle 10 Minuten, der Rest alle 6 Stunden;
+// Läuft in der App (DATENABGLEICH, in Produktion an): Spielplan alle 10 Minuten (an Spieltagen alle 2), der Rest alle 6 Stunden;
 // außerdem auf Knopfdruck im Admin-Bereich und mit  tippspiel abgleich.
 // Einträge aus dem Admin-Bereich werden nie überschrieben; Fehler werden gemeldet, vorhandene Daten bleiben stehen.
 
@@ -328,8 +328,14 @@ export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<s
           if (typeof winsA === 'number' && typeof winsB === 'number' && Math.max(winsA, winsB) === need && winsA !== winsB) {
             await q.run(`update matches set wins_a = $2, wins_b = $3, status = 'finished' where id = $1 and wins_a is null`, [m.id, winsA, winsB]);
             m.wins_a = winsA;
+            m.status = 'finished';
             stats.results++;
           }
+        }
+        // Vorbei, auch wenn sich das Ergebnis nicht eintragen ließ – wichtig für den Tippschluss des nächsten Spiels
+        if (e.state === 'completed' && m.status !== 'finished' && m.status !== 'cancelled') {
+          await q.run(`update matches set status = 'finished' where id = $1 and status not in ('finished', 'cancelled')`, [m.id]);
+          m.status = 'finished';
         }
       }
     });
@@ -392,19 +398,39 @@ export async function runSync(db: Db, get: FetchJson = fetchJson, only: 'alle' |
   return results;
 }
 
+/** Läuft gerade ein Spieltag eines abgeglichenen Turniers (oder beginnt bald)? Dann wird öfter nachgesehen. */
+export async function matchdayRunning(db: Db): Promise<boolean> {
+  const row = await db.one<{ busy: boolean }>(
+    `select exists (
+       select 1 from matches m join tournaments t on t.id = m.tournament_id
+        where t.source like 'lolesports:%' and m.status in ('scheduled', 'live') and m.wins_a is null
+          and m.scheduled_at between now() - interval '12 hours' and now() + interval '30 minutes'
+     ) as busy`,
+  );
+  return !!row?.busy;
+}
+
 /**
- * Abgleich kurz nach dem Start, dann Paarungen/Ergebnisse alle 10 Minuten und alles andere alle 6 Stunden.
+ * Abgleich kurz nach dem Start; Paarungen/Ergebnisse alle 10 Minuten, an laufenden Spieltagen alle 2 Minuten
+ * (damit der Tippschluss "automatisch" rechtzeitig greift); Champions und Kader alle 6 Stunden.
  * Ins Protokoll kommt nur, was sich geändert hat oder schiefging.
  */
 export function startSyncSchedule(db: Db, log: (msg: string) => void, get: FetchJson = fetchJson): () => void {
   let last = '';
   let running = false;
-  let ticks = 0;
+  let lastFull = 0;
+  let lastQuick = 0;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
-      const results = await runSync(db, get, ticks++ % 36 === 0 ? 'alle' : 'haeufig');
+      const now = Date.now();
+      const full = now - lastFull >= 6 * 3_600_000;
+      const due = full || now - lastQuick >= 10 * 60_000 || (await matchdayRunning(db).catch(() => false));
+      if (!due) return;
+      const results = await runSync(db, get, full ? 'alle' : 'haeufig');
+      if (full) lastFull = now;
+      lastQuick = now;
       const text = results.map((r) => `${SYNC_LABELS[r.name]}: ${r.ok ? r.details : `Fehler – ${r.details}`}`).join(' | ');
       if (text !== last) log(`Datenabgleich – ${text}`);
       last = text;
@@ -413,7 +439,7 @@ export function startSyncSchedule(db: Db, log: (msg: string) => void, get: Fetch
     }
   };
   const first = setTimeout(tick, 20_000);
-  const every = setInterval(tick, 10 * 60_000);
+  const every = setInterval(tick, 2 * 60_000);
   first.unref();
   every.unref();
   return () => {

@@ -410,6 +410,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
 .match-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.88rem; color: var(--muted); margin-bottom: 6px; }
 .match-meta .bo { font-weight: 700; color: var(--gold-text); }
+.match-lock { margin: -2px 0 8px; font-size: 0.88rem; color: var(--gold-text); }
 .live { color: var(--red); font-weight: 700; }
 
 .teams {

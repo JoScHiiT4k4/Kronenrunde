@@ -2,7 +2,13 @@
 
 export type BestOf = 1 | 3 | 5;
 export type Side = 'A' | 'B';
-export type LockMode = 'matchday' | 'match';
+/**
+ * Tippschluss:
+ *  - auto:     jedes Spiel einzeln – beim Anstoß, oder früher, sobald das Spiel davor vorbei ist oder es läuft
+ *  - matchday: alle Spiele eines Spieltags beim Anstoß des ersten
+ *  - match:    jedes Spiel einzeln bei seinem (geschätzten) Anstoß
+ */
+export type LockMode = 'auto' | 'matchday' | 'match';
 
 export interface Match {
   id: string;
@@ -14,6 +20,10 @@ export interface Match {
   teamB: string | null;
   winsA: number | null;
   winsB: number | null;
+  /** Seit wann das Spiel als „läuft“ gemeldet ist. */
+  liveAt?: Date | null;
+  /** Wann das vorherige Spiel desselben Spieltags vorbei war (Ergebnis eingetragen). */
+  previousFinishedAt?: Date | null;
 }
 
 export interface Prediction {
