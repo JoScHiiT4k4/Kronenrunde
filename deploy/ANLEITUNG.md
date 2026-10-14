@@ -51,7 +51,7 @@ Dein Repository ist privat. Der Pi bekommt deshalb einen eigenen Schlüssel, mit
    ```
 
 2. Die letzte Zeile (beginnt mit `ssh-ed25519`) mit der Maus markieren und mit **Rechtsklick** kopieren.
-3. Im Browser öffnen: <https://github.com/JoScHiiT4k4/lol-tippspiel/settings/keys/new>
+3. Im Browser öffnen: <https://github.com/JoScHiiT4k4/LoL-Tippspiel/settings/keys/new>
    - **Title:** `Raspberry Pi`
    - **Key:** einfügen (Strg+V)
    - **Allow write access:** *nicht* ankreuzen
@@ -59,7 +59,7 @@ Dein Repository ist privat. Der Pi bekommt deshalb einen eigenen Schlüssel, mit
 4. Auf dem Pi den Code holen:
 
    ```
-   git clone -c core.sshCommand="ssh -i ~/.ssh/lol-tippspiel -o StrictHostKeyChecking=accept-new" git@github.com:JoScHiiT4k4/lol-tippspiel.git ~/lol-tippspiel
+   git clone -c core.sshCommand="ssh -i ~/.ssh/lol-tippspiel -o StrictHostKeyChecking=accept-new" git@github.com:JoScHiiT4k4/LoL-Tippspiel.git ~/lol-tippspiel
    ```
 
 ---

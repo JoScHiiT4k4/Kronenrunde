@@ -6,7 +6,7 @@
 # Sicherheitsnetz: Das Skript bricht ab, wenn die Datenbank schon Tabellen enthält,
 # damit nie versehentlich echte Daten überschrieben werden.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 : "${TEST_DATABASE_URL:?Bitte TEST_DATABASE_URL auf eine leere Test-Datenbank setzen}"
 run() { psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -q "$@"; }

@@ -5,6 +5,6 @@
 #
 # Der Test bricht ab, wenn die Datenbank schon Tabellen enthält, und leert sie am Ende wieder.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 : "${TEST_DATABASE_URL:?Bitte TEST_DATABASE_URL auf eine leere Test-Datenbank setzen}"
 node --experimental-strip-types --disable-warning=ExperimentalWarning --test src/server/app.test.ts

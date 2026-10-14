@@ -27,7 +27,7 @@ BACKUP_DIR=/var/backups/lol-tippspiel
 NODE_MAJOR=24
 DEFAULT_PORT=3000
 TS_HOSTNAME=lol-tippspiel
-DEFAULT_REPO=git@github.com:JoScHiiT4k4/lol-tippspiel.git
+DEFAULT_REPO=git@github.com:JoScHiiT4k4/LoL-Tippspiel.git
 LOG=/var/log/lol-tippspiel-install.log
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

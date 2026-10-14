@@ -30,7 +30,7 @@ healthy() {
   return 1
 }
 cli() {
-  cd "$APP_DIR"
+  cd "$APP_DIR" || exit 1
   runuser -u "$SERVICE_USER" -- "$(command -v node)" --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts "$@"
 }
 
@@ -72,7 +72,7 @@ case "${1:-hilfe}" in
     ;;
 
   update)
-    cd "$APP_DIR"
+    cd "$APP_DIR" || exit 1
     old=$(git rev-parse HEAD)
     git fetch -q origin || die "GitHub nicht erreichbar (Internet? Zugangs-Schlüssel?)."
     branch=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
@@ -157,7 +157,19 @@ case "${1:-hilfe}" in
     get_env APP_URL
     ;;
 
-  hilfe | help | -h | --help | *)
+  hilfe | help | -h | --help)
+    usage
+    ;;
+
+  *)
+    warn "Unbekannter Befehl: $1"
+    usage
+    exit 1
+    ;;
+esac
+}
+
+usage() {
     cat <<EOF
 LoL-Tippspiel – Befehle:
 
@@ -174,8 +186,6 @@ LoL-Tippspiel – Befehle:
   tippspiel wiederherstellen <Datei>  Daten aus einer Sicherung zurückholen
   tippspiel adresse                 Internet-Adresse der App anzeigen
 EOF
-    ;;
-esac
 }
 
 main "$@"

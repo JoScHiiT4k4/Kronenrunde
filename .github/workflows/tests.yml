@@ -23,7 +23,11 @@ jobs:
           npx tsc --noEmit
       - name: Installations-Skripte prüfen
         if: matrix.node == 24
-        run: shellcheck --severity=warning deploy/install.sh deploy/tippspiel scripts/*.sh
+        run: |
+          # Fundstellen erscheinen als Hinweise direkt an der Datei
+          out=$(shellcheck --severity=warning --format=gcc deploy/install.sh deploy/tippspiel scripts/*.sh) && exit 0
+          echo "$out" | sed -E 's/^([^:]+):([0-9]+):([0-9]+): (.*)$/::error file=\1,line=\2,col=\3::\4/'
+          exit 1
 
   datenbank:
     name: Datenbank und Web-App (Node ${{ matrix.node }})

@@ -39,7 +39,7 @@ Danach gibt es den Befehl `tippspiel` (`tippspiel hilfe`), z. B. `tippspiel upda
 Nötig: **Node.js 22** (oder neuer) und **PostgreSQL 15** (oder neuer). Zusatzpakete braucht die App keine.
 
 ```bash
-git clone https://github.com/JoScHiiT4k4/lol-tippspiel.git
+git clone https://github.com/JoScHiiT4k4/LoL-Tippspiel.git
 cd lol-tippspiel
 cp .env.example .env        # dann .env öffnen: DATABASE_URL und ADMIN_EMAILS eintragen
 npm run db:seed             # optional: Beispieldaten Worlds 2026 (nur einmal ausführen)
