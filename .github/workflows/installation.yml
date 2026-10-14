@@ -124,10 +124,35 @@ jobs:
           docker exec pi curl -fsS http://127.0.0.1:3001/gesund
           docker exec pi systemctl is-active homebridge
 
+      - name: Auto-Update holt nur geprüfte Versionen (Zweig stabil)
+        run: |
+          cd /tmp/quelle
+          G="git -c user.name=Test -c user.email=test@example.org"
+          gut=$(git rev-parse HEAD~1)
+          $G revert --no-edit HEAD >/dev/null
+          python3 -c "import json; p='db/daten/worlds-2026.json'; d=json.load(open(p)); [m for m in d['matches'] if m['key']=='finale'][0].update(scheduled_at='2026-11-14T15:00:00-05:00'); json.dump(d, open(p,'w'), ensure_ascii=False, indent=1)"
+          $G commit -qam "Test: geprüfte Version mit geänderten Turnierdaten"
+          geprueft=$(git rev-parse HEAD)
+          echo "<!-- ungeprüft -->" >> README.md
+          $G commit -qam "Test: noch nicht geprüft"
+          docker exec pi systemctl is-enabled lol-tippspiel-update.timer
+          # stabil = installierte Version: nichts zu tun, keine Ausgabe
+          git branch -f stabil "$gut"
+          test -z "$(docker exec pi tippspiel update --auto)"
+          test "$(docker exec pi git -C /opt/lol-tippspiel rev-parse HEAD)" = "$gut"
+          # stabil rückt vor: der Zeitplan holt genau diese Version (nicht die ungeprüfte) und spielt die Turnierdaten ein
+          git branch -f stabil "$geprueft"
+          docker exec pi systemctl start lol-tippspiel-update.service
+          test "$(docker exec pi git -C /opt/lol-tippspiel rev-parse HEAD)" = "$geprueft"
+          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc "select to_char(scheduled_at at time zone 'UTC', 'HH24:MI') from matches where external_id = 'finale'")" = "20:00"
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+          docker exec pi journalctl -u lol-tippspiel-update -n 20 --no-pager
+
       - name: Protokolle (nur bei Fehler)
         if: failure()
         run: |
           docker exec pi tail -n 80 /var/log/lol-tippspiel-install.log || true
           docker exec pi journalctl -u lol-tippspiel -n 60 --no-pager || true
           docker exec pi journalctl -u homebridge -n 30 --no-pager || true
+          docker exec pi journalctl -u lol-tippspiel-update -n 40 --no-pager || true
           docker exec pi systemctl --failed --no-pager || true

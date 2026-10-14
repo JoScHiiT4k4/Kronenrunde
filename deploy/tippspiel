@@ -9,7 +9,8 @@ SERVICE=lol-tippspiel
 SERVICE_USER=tippspiel
 DB_NAME=tippspiel
 BACKUP_DIR=/var/backups/lol-tippspiel
-KEEP_BACKUPS=14
+KEEP_BACKUPS=14        # nächtliche Sicherungen
+KEEP_EXTRA_BACKUPS=10  # Sicherungen vor Updates, Datenimporten usw.
 
 # Alles in main(): Bash liest so das ganze Skript vorab ein – wichtig, weil "update" diese Datei ersetzt.
 
@@ -53,9 +54,12 @@ backup() {
   runuser -u postgres -- pg_dump --format=custom "$DB_NAME" >"$file.tmp" || { rm -f "$file.tmp"; die "Sicherung fehlgeschlagen."; }
   mv "$file.tmp" "$file"
   chmod 600 "$file"
-  # Nur die neuesten Sicherungen behalten
-  find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP_BACKUPS + 1)) |
-    cut -d' ' -f2- | xargs -r rm -f
+  # Nur die neuesten Sicherungen behalten – nächtliche und solche vor Updates getrennt,
+  # damit häufige Updates die nächtlichen nicht verdrängen
+  find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' ! -name '*-vor-*' -printf '%T@ %p\n' | sort -rn |
+    tail -n +$((KEEP_BACKUPS + 1)) | cut -d' ' -f2- | xargs -r rm -f
+  find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*-vor-*.dump' -printf '%T@ %p\n' | sort -rn |
+    tail -n +$((KEEP_EXTRA_BACKUPS + 1)) | cut -d' ' -f2- | xargs -r rm -f
   ok "Gesichert: $file ($(du -h "$file" | cut -f1))"
 }
 
@@ -76,6 +80,11 @@ case "${1:-hilfe}" in
     echo "  E-Mail:     $(get_env MAIL_MODE) $(get_env SMTP_USER)"
     last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
     echo "  Sicherung:  ${last:-noch keine}"
+    if systemctl is-enabled --quiet "$SERVICE-update.timer" 2>/dev/null; then
+      echo "  Updates:    automatisch alle 15 Minuten (nur geprüfte Versionen)"
+    else
+      echo "  Updates:    von Hand (tippspiel update)"
+    fi
     if funnel_on; then
       ok "Im Internet erreichbar (Tailscale Funnel an)"
     else
@@ -84,18 +93,37 @@ case "${1:-hilfe}" in
     ;;
 
   update)
+    # --auto: vom Zeitplan alle 15 Minuten aufgerufen – ohne Ausgabe, wenn es nichts Neues gibt
+    auto=0
+    [[ ${2:-} == --auto ]] && auto=1
+    exec 9>/run/lock/lol-tippspiel-update.lock
+    flock -n 9 || { [[ $auto == 1 ]] && exit 0; die "Gerade läuft schon ein Update."; }
     cd "$APP_DIR" || exit 1
     old=$(git rev-parse HEAD)
-    git fetch -q origin || die "GitHub nicht erreichbar (Internet? Zugangs-Schlüssel?)."
-    branch=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
+    git fetch -q --prune origin || die "GitHub nicht erreichbar (Internet? Zugangs-Schlüssel?)."
+    # Nur geprüfte Versionen: GitHub schiebt sie nach grünen Tests auf den Zweig "stabil"
+    if git rev-parse -q --verify origin/stabil >/dev/null; then
+      branch=origin/stabil
+    else
+      branch=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
+    fi
     new=$(git rev-parse "$branch")
-    if [[ $old == "$new" ]]; then ok "Schon die neueste Version ($(git log -1 --format=%h))."; exit 0; fi
+    if [[ $old == "$new" ]] || git merge-base --is-ancestor "$new" "$old"; then
+      [[ $auto == 1 ]] || ok "Schon die neueste geprüfte Version ($(git log -1 --format=%h))."
+      exit 0
+    fi
     echo "Neu seit der letzten Version:"
     git log --format='  • %s' "$old..$new" | head -n 20
     backup vor-update
     git reset -q --hard "$new"
     if bash "$APP_DIR/deploy/install.sh" --update && healthy; then
       ok "Update fertig ($(git log -1 --format=%h))"
+      # Geänderte Turnierdaten gleich einspielen – aber nur für Turniere, die es hier schon gibt
+      for f in $(git diff --name-only "$old" "$new" -- db/daten | grep -E '\.json$' || true); do
+        name=$(basename "$f" .json)
+        [[ -f $APP_DIR/db/daten/$name.json ]] || continue
+        cli daten "$name" --nur-vorhandene || warn "Turnierdaten $name konnten nicht eingespielt werden."
+      done
     else
       warn "Die neue Version startet nicht – zurück zur vorherigen …"
       git reset -q --hard "$old"
@@ -193,8 +221,8 @@ usage() {
 LoL-Tippspiel – Befehle:
 
   tippspiel status                  Läuft alles? Adresse, Version, letzte Sicherung
-  tippspiel update                  Neueste Version von GitHub installieren
-                                    (sichert vorher; startet die neue Version nicht, geht's automatisch zurück)
+  tippspiel update                  Neueste geprüfte Version von GitHub installieren (läuft auch automatisch
+                                    alle 15 Minuten; sichert vorher; startet sie nicht, geht's automatisch zurück)
   tippspiel neustart                App neu starten
   tippspiel protokoll               Meldungen der App anzeigen (Fehlersuche)
   tippspiel einstellungen           Einstellungen ändern (Gmail, Admins, …) – Speichern: Strg+O, Enter, Strg+X

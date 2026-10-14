@@ -10,7 +10,7 @@
 #   4. Dienst "lol-tippspiel": startet automatisch, auch nach Stromausfall
 #   5. Tägliche Sicherung der Datenbank nach /var/backups/lol-tippspiel
 #   6. Tailscale Funnel: macht die App unter https://….ts.net im Internet erreichbar
-#   7. Befehl "tippspiel" für Updates, Sicherungen usw. (tippspiel hilfe)
+#   7. Befehl "tippspiel" für Updates, Sicherungen usw. (tippspiel hilfe); Updates laufen automatisch alle 15 Minuten
 #
 # Das Skript kann gefahrlos mehrfach laufen: Einstellungen und Daten bleiben erhalten.
 # "tippspiel update" ruft es mit --update auf (ohne Fragen, ohne Tailscale-Einrichtung).
@@ -145,29 +145,34 @@ if [[ ! -f $ENV_FILE ]]; then
 fi
 
 # --- 1. Programme ------------------------------------------------------------
-step "Programme installieren (kann einige Minuten dauern)"
 export DEBIAN_FRONTEND=noninteractive
-run apt-get update
-# Vor dem Installieren prüfen, damit auf einem zu alten System nichts halb eingerichtet wird
-PG_CAND=$(apt-cache policy postgresql 2>/dev/null | awk '/Candidate:/ { print $2 }' | grep -oE '^[0-9]+' || true)
-[[ -z $PG_CAND || $PG_CAND -ge 15 ]] ||
-  die "Dieses System bietet nur PostgreSQL $PG_CAND an (mindestens 15 nötig). Bitte ein System ab Debian 12 verwenden (z. B. aktuelles Raspberry Pi OS)."
-run apt-get install -y ca-certificates curl gnupg git iproute2 openssh-client postgresql unattended-upgrades
-ok "PostgreSQL, git und automatische Sicherheits-Updates"
-
-if [[ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]]; then
-  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
-fi
-
-if ! node_ok; then
-  install -d -m 755 /etc/apt/keyrings
-  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg ||
-    die "Node.js-Paketquelle nicht erreichbar. Ist der Pi mit dem Internet verbunden?"
-  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
-    >/etc/apt/sources.list.d/nodesource.list
+if [[ $UPDATE == 1 ]] && command -v psql >/dev/null && command -v git >/dev/null && command -v ss >/dev/null &&
+  command -v flock >/dev/null && node_ok; then
+  : # Beim Update ist alles schon da – kein apt (schneller, und kein Konflikt mit den automatischen Sicherheits-Updates)
+else
+  step "Programme installieren (kann einige Minuten dauern)"
   run apt-get update
-  run apt-get install -y nodejs
-  node_ok || die "Node.js konnte nicht installiert werden (gefunden: $(node -v 2>/dev/null || echo nichts))."
+  # Vor dem Installieren prüfen, damit auf einem zu alten System nichts halb eingerichtet wird
+  PG_CAND=$(apt-cache policy postgresql 2>/dev/null | awk '/Candidate:/ { print $2 }' | grep -oE '^[0-9]+' || true)
+  [[ -z $PG_CAND || $PG_CAND -ge 15 ]] ||
+    die "Dieses System bietet nur PostgreSQL $PG_CAND an (mindestens 15 nötig). Bitte ein System ab Debian 12 verwenden (z. B. aktuelles Raspberry Pi OS)."
+  run apt-get install -y ca-certificates curl gnupg git iproute2 openssh-client postgresql unattended-upgrades
+  ok "PostgreSQL, git und automatische Sicherheits-Updates"
+
+  if [[ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]]; then
+    printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
+  fi
+
+  if ! node_ok; then
+    install -d -m 755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg ||
+      die "Node.js-Paketquelle nicht erreichbar. Ist der Pi mit dem Internet verbunden?"
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
+      >/etc/apt/sources.list.d/nodesource.list
+    run apt-get update
+    run apt-get install -y nodejs
+    node_ok || die "Node.js konnte nicht installiert werden (gefunden: $(node -v 2>/dev/null || echo nichts))."
+  fi
 fi
 NODE_BIN=$(command -v node)
 ok "Node.js $(node -v)"
@@ -335,9 +340,34 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
+# Automatische Updates: alle 15 Minuten nach einer neuen, auf GitHub geprüften Version schauen
+cat >/etc/systemd/system/$SERVICE-update.service <<EOF
+[Unit]
+Description=LoL-Tippspiel: neue geprüfte Version von GitHub holen
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tippspiel update --auto
+EOF
+
+cat >/etc/systemd/system/$SERVICE-update.timer <<EOF
+[Unit]
+Description=LoL-Tippspiel: alle 15 Minuten nach Updates schauen
+
+[Timer]
+OnCalendar=*:0/15
+RandomizedDelaySec=90
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
 run systemctl daemon-reload
-run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer"
-run systemctl start "$SERVICE-sicherung.timer"
+run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer"
+run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer"
 run systemctl restart "$SERVICE.service"
 if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
   journalctl -u "$SERVICE" -n 20 --no-pager >&2 || true
@@ -345,6 +375,7 @@ if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
 fi
 ok "App läuft (startet automatisch nach jedem Neustart)"
 ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR"
+ok "Automatische Updates alle 15 Minuten (nur auf GitHub geprüfte Versionen)"
 
 [[ $UPDATE == 1 ]] && exit 0
 

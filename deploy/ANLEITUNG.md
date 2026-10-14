@@ -128,7 +128,9 @@ Am Ende steht **„Fertig! Deine App: https://lol-tippspiel.….ts.net“**, und
 
 ## Später
 
-Neue Version installieren (sichert vorher die Daten; klappt der Start nicht, geht es automatisch zur alten Version zurück):
+Neue Versionen kommen **automatisch**: Alle 15 Minuten schaut der Pi bei GitHub nach. Er holt nur Versionen,
+deren automatische Prüfungen grün sind (Zweig `stabil`), sichert vorher die Daten und geht zur alten Version zurück,
+falls die neue nicht startet. Von Hand geht es genauso mit:
 
 ```
 tippspiel update

@@ -18,7 +18,7 @@ import { createMailer } from './mail.ts';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
 
-const [command, arg] = process.argv.slice(2);
+const [command, arg, ...flags] = process.argv.slice(2);
 const config = loadConfig();
 const db = createDb(config.databaseUrl, { max: 1 });
 
@@ -45,7 +45,10 @@ try {
     } else {
       await migrate(db, join(root, 'db', 'migrations'));
       const data = JSON.parse(readFileSync(join(dir, `${arg}.json`), 'utf8')) as TournamentData;
-      console.log(describeSummary(await importTournament(db, data)));
+      // --nur-vorhandene: beim automatischen Update nur Turniere aktualisieren, die schon eingespielt wurden
+      const known = await db.one('select 1 from tournaments where game = $1 and external_id = $2', [data.tournament.game ?? 'lol', data.tournament.key]);
+      if (flags.includes('--nur-vorhandene') && !known) console.log(`${data.tournament.name}: noch nicht eingespielt – übersprungen.`);
+      else console.log(describeSummary(await importTournament(db, data)));
     }
   } else if (command === 'login-link') {
     const email = normalizeEmail(arg ?? '');

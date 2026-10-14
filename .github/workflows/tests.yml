@@ -57,3 +57,26 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: bash scripts/test-db.sh
       - run: bash scripts/test-app.sh
+
+  # Sind alle Prüfungen grün, wird diese Version auf den Zweig "stabil" geschoben.
+  # Nur von dort holt sich der Raspberry Pi automatisch neue Versionen (tippspiel update).
+  freigeben:
+    name: Als geprüft freigeben (Zweig stabil)
+    needs: [logik, datenbank]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Zweig stabil nachziehen
+        run: |
+          git fetch -q origin stabil 2>/dev/null || true
+          if git rev-parse -q --verify origin/stabil >/dev/null && ! git merge-base --is-ancestor origin/stabil "$GITHUB_SHA"; then
+            echo "Der Zweig stabil ist schon auf einer neueren Version – nichts zu tun."
+            exit 0
+          fi
+          git push -q origin "$GITHUB_SHA:refs/heads/stabil"
+          echo "Freigegeben: $(git log -1 --format='%h %s' "$GITHUB_SHA")"
