@@ -87,7 +87,7 @@ wait_healthy() {
 [[ " ${ID:-} ${ID_LIKE:-} " == *" debian "* ]] || die "Dieses Skript ist für Raspberry Pi OS, Debian oder Ubuntu."
 ARCH=$(dpkg --print-architecture)
 [[ $ARCH == arm64 || $ARCH == amd64 ]] ||
-  die "Bitte ein 64-Bit-System verwenden (gefunden: $ARCH). Beim Raspberry Pi: „Raspberry Pi OS (64-bit)“ aufspielen."
+  die "Bitte ein 64-Bit-System verwenden (gefunden: $ARCH). Beim Raspberry Pi: 'Raspberry Pi OS (64-bit)' aufspielen."
 : >>"$LOG"
 chmod 600 "$LOG"
 
@@ -188,7 +188,7 @@ chown -R root:root "$APP_DIR"
 chmod 755 "$APP_DIR"
 chmod +x "$APP_DIR/deploy/tippspiel" "$APP_DIR/deploy/install.sh"
 ln -sf "$APP_DIR/deploy/tippspiel" /usr/local/bin/tippspiel
-ok "Code in $APP_DIR, Befehl „tippspiel“ eingerichtet"
+ok "Code in $APP_DIR, Befehl 'tippspiel' eingerichtet"
 
 # --- 3. Einstellungen ----------------------------------------------------------
 if [[ ! -f $ENV_FILE ]]; then
@@ -237,7 +237,7 @@ SQL
 runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -d "$DB_NAME" \
   -c 'create extension if not exists citext' -c 'create extension if not exists pgcrypto' >>"$LOG" 2>&1 ||
   die "Datenbank-Erweiterungen fehlen (Protokoll: $LOG)"
-ok "Datenbank „$DB_NAME“ bereit"
+ok "Datenbank '$DB_NAME' bereit"
 
 # --- 5. Dienst und tägliche Sicherung ------------------------------------------
 install -d -m 700 "$BACKUP_DIR"
@@ -342,7 +342,7 @@ ok "Tailscale verbunden als $TS_NAME"
 if tailscale funnel status 2>/dev/null | grep -q "Funnel on" && tailscale funnel status 2>/dev/null | grep -q "127.0.0.1:$PORT"; then
   ok "Funnel ist schon eingeschaltet"
 else
-  note "Falls gleich ein Link zum Freischalten von „Funnel“ erscheint: öffnen, bestätigen, hier geht es dann weiter."
+  note "Falls gleich ein Link zum Freischalten von 'Funnel' erscheint: öffnen, bestätigen, hier geht es dann weiter."
   tailscale funnel --bg "$PORT" </dev/tty || die "Funnel konnte nicht eingeschaltet werden. Einfach das Skript noch einmal starten."
   ok "Funnel eingeschaltet"
 fi
