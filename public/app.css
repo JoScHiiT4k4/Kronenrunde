@@ -335,7 +335,56 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 /* ---------- Tippen ---------- */
 
 .day { margin-bottom: 24px; }
-.day-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin: 10px 0 8px; }
+/* Datumsleiste bleibt oben stehen, solange die Spiele dieses Tages durchlaufen – dann übernimmt der nächste Tag */
+.day-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin: 0 -16px 10px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  background: rgb(7 17 28 / 94%);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--frame);
+}
+
+/* Phasen: Play-In, Swiss, … */
+.phase-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 14px; padding: 2px 16px 4px; }
+.phase-tabs a {
+  --c: 6px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 14px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--frame);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+.phase-tabs a:hover { border-color: var(--gold); color: var(--gold-bright); }
+.phase-tabs a.later { color: var(--muted); }
+.phase-tabs a[aria-current="page"] { background: linear-gradient(180deg, #e6cf97, var(--gold) 45%, #a7853f); border-color: #ecd9a6; color: var(--on-gold); }
+.phase-tabs a:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold-bright); }
+.phase-tabs .missing {
+  min-width: 1.5em;
+  padding: 0 5px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--on-gold);
+  background: var(--gold);
+}
+.phase-tabs a[aria-current="page"] .missing { color: var(--gold-bright); background: var(--on-gold); }
+.phase-note { margin: -8px 0 16px; }
 .day-head h2 { margin: 0; }
 .lock { margin: 0; color: var(--gold-text); font-weight: 600; }
 .lock .muted { font-weight: 400; }
@@ -356,6 +405,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   background-position: top left, bottom right, 0 0;
   border-left: 3px solid var(--blue);
   border-right: 3px solid var(--red);
+  scroll-margin-top: 90px; /* Sprungziel nicht unter der festen Datumsleiste */
 }
 
 .match-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.88rem; color: var(--muted); margin-bottom: 6px; }

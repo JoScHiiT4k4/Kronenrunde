@@ -276,6 +276,12 @@ interface Matchday {
   matches: MatchRow[];
 }
 
+/** Phase eines Spiels: der Teil des Phasennamens vor dem Doppelpunkt („Swiss: Runde 2“ → „Swiss“). */
+export function phaseName(m: { stage: string | null }): string {
+  return (m.stage ?? '').split(':')[0].trim() || 'Weitere Spiele';
+}
+export const phaseSlug = (name: string) => slugify(name) || 'spiele';
+
 function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
   const days = new Map<string, Matchday>();
   for (const m of matches) {
@@ -359,12 +365,33 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     leagueTournaments(db, league.id),
   ]);
   const own = new Map(preds.map((p) => [p.match_id, p]));
-  const days = groupMatchdays(matches, tz);
+  const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
+  const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
+  const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
+
+  // Phasen (Play-In, Swiss, …) in zeitlicher Reihenfolge; angezeigt wird immer eine davon
+  const phases: { slug: string; name: string; first: number; matches: MatchRow[]; missing: number }[] = [];
+  for (const m of matches) {
+    const name = phaseName(m);
+    let p = phases.find((x) => x.name === name);
+    if (!p) phases.push((p = { slug: phaseSlug(name), name, first: time(m), matches: [], missing: 0 }));
+    p.first = Math.min(p.first, time(m));
+    p.matches.push(m);
+    if (known(m) && beforeLock(m) && !own.has(m.id)) p.missing++;
+  }
+  phases.sort((a, b) => a.first - b.first);
+  // Ohne Auswahl: die Phase mit dem nächsten tippbaren Spiel, sonst dem nächsten Spiel, sonst die letzte
+  const upcoming = [...matches].filter((m) => known(m) && beforeLock(m)).sort((a, b) => time(a) - time(b))[0]
+    ?? [...matches].filter((m) => time(m) > ctx.now.getTime() && time(m) < Number.MAX_SAFE_INTEGER).sort((a, b) => time(a) - time(b))[0];
+  const current = phases.find((p) => p.slug === ctx.query.get('phase')) ?? phases.find((p) => upcoming && p.name === phaseName(upcoming)) ?? phases.at(-1);
+  // Nur Begegnungen, deren Teams schon feststehen
+  const shown = current ? current.matches.filter(known) : [];
+  const hidden = current ? current.matches.length - shown.length : 0;
+  const days = groupMatchdays(shown, tz);
 
   const openDays: Matchday[] = [];
   const closedDays: Matchday[] = [];
   const unscheduled: Matchday[] = [];
-  const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   for (const d of days) {
     if (!d.start) unscheduled.push(d);
     else if (d.matches.some(beforeLock)) openDays.push(d);
@@ -372,7 +399,24 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   }
   closedDays.reverse();
 
-  const anyTippable = matches.some((m) => isOpen(toDomainMatch(m), league.lock_mode, ctx.now));
+  const anyTippable = shown.some((m) => isOpen(toDomainMatch(m), league.lock_mode, ctx.now));
+  const phaseTabs = phases.length > 1
+    ? html`<nav class="phase-tabs" aria-label="Phasen">
+    ${phases.map(
+      (p) => html`<a href="/r/${league.slug}/tippen?phase=${p.slug}"${p === current ? html` aria-current="page"` : nothing}${p.matches.some(known) ? nothing : html` class="later"`}>${p.name}${
+        p.missing ? html` <span class="missing" title="${p.missing} noch nicht getippt">${p.missing}</span>` : nothing
+      }</a>`,
+    )}
+  </nav>`
+    : nothing;
+  const firstOfPhase = current?.matches.map((m) => m.scheduled_at).filter((d): d is Date => !!d).sort((a, b) => a.getTime() - b.getTime())[0];
+  const hiddenNote = hidden
+    ? shown.length
+      ? html`<p class="muted phase-note">${hidden === 1 ? 'Ein weiteres Spiel' : `${hidden} weitere Spiele`} dieser Phase ${hidden === 1 ? 'erscheint' : 'erscheinen'} hier, sobald die Teams feststehen.</p>`
+      : html`<div class="empty"><p>Die Paarungen für ${current!.name} stehen noch nicht fest. Sie erscheinen hier, sobald die Teams feststehen${
+          firstOfPhase ? html` – das erste Spiel ist am ${formatDayLong(firstOfPhase, tz)}` : nothing
+        }.</p></div>`
+    : nothing;
 
   const dayHeader = (d: Matchday, closed: boolean) => {
     const first = d.matches[0];
@@ -417,10 +461,12 @@ ${
       ? emptyState('Für dieses Turnier sind noch keine Spiele eingetragen.')
       : nothing
 }
+${phaseTabs}
 ${
   openDays.length || unscheduled.length
     ? html`<form method="post" action="/r/${league.slug}/tippen" class="tip-form">
   ${csrfField(ctx)}
+  ${current ? html`<input type="hidden" name="phase" value="${current.slug}">` : nothing}
   ${openDays.map(
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
@@ -434,11 +480,14 @@ ${
     ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false))}
   </section>`,
   )}
+  ${hiddenNote}
   ${anyTippable ? html`<div class="save-bar"><button type="submit" class="btn btn-primary">Tipps speichern</button></div>` : nothing}
 </form>`
-    : matches.length
-      ? emptyState('Gerade gibt es nichts zu tippen. Neue Spiele erscheinen hier, sobald sie feststehen.')
-      : nothing
+    : hidden
+      ? hiddenNote
+      : matches.length && !closedDays.length
+        ? emptyState('Gerade gibt es nichts zu tippen. Neue Spiele erscheinen hier, sobald sie feststehen.')
+        : nothing
 }
 ${
   closedDays.length
@@ -492,7 +541,8 @@ async function saveTips(ctx: Ctx): Promise<Res> {
     }
   }
   const notice = rejected ? 'tipps-teilweise' : saved ? 'tipps-gespeichert' : 'keine-aenderung';
-  return redirect(`/r/${league.slug}/tippen?hinweis=${notice}`);
+  const phase = ctx.form.get('phase') ?? '';
+  return redirect(`/r/${league.slug}/tippen?${/^[a-z0-9-]{1,60}$/.test(phase) ? `phase=${phase}&` : ''}hinweis=${notice}`);
 }
 
 // ---------------------------------------------------------------------
@@ -566,7 +616,7 @@ ${
   }
 
   const body = html`<section class="panel">
-  <p><a href="/r/${league.slug}/tippen#spiel-${m.id}">Zurück zu den Spielen</a></p>
+  <p><a href="/r/${league.slug}/tippen?phase=${phaseSlug(phaseName(m))}#spiel-${m.id}">Zurück zu den Spielen</a></p>
   <h1 class="versus"><span class="team-a">${m.team_a ?? 'offen'}</span> <span class="vs">VS</span> <span class="team-b">${m.team_b ?? 'offen'}</span></h1>
   <p class="muted">${m.tournament}${m.stage ? `, ${m.stage}` : ''}, Bo${m.best_of}${m.scheduled_at ? `, ${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : ''}</p>
   ${result ? html`<p class="result">Ergebnis: <strong>${result}</strong></p>` : nothing}

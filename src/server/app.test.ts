@@ -335,7 +335,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const page = await anna.get(`/r/${slug}/tippen`);
     assert.match(page.text, /Tipps speichern/);
     assert.match(page.text, new RegExp(`name="tipp_${match['GEN-T1']}" value="A-3-1"`));
-    assert.match(page.text, /Tippen geht, sobald beide Teams feststehen/);
+    // Spiele ohne feststehende Teams werden nicht gezeigt, nur ein Hinweis
+    assert.match(page.text, /Ein weiteres Spiel dieser Phase erscheint hier, sobald die Teams feststehen/);
+    assert.doesNotMatch(page.text, /Steht noch nicht fest/);
 
     const saved = await anna.post(`/r/${slug}/tippen`, {
       [`tipp_${match['GEN-T1']}`]: 'A-3-1',
@@ -683,5 +685,17 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Nochmal: nichts Neues
     const third = await runSync(db, fakeRiot(120, later), 'haeufig');
     assert.doesNotMatch(third[0].details, /eingetragen|geändert|verknüpft/);
+
+    // Tippseite: Knöpfe für die Phasen, nur bekannte Paarungen
+    const tipPage = await admin.get(`/r/${slug}/tippen?phase=play-in`);
+    assert.match(tipPage.text, /<nav class="phase-tabs"/);
+    assert.match(tipPage.text, /<a href="\/r\/[a-z0-9-]+\/tippen\?phase=play-in" aria-current="page">Play-In/);
+    assert.match(tipPage.text, /phase=swiss" class="later">Swiss/);
+    assert.match(tipPage.text, /Cloud9/);
+    assert.match(tipPage.text, /weitere Spiele dieser Phase erscheinen hier/);
+    const swissPage = await admin.get(`/r/${slug}/tippen?phase=swiss`);
+    assert.match(swissPage.text, /Die Paarungen für Swiss stehen noch nicht fest/);
+    assert.match(swissPage.text, /Freitag, 23\. Oktober/);
+    assert.doesNotMatch(swissPage.text, /class="match/);
   });
 });
