@@ -1,0 +1,14 @@
+{
+  "name": "lol-tippspiel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tippspiel-Web-App für League-of-Legends-Turniere",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
+    "test:db": "bash scripts/test-db.sh"
+  }
+}
