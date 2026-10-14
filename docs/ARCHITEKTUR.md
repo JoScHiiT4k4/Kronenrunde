@@ -24,8 +24,9 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 | Datenbank-Anschluss | Eigener schlanker PostgreSQL-Anschluss (`src/server/db/pg.ts`) mit TLS und SCRAM-Anmeldung, hinter einer kleinen Schnittstelle (`db/index.ts`) | Bei der Entwicklung waren keine Zusatzpakete ladbar. Austauschbar gegen das verbreitete Paket `pg`, indem nur `pg.ts` ersetzt wird |
 | Sicherheit | Anmelde-Links und Sitzungen nur als Hash gespeichert; Formular-Schutz (CSRF) mit Token und Herkunfts-Prüfung; strenge Content-Security-Policy; alle Ausgaben maskiert | Übliche Angriffe (fremde Formulare, eingeschleuster Code, gestohlene Datenbank) laufen ins Leere |
 | Datenquelle | Spielplan/Ergebnisse im Admin-Bereich von Hand; dieselben Tabellen kann später ein Daten-Dienst (API) füllen | Erst manuell, später automatisch – ohne Umbau |
-| Hosting | Eigener Server (Raspberry Pi 4 / Debian-PC) **oder** ein Cloud-Anbieter, der Node.js-Server betreibt, plus PostgreSQL (z. B. Supabase) | Gleicher Code; Wechsel = andere Einstellungen. Auswahl in Baustein 3 |
-| E-Mail | Austauschbar über `MAIL_MODE`: Brevo (kostenlos, eigene Domain nicht nötig) oder Resend | Auswahl in Baustein 3 |
+| Hosting | **Raspberry Pi 4 zu Hause** (Raspberry Pi OS 64-bit), öffentlich über **Tailscale Funnel** (`https://lol-tippspiel.….ts.net`). Einrichtung per `deploy/install.sh` | Kostenlos, keine offenen Ports am Router, HTTPS automatisch. Dasselbe Skript läuft auf jedem Debian/Ubuntu (z. B. gemieteter Server) – Umzug = installieren + Sicherung einspielen |
+| Betrieb | systemd-Dienst mit Schutz-Einstellungen, App lauscht nur auf 127.0.0.1; nächtliche Sicherung (14 Stück); automatische Sicherheits-Updates; `tippspiel update` sichert vorher und geht bei Startproblemen automatisch zurück | Wenig Pflege, nichts Wichtiges geht verloren |
+| E-Mail | Ohne eigene Domain: **Gmail per SMTP** mit App-Passwort (`MAIL_MODE=smtp`, bis 500 Empfänger/Tag). Mit eigener Domain später: Brevo oder Resend | Brevo schreibt Gmail-Absender auf `@brevosend.com` um, das landet eher im Spam. Eigener SMTP-Client ohne Zusatzpakete (`src/server/smtp.ts`), Passwort nur verschlüsselt |
 | Geld verdienen | Vorbereitet: Werbeflächen, Cookie-Banner (zertifiziert, IAB TCF), Premium (`users.premium_until`) | Später ohne Umbau einschaltbar |
 
 ## Hinweise für später
@@ -34,8 +35,11 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 - **Werbung in der EU**: Für personalisierte Anzeigen verlangt Google ein zertifiziertes Cookie-Banner (IAB TCF).
 - **Öffentlich**: Vor Stufe 2 Impressum und Datenschutzerklärung ergänzen.
 - **Supabase Free** pausiert Projekte nach 7 Tagen ohne Nutzung (mit einem Klick wieder aktiv).
-- **Raspberry Pi**: 64-Bit-Betriebssystem; Datenbank besser auf USB-SSD statt SD-Karte; Sicherungskopien einrichten.
-- **Öffentlich erreichbar machen und Sicherheit** (eigener Server): HTTPS über einen vorgeschalteten Proxy (z. B. Caddy oder Cloudflare Tunnel), dann `TRUST_PROXY=1`.
+- **Raspberry Pi**: 64-Bit-Betriebssystem (prüft das Skript); Datenbank besser auf USB-SSD statt SD-Karte.
+- **Öffentlich erreichbar**: Tailscale Funnel ist (Stand Okt. 2026) noch Beta und hat nicht näher genannte Bandbreiten-Grenzen; eigene Domains gehen damit nicht. Für Stufe 2 mit eigener Domain: Cloudflare Tunnel (Domain bei Cloudflare) – die App bleibt gleich, nur `APP_URL` ändert sich.
+- **Proxy**: Mit `TRUST_PROXY=1` zählt der **letzte** Eintrag in `X-Forwarded-For` (den trägt der Proxy ein; Tailscale ersetzt den Kopf ganz).
+- **Werbung braucht eine eigene Domain** (eine `ts.net`-Adresse gehört Tailscale) – vor dem Einschalten von Werbung also umziehen.
+- **Sicherungen** liegen auf derselben SD-Karte wie die Datenbank. Sobald echte Daten drin sind: regelmäßig eine Kopie auf ein anderes Gerät.
 - **Mehrere Server-Instanzen**: Die Begrenzung für Anmelde-Links pro Internet-Adresse zählt pro Instanz im Speicher; die Begrenzung pro E-Mail-Adresse steht in der Datenbank und gilt überall.
 
 ## Aufbau des Projekts
@@ -45,6 +49,7 @@ db/migrations/      Datenbank-Aufbau (wird beim Start automatisch eingespielt)
 db/tests/           Tests für die Datenbank-Regeln
 db/seed/            Beispieldaten (Worlds 2026)
 src/domain/         Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste
+deploy/             install.sh (Einrichtung/Update auf Debian/Raspberry Pi OS), tippspiel (Verwaltungsbefehl), ANLEITUNG.md
 src/server/         Web-Server
   main.ts           Start
   app.ts            Anfragen → Anmeldung prüfen → Seite
@@ -52,7 +57,8 @@ src/server/         Web-Server
   routes/           Seiten (Tipprunden/Tippen, Verwalten, Admin, Anmeldung)
   views/layout.ts   Seitenrahmen
   db/               PostgreSQL-Anschluss, Migrationen
-  cli.ts            Hilfsbefehle (migrate, seed, login-link)
+  mail.ts, smtp.ts  E-Mail-Versand (Gmail/SMTP, Brevo, Resend)
+  cli.ts            Hilfsbefehle (migrate, seed, login-link, mail-test)
 public/             CSS, JavaScript, App-Symbole
 scripts/            Test-Skripte
 ```

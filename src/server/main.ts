@@ -26,7 +26,7 @@ const server = createServer(app.listener);
 server.headersTimeout = 20_000;
 server.requestTimeout = 30_000;
 
-server.listen(config.port, () => {
+server.listen(config.port, config.host, () => {
   console.log(`${config.appName} läuft auf ${config.appUrl} (Port ${config.port})`);
   if (config.mail.mode === 'console') console.log('Hinweis: MAIL_MODE=console – Anmelde-Links erscheinen hier im Protokoll statt per E-Mail.');
   if (!config.adminEmails.size) console.log('Hinweis: ADMIN_EMAILS ist leer – niemand kann Turniere und Ergebnisse pflegen.');

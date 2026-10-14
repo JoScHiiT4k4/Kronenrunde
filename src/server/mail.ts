@@ -1,10 +1,12 @@
 // E-Mails verschicken. Austauschbar über MAIL_MODE:
 //   console – Link nur im Server-Protokoll ausgeben (zum Ausprobieren)
-//   brevo   – über Brevo (kostenlos bis 300 Mails/Tag, Absender-Adresse bestätigen genügt)
+//   smtp    – über einen E-Mail-Server, z. B. Gmail mit App-Passwort (bis 500 Empfänger/Tag, keine eigene Domain nötig)
+//   brevo   – über Brevo (kostenlos bis 300 Mails/Tag; gut mit eigener Domain, sonst wird der Absender umgeschrieben)
 //   resend  – über Resend (eigene Domain nötig)
 //   memory  – nur für automatische Tests
 
 import type { Config } from './config.ts';
+import { sendSmtp } from './smtp.ts';
 
 export interface Mail {
   to: string;
@@ -30,6 +32,14 @@ export function createMailer(config: Config, log: (msg: string) => void = consol
   if (mode === 'console') {
     return {
       send: async (m) => log(`\n[E-Mail an ${m.to}] ${m.subject}\n${m.text}\n`),
+    };
+  }
+
+  if (mode === 'smtp') {
+    const smtp = config.mail.smtp;
+    if (!smtp.user || !smtp.password) throw new Error('SMTP_USER und SMTP_PASSWORD müssen gesetzt sein (siehe .env.example)');
+    return {
+      send: (m) => sendSmtp(smtp, { from: from || smtp.user, fromName, to: m.to, subject: m.subject, text: m.text, html: m.html }),
     };
   }
 

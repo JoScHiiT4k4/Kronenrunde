@@ -8,7 +8,8 @@ Tippspiel-Web-App für League-of-Legends-Turniere – erst für die private Rund
 |---|---|
 | 1. Fundament: Datenbank-Aufbau, Punkte-Logik, Tests | ✅ fertig |
 | 2. Bedienoberfläche & Anmeldung | ✅ fertig |
-| 3. Online stellen (Raspberry Pi / PC oder Cloud), E-Mail-Versand | ⏳ als Nächstes |
+| 3. Online stellen: Raspberry Pi + Tailscale Funnel, Anmelde-Mails über Gmail | ✅ fertig – einrichten mit [deploy/ANLEITUNG.md](deploy/ANLEITUNG.md) |
+| 4. Öffentlich: eigene Domain, Impressum/Datenschutz, Werbung | offen |
 
 Was die App kann:
 
@@ -27,7 +28,13 @@ Was die App kann:
 
 Entscheidungen und Plan: siehe [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md).
 
-## Starten (Raspberry Pi, PC oder Laptop)
+## Auf dem Raspberry Pi betreiben
+
+Schritt für Schritt: **[deploy/ANLEITUNG.md](deploy/ANLEITUNG.md)**. Kurz: `sudo bash deploy/install.sh` richtet alles ein
+(Node.js, PostgreSQL, Dienst, nächtliche Sicherung, Tailscale Funnel für `https://….ts.net`).
+Danach gibt es den Befehl `tippspiel` (`tippspiel hilfe`), z. B. `tippspiel update` für neue Versionen.
+
+## Zum Ausprobieren starten (PC oder Laptop)
 
 Nötig: **Node.js 22** (oder neuer) und **PostgreSQL 15** (oder neuer). Zusatzpakete braucht die App keine.
 
@@ -46,6 +53,9 @@ Einen Link kann man sich auch direkt erzeugen lassen:
 npm run login-link -- deine@mail.de
 ```
 
+Für echte Mails über Gmail: `MAIL_MODE=smtp`, `SMTP_USER` = Gmail-Adresse, `SMTP_PASSWORD` = App-Passwort
+(siehe `.env.example`). Prüfen mit `npm run mail-test -- deine@mail.de`.
+
 Die Datenbank wird beim Start automatisch auf den neuesten Stand gebracht (`npm run db:migrate` geht auch von Hand).
 
 ## Tests
@@ -63,6 +73,7 @@ TEST_DATABASE_URL=postgres://… npm run test:app      # ganze App im Ablauf (nu
 ## Aufbau
 
 ```
+deploy/           Installation auf dem Raspberry Pi (install.sh), Verwaltungsbefehl "tippspiel", Anleitung
 src/domain/       Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste (reine Logik)
 src/server/       Web-Server: Anmeldung, Seiten, Datenbank-Anschluss
   routes/         Seiten: Tipprunden & Tippen, Verwalten, Admin, Anmeldung

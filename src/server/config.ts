@@ -2,13 +2,15 @@
 
 import { randomBytes } from 'node:crypto';
 
-export type MailMode = 'console' | 'memory' | 'brevo' | 'resend';
+export type MailMode = 'console' | 'memory' | 'smtp' | 'brevo' | 'resend';
 
 export interface Config {
   appName: string;
   /** Öffentliche Adresse ohne / am Ende, z. B. https://tippspiel.example.de */
   appUrl: string;
   port: number;
+  /** Nur auf dieser Netzwerk-Adresse lauschen, z. B. 127.0.0.1 hinter einem Proxy. Leer = überall. */
+  host: string | undefined;
   databaseUrl: string;
   /** Geheimer Schlüssel für Formular-Schutz (CSRF). Muss in Produktion fest gesetzt sein. */
   secret: string;
@@ -20,6 +22,8 @@ export interface Config {
     from: string;
     fromName: string;
     apiKey: string;
+    /** Für MAIL_MODE=smtp, z. B. Gmail: smtp.gmail.com, Port 465, Gmail-Adresse, App-Passwort */
+    smtp: { host: string; port: number; user: string; password: string };
   };
   /** Läuft hinter einem Proxy (Caddy, nginx, Cloudflare)? Dann zählt X-Forwarded-For als Adresse. */
   trustProxy: boolean;
@@ -41,12 +45,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   const mode = (env.MAIL_MODE ?? 'console') as MailMode;
-  if (!['console', 'memory', 'brevo', 'resend'].includes(mode)) throw new Error(`Unbekannter MAIL_MODE: ${mode}`);
+  if (!['console', 'memory', 'smtp', 'brevo', 'resend'].includes(mode)) throw new Error(`Unbekannter MAIL_MODE: ${mode}`);
 
   return {
     appName: env.APP_NAME ?? 'LoL-Tippspiel',
     appUrl,
     port,
+    host: env.HOST?.trim() || undefined,
     databaseUrl,
     secret,
     adminEmails: new Set(
@@ -58,9 +63,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
     mail: {
       mode,
-      from: env.MAIL_FROM ?? '',
+      from: (env.MAIL_FROM || (mode === 'smtp' ? env.SMTP_USER : '') || '').trim(),
       fromName: env.MAIL_FROM_NAME ?? env.APP_NAME ?? 'LoL-Tippspiel',
       apiKey: env.MAIL_API_KEY ?? '',
+      smtp: {
+        host: env.SMTP_HOST || 'smtp.gmail.com',
+        port: Number(env.SMTP_PORT || 465),
+        user: (env.SMTP_USER ?? '').trim(),
+        password: env.SMTP_PASSWORD ?? '',
+      },
     },
     trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
     secureCookies: appUrl.startsWith('https://'),

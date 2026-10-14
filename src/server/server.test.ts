@@ -6,7 +6,7 @@ import { csrfToken, csrfValid, normalizeEmail, safeNext } from './auth.ts';
 import { parseArray, parseDatabaseUrl, parseTimestamp, serializeParam } from './db/pg.ts';
 import { formatDateTime, formatDayLong, toLocalInput } from './format.ts';
 import { html, raw } from './html.ts';
-import { isSameOrigin, parseCookies, Router, serializeCookie } from './http.ts';
+import { clientIp, isSameOrigin, parseCookies, Router, serializeCookie } from './http.ts';
 import { cleanName, slugify } from './routes/common.ts';
 import { parsePick, pickValue } from './routes/leagues.ts';
 
@@ -104,4 +104,14 @@ test('Routen mit Platzhaltern', () => {
   assert.equal(r.match('PUT', '/r/x/tippen'), 'method');
   assert.equal(r.match('GET', '/r/x/y/tippen'), null);
   assert.ok(r.match('HEAD', '/r/x/tippen'));
+});
+
+test('Besucher-Adresse hinter einem Proxy (z. B. Tailscale Funnel)', () => {
+  const req = (fwd: string | undefined) =>
+    ({ headers: fwd === undefined ? {} : { 'x-forwarded-for': fwd }, socket: { remoteAddress: '127.0.0.1' } }) as unknown as Parameters<typeof clientIp>[0];
+  assert.equal(clientIp(req('203.0.113.7'), true), '203.0.113.7');
+  // Vom Besucher vorgetäuschte Einträge zählen nicht – nur der vom Proxy angehängte letzte:
+  assert.equal(clientIp(req('1.2.3.4, 203.0.113.7'), true), '203.0.113.7');
+  assert.equal(clientIp(req(undefined), true), '127.0.0.1');
+  assert.equal(clientIp(req('203.0.113.7'), false), '127.0.0.1');
 });

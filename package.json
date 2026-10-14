@@ -1,6 +1,6 @@
 {
   "name": "lol-tippspiel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Tippspiel-Web-App für League-of-Legends-Turniere",
   "type": "module",
@@ -13,6 +13,7 @@
     "db:migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts migrate",
     "db:seed": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts seed",
     "login-link": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts login-link",
+    "mail-test": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts mail-test",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
     "test:db": "bash scripts/test-db.sh",
     "test:app": "bash scripts/test-app.sh",

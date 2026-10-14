@@ -153,11 +153,17 @@ export class Router<C> {
   }
 }
 
-export function clientIp(req: IncomingMessage, trustProxy: boolean): string {
+/**
+ * Internet-Adresse des Besuchers. Hinter einem Proxy (TRUST_PROXY=1) zählt der LETZTE Eintrag in
+ * X-Forwarded-For – den hat unser Proxy eingetragen. Frühere Einträge kann jeder Besucher selbst
+ * mitschicken (z. B. um die Begrenzung für Anmelde-Links zu umgehen).
+ */
+export function clientIp(req: Pick<IncomingMessage, 'headers' | 'socket'>, trustProxy: boolean): string {
   if (trustProxy) {
     const fwd = req.headers['x-forwarded-for'];
-    const first = (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim();
-    if (first) return first;
+    const all = (Array.isArray(fwd) ? fwd.join(',') : (fwd ?? '')).split(',');
+    const last = all[all.length - 1]?.trim();
+    if (last) return last;
   }
   return req.socket.remoteAddress ?? '';
 }

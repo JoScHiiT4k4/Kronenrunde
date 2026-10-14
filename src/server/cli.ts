@@ -2,6 +2,7 @@
 //   npm run db:migrate                 Datenbank auf den neuesten Stand bringen
 //   npm run login-link -- name@mail.de Anmelde-Link erzeugen, ohne E-Mail zu verschicken
 //   npm run db:seed                    Beispieldaten (Worlds 2026) einspielen – nur zum Ausprobieren
+//   npm run mail-test -- name@mail.de  Test-E-Mail verschicken (prüft die E-Mail-Einstellungen)
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { hashToken, LOGIN_TOKEN_MINUTES, newToken, normalizeEmail } from './auth.ts';
 import { loadConfig } from './config.ts';
 import { createDb, migrate } from './db/index.ts';
+import { html } from './html.ts';
+import { createMailer } from './mail.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
@@ -37,8 +40,19 @@ try {
       [hashToken(token), email, LOGIN_TOKEN_MINUTES],
     );
     console.log(`Anmelde-Link für ${email} (gilt ${LOGIN_TOKEN_MINUTES} Minuten, nur einmal):\n${config.appUrl}/anmelden/bestaetigen?token=${token}`);
+  } else if (command === 'mail-test') {
+    const email = normalizeEmail(arg ?? '');
+    if (!email) throw new Error('Bitte E-Mail-Adresse angeben:  npm run mail-test -- name@example.de');
+    console.log(`Verschicke Test-E-Mail an ${email} (MAIL_MODE=${config.mail.mode}) …`);
+    await createMailer(config).send({
+      to: email,
+      subject: `Test-E-Mail von ${config.appName}`,
+      text: `Hallo!\n\nDer E-Mail-Versand von ${config.appName} funktioniert.\n\n${config.appUrl}`,
+      html: html`<p>Hallo!</p><p>Der E-Mail-Versand von ${config.appName} funktioniert.</p>`.value,
+    });
+    console.log(config.mail.mode === 'console' ? 'Fertig (nur angezeigt, MAIL_MODE=console).' : 'Verschickt. Schau in dein Postfach (notfalls auch im Spam-Ordner).');
   } else {
-    console.log('Befehle: migrate | seed | login-link <email>');
+    console.log('Befehle: migrate | seed | login-link <email> | mail-test <email>');
     process.exitCode = 1;
   }
 } catch (e) {

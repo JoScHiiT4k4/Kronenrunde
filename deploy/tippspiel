@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Verwaltung des LoL-Tippspiels auf dem eigenen Server (eingerichtet von deploy/install.sh).
+# Übersicht:  tippspiel hilfe
+set -euo pipefail
+
+APP_DIR=/opt/lol-tippspiel
+ENV_FILE=$APP_DIR/.env
+SERVICE=lol-tippspiel
+SERVICE_USER=tippspiel
+DB_NAME=tippspiel
+BACKUP_DIR=/var/backups/lol-tippspiel
+KEEP_BACKUPS=14
+
+# Alles in main(): Bash liest so das ganze Skript vorab ein – wichtig, weil "update" diese Datei ersetzt.
+
+# Alles hier braucht Administrator-Rechte – notfalls mit sudo neu starten.
+if [[ $EUID -ne 0 ]]; then exec sudo "$0" "$@"; fi
+
+ok()   { printf '\033[32m✔\033[0m %s\n' "$*"; }
+warn() { printf '\033[33m!\033[0m %s\n' "$*"; }
+die()  { printf '\033[31m✘ %s\033[0m\n' "$*" >&2; exit 1; }
+
+get_env() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+port() { local p; p=$(get_env PORT); echo "${p:-3000}"; }
+healthy() {
+  for _ in $(seq "${1:-30}"); do
+    curl -fsS -m 5 "http://127.0.0.1:$(port)/gesund" >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
+cli() {
+  cd "$APP_DIR"
+  runuser -u "$SERVICE_USER" -- "$(command -v node)" --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts "$@"
+}
+
+backup() {
+  local label=${1:-} file
+  install -d -m 700 "$BACKUP_DIR"
+  file="$BACKUP_DIR/tippspiel-$(date +%Y-%m-%d_%H%M%S)${label:+-$label}.dump"
+  runuser -u postgres -- pg_dump --format=custom "$DB_NAME" >"$file.tmp" || { rm -f "$file.tmp"; die "Sicherung fehlgeschlagen."; }
+  mv "$file.tmp" "$file"
+  chmod 600 "$file"
+  # Nur die neuesten Sicherungen behalten
+  find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP_BACKUPS + 1)) |
+    cut -d' ' -f2- | xargs -r rm -f
+  ok "Gesichert: $file ($(du -h "$file" | cut -f1))"
+}
+
+restart() {
+  systemctl restart "$SERVICE"
+  if healthy; then ok "App läuft"; else
+    journalctl -u "$SERVICE" -n 20 --no-pager >&2 || true
+    die "Die App startet nicht. Die Meldungen oben zeigen, warum."
+  fi
+}
+
+main() {
+case "${1:-hilfe}" in
+  status)
+    if systemctl is-active --quiet "$SERVICE" && healthy 1; then ok "App läuft"; else warn "App läuft NICHT – Details: tippspiel protokoll"; fi
+    echo "  Adresse:    $(get_env APP_URL)"
+    echo "  Version:    $(git -C "$APP_DIR" log -1 --format='%h vom %cd' --date=format:'%d.%m.%Y %H:%M')"
+    echo "  E-Mail:     $(get_env MAIL_MODE) $(get_env SMTP_USER)"
+    last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+    echo "  Sicherung:  ${last:-noch keine}"
+    if command -v tailscale >/dev/null && tailscale funnel status 2>/dev/null | grep -q "Funnel on"; then
+      ok "Im Internet erreichbar (Tailscale Funnel an)"
+    else
+      warn "Tailscale Funnel ist aus – einschalten: sudo tailscale funnel --bg $(port)"
+    fi
+    ;;
+
+  update)
+    cd "$APP_DIR"
+    old=$(git rev-parse HEAD)
+    git fetch -q origin || die "GitHub nicht erreichbar (Internet? Zugangs-Schlüssel?)."
+    branch=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
+    new=$(git rev-parse "$branch")
+    if [[ $old == "$new" ]]; then ok "Schon die neueste Version ($(git log -1 --format=%h))."; exit 0; fi
+    echo "Neu seit der letzten Version:"
+    git log --format='  • %s' "$old..$new" | head -n 20
+    backup vor-update
+    git reset -q --hard "$new"
+    if bash "$APP_DIR/deploy/install.sh" --update && healthy; then
+      ok "Update fertig ($(git log -1 --format=%h))"
+    else
+      warn "Die neue Version startet nicht – zurück zur vorherigen …"
+      git reset -q --hard "$old"
+      bash "$APP_DIR/deploy/install.sh" --update || true
+      die "Update zurückgenommen. Die App läuft wieder mit der alten Version."
+    fi
+    ;;
+
+  neustart | restart)
+    restart
+    ;;
+
+  protokoll | log)
+    echo "(Beenden mit Strg+C)"
+    journalctl -u "$SERVICE" -n 50 -f
+    ;;
+
+  sicherung | backup)
+    backup
+    ;;
+
+  sicherungen | backups)
+    find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%TY-%Tm-%Td %TH:%TM  %p\n' 2>/dev/null | sort -r
+    ;;
+
+  wiederherstellen | restore)
+    file=${2:-}
+    [[ -f $file ]] || die "Bitte Datei angeben, z. B.:  tippspiel wiederherstellen $BACKUP_DIR/tippspiel-….dump  (Liste: tippspiel sicherungen)"
+    warn "Alle Daten werden durch den Stand aus $file ersetzt."
+    read -r -p "Zum Bestätigen JA eingeben: " answer
+    [[ $answer == JA ]] || die "Abgebrochen."
+    backup vor-wiederherstellung
+    systemctl stop "$SERVICE"
+    if runuser -u postgres -- pg_restore --clean --if-exists --single-transaction --dbname="$DB_NAME" <"$file"; then
+      ok "Wiederhergestellt."
+    else
+      warn "Wiederherstellen fehlgeschlagen – die Daten sind unverändert."
+    fi
+    restart
+    ;;
+
+  einstellungen | settings)
+    cp -p "$ENV_FILE" "$ENV_FILE.vorher"
+    # shellcheck disable=SC2086  # EDITOR darf Optionen enthalten
+    ${EDITOR:-nano} "$ENV_FILE" || { rm -f "$ENV_FILE.vorher"; die "Der Editor wurde mit einem Fehler beendet."; }
+    if cmp -s "$ENV_FILE" "$ENV_FILE.vorher"; then rm -f "$ENV_FILE.vorher"; ok "Nichts geändert."; exit 0; fi
+    chown root:"$SERVICE_USER" "$ENV_FILE"
+    chmod 640 "$ENV_FILE"
+    if systemctl restart "$SERVICE" && healthy; then
+      rm -f "$ENV_FILE.vorher"
+      ok "Gespeichert, App neu gestartet."
+    else
+      journalctl -u "$SERVICE" -n 10 --no-pager >&2 || true
+      mv "$ENV_FILE.vorher" "$ENV_FILE"
+      systemctl restart "$SERVICE"
+      die "Mit den neuen Einstellungen startet die App nicht (Meldungen oben). Die alten sind wiederhergestellt."
+    fi
+    ;;
+
+  mail-test)
+    [[ -n ${2:-} ]] || die "Bitte E-Mail-Adresse angeben:  tippspiel mail-test name@example.de"
+    cli mail-test "$2"
+    ;;
+
+  login-link)
+    [[ -n ${2:-} ]] || die "Bitte E-Mail-Adresse angeben:  tippspiel login-link name@example.de"
+    cli login-link "$2"
+    ;;
+
+  adresse | url)
+    get_env APP_URL
+    ;;
+
+  hilfe | help | -h | --help | *)
+    cat <<EOF
+LoL-Tippspiel – Befehle:
+
+  tippspiel status                  Läuft alles? Adresse, Version, letzte Sicherung
+  tippspiel update                  Neueste Version von GitHub installieren
+                                    (sichert vorher; startet die neue Version nicht, geht's automatisch zurück)
+  tippspiel neustart                App neu starten
+  tippspiel protokoll               Meldungen der App anzeigen (Fehlersuche)
+  tippspiel einstellungen           Einstellungen ändern (Gmail, Admins, …) – Speichern: Strg+O, Enter, Strg+X
+  tippspiel mail-test <E-Mail>      Test-Mail verschicken
+  tippspiel login-link <E-Mail>     Anmelde-Link erzeugen, ohne Mail (falls der Versand mal klemmt)
+  tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
+  tippspiel sicherungen             Vorhandene Sicherungen anzeigen
+  tippspiel wiederherstellen <Datei>  Daten aus einer Sicherung zurückholen
+  tippspiel adresse                 Internet-Adresse der App anzeigen
+EOF
+    ;;
+esac
+}
+
+main "$@"
+exit
