@@ -1,0 +1,125 @@
+name: Installation
+
+# Spielt deploy/install.sh auf einem nachgebauten Raspberry Pi durch, auf dem schon Homebridge läuft
+# (Debian mit systemd im Container; der echte Pi hat arm64, hier ist es amd64 – sonst gleich).
+# Tailscale wird übersprungen, weil dafür eine Anmeldung nötig ist.
+
+on:
+  push:
+    paths:
+      - 'deploy/**'
+      - 'db/migrations/**'
+      - 'src/server/**'
+      - 'package.json'
+      - '.github/workflows/installation.yml'
+  workflow_dispatch:
+
+jobs:
+  installation:
+    name: Neben Homebridge (Debian ${{ matrix.debian }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: [bookworm, trixie]   # Debian 12 und 13 – darauf bauen Raspberry Pi OS und Homebridge OS auf
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Pi-Ersatz starten (Debian mit systemd)
+        run: |
+          docker build -q -t pi --build-arg DEBIAN=${{ matrix.debian }} - <<'EOF'
+          ARG DEBIAN
+          FROM debian:${DEBIAN}
+          RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                systemd systemd-sysv dbus sudo curl ca-certificates gnupg git netcat-openbsd \
+           && rm -rf /var/lib/apt/lists/*
+          CMD ["/lib/systemd/systemd"]
+          EOF
+          # Code wie von GitHub: eine Kopie, die als "origin" dient (für "tippspiel update")
+          cp -a "$GITHUB_WORKSPACE" /tmp/quelle
+          git -C /tmp/quelle remote set-url origin /quelle
+          docker run -d --name pi --hostname homebridge --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock -v /tmp/quelle:/quelle pi
+          for _ in $(seq 60); do
+            docker exec pi systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded' && break
+            sleep 1
+          done
+          docker exec pi git config --global --add safe.directory '*'
+
+      - name: Homebridge installieren (wie auf Homebridge OS)
+        run: |
+          docker exec pi bash -euo pipefail -c '
+            curl -sSfL https://repo.homebridge.io/KEY.gpg | gpg --dearmor > /usr/share/keyrings/homebridge.gpg
+            echo "deb [signed-by=/usr/share/keyrings/homebridge.gpg] https://repo.homebridge.io stable main" \
+              > /etc/apt/sources.list.d/homebridge.list
+            apt-get update -q
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -q homebridge >/dev/null
+          '
+          for _ in $(seq 60); do docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581 && break; sleep 2; done
+          docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581
+          docker exec pi /opt/homebridge/bin/node -v | tee /tmp/homebridge-node-vorher
+          # Port 3000 ist belegt – die App muss auf einen freien ausweichen
+          docker exec pi systemd-run --unit=belegt nc -lk 3000
+
+      - name: Tippspiel installieren
+        run: docker exec -e ADMIN_EMAIL=admin@example.org -e GMAIL= -e OHNE_TAILSCALE=1 pi bash /quelle/deploy/install.sh
+
+      - name: App läuft, Homebridge unverändert
+        run: |
+          set -x
+          docker exec pi grep -x 'PORT=3001' /opt/lol-tippspiel/.env
+          docker exec pi systemctl is-active lol-tippspiel
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+          docker exec pi curl -fsS -o /dev/null http://127.0.0.1:3001/
+          docker exec pi tippspiel login-link admin@example.org | grep -q 'http://127.0.0.1:3001/'
+          docker exec pi tippspiel status
+          docker exec pi systemctl is-active homebridge
+          docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581
+          test "$(docker exec pi /opt/homebridge/bin/node -v)" = "$(cat /tmp/homebridge-node-vorher)"
+
+      - name: Zweiter Lauf behält Einstellungen
+        run: |
+          docker exec pi sha256sum /opt/lol-tippspiel/.env > /tmp/env-vorher
+          docker exec -e OHNE_TAILSCALE=1 pi bash /opt/lol-tippspiel/deploy/install.sh
+          docker exec pi sha256sum /opt/lol-tippspiel/.env | diff - /tmp/env-vorher
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+
+      - name: Sicherung und Wiederherstellen
+        run: |
+          docker exec pi tippspiel sicherung
+          datei=$(docker exec pi bash -c 'ls -t /var/backups/lol-tippspiel/tippspiel-*.dump | head -n 1')
+          docker exec pi runuser -u postgres -- psql -d tippspiel -Xqc "insert into teams (name) values ('Nach der Sicherung')"
+          echo JA | docker exec -i pi tippspiel wiederherstellen "$datei"
+          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc "select count(*) from teams where name = 'Nach der Sicherung'")" = 0
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+
+      - name: Update auf eine neue Version
+        run: |
+          cd /tmp/quelle
+          echo "<!-- Test -->" >> README.md
+          git -c user.name=Test -c user.email=test@example.org commit -qam "Test: neue Version"
+          docker exec pi tippspiel update
+          test "$(docker exec pi git -C /opt/lol-tippspiel rev-parse HEAD)" = "$(git rev-parse HEAD)"
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+
+      - name: Kaputtes Update wird zurückgenommen
+        run: |
+          cd /tmp/quelle
+          gut=$(git rev-parse HEAD)
+          sed -i '1i throw new Error("absichtlich kaputt");' src/server/main.ts
+          git -c user.name=Test -c user.email=test@example.org commit -qam "Test: kaputte Version"
+          if docker exec pi tippspiel update; then echo "Das Update hätte scheitern müssen"; exit 1; fi
+          test "$(docker exec pi git -C /opt/lol-tippspiel rev-parse HEAD)" = "$gut"
+          docker exec pi curl -fsS http://127.0.0.1:3001/gesund
+          docker exec pi systemctl is-active homebridge
+
+      - name: Protokolle (nur bei Fehler)
+        if: failure()
+        run: |
+          docker exec pi tail -n 80 /var/log/lol-tippspiel-install.log || true
+          docker exec pi journalctl -u lol-tippspiel -n 60 --no-pager || true
+          docker exec pi journalctl -u homebridge -n 30 --no-pager || true
+          docker exec pi systemctl --failed --no-pager || true

@@ -69,6 +69,29 @@ node_ok() {
     node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 6) ? 0 : 1)'
 }
 
+port_in_use() { ss -Hltn "sport = :$1" 2>/dev/null | grep -q .; }
+
+# Tailscale-Weiterleitungen lesen (z. B. eine schon vorhandene für Homebridge) und ausgeben:
+#   "<HTTPS-Port> <an|aus>"  – Port, auf dem die App schon weitergeleitet wird, und ob Funnel dort an ist
+#   "<HTTPS-Port> neu"       – noch keine Weiterleitung für die App; dieser Funnel-Port ist frei
+#   ""                       – alle Funnel-Ports (443, 8443, 10000) sind von anderen Programmen belegt
+funnel_plan() {
+  tailscale serve status --json 2>/dev/null | node -e '
+    let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+      let j = {}; try { j = JSON.parse(s || "{}") || {}; } catch {}
+      const port = process.argv[1], ours = new RegExp("^(https?://)?(127\\.0\\.0\\.1|localhost):" + port + "/?$");
+      for (const [hostPort, web] of Object.entries(j.Web || {})) {
+        const p = hostPort.split(":").pop();
+        if (Object.values((web && web.Handlers) || {}).some(h => h && ours.test(h.Proxy || ""))) {
+          console.log(p + " " + ((j.AllowFunnel || {})[hostPort] ? "an" : "aus")); return;
+        }
+      }
+      const used = new Set(Object.keys(j.TCP || {}));
+      for (const p of ["443", "8443", "10000"]) if (!used.has(p)) { console.log(p + " neu"); return; }
+      console.log("");
+    });' "$1"
+}
+
 wait_healthy() {
   local url=$1 tries=${2:-30}
   shift 2 || shift $#
@@ -129,7 +152,7 @@ run apt-get update
 PG_CAND=$(apt-cache policy postgresql 2>/dev/null | awk '/Candidate:/ { print $2 }' | grep -oE '^[0-9]+' || true)
 [[ -z $PG_CAND || $PG_CAND -ge 15 ]] ||
   die "Dieses System bietet nur PostgreSQL $PG_CAND an (mindestens 15 nötig). Bitte ein System ab Debian 12 verwenden (z. B. aktuelles Raspberry Pi OS)."
-run apt-get install -y ca-certificates curl gnupg git openssh-client postgresql unattended-upgrades
+run apt-get install -y ca-certificates curl gnupg git iproute2 openssh-client postgresql unattended-upgrades
 ok "PostgreSQL, git und automatische Sicherheits-Updates"
 
 if [[ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]]; then
@@ -198,15 +221,19 @@ ok "Code in $APP_DIR, Befehl 'tippspiel' eingerichtet"
 if [[ ! -f $ENV_FILE ]]; then
   DB_PASS=$(node -e 'console.log(require("crypto").randomBytes(24).toString("hex"))')
   SECRET=$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')
+  # Läuft auf dem Gerät schon etwas anderes auf Port 3000, nimmt die App den nächsten freien.
+  APP_PORT=$DEFAULT_PORT
+  while port_in_use "$APP_PORT"; do APP_PORT=$((APP_PORT + 1)); done
+  [[ $APP_PORT == "$DEFAULT_PORT" ]] || note "Port $DEFAULT_PORT ist von einem anderen Programm belegt – die App nimmt Port $APP_PORT."
   umask 027
   cat >"$ENV_FILE" <<EOF
 # Einstellungen für das LoL-Tippspiel (angelegt von deploy/install.sh am $(date +%d.%m.%Y)).
 # Ändern mit:  tippspiel einstellungen   (startet die App danach neu)
 
 DATABASE_URL=postgres://$DB_USER:$DB_PASS@127.0.0.1:5432/$DB_NAME
-APP_URL=http://127.0.0.1:$DEFAULT_PORT
+APP_URL=http://127.0.0.1:$APP_PORT
 HOST=127.0.0.1
-PORT=$DEFAULT_PORT
+PORT=$APP_PORT
 APP_SECRET=$SECRET
 APP_TIMEZONE=Europe/Berlin
 # Dürfen Turniere, Teams, Spiele und Ergebnisse pflegen (mehrere mit Komma trennen)
@@ -322,50 +349,65 @@ ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR"
 [[ $UPDATE == 1 ]] && exit 0
 
 # --- 6. Tailscale Funnel: öffentlich erreichbar unter https://….ts.net ---------
-step "Im Internet erreichbar machen (Tailscale)"
-if ! command -v tailscale >/dev/null 2>&1; then
-  curl -fsSL https://tailscale.com/install.sh -o /tmp/tailscale-install.sh || die "tailscale.com nicht erreichbar."
-  run sh /tmp/tailscale-install.sh
-  rm -f /tmp/tailscale-install.sh
-fi
-run systemctl enable --now tailscaled
+# OHNE_TAILSCALE=1 überspringt diesen Schritt (für Tests oder einen anderen Weg ins Internet).
+if [[ ${OHNE_TAILSCALE:-0} == 1 ]]; then
+  step "Tailscale übersprungen (OHNE_TAILSCALE=1)"
+  APP_URL=$(get_env APP_URL)
+else
+  step "Im Internet erreichbar machen (Tailscale)"
+  if ! command -v tailscale >/dev/null 2>&1; then
+    curl -fsSL https://tailscale.com/install.sh -o /tmp/tailscale-install.sh || die "tailscale.com nicht erreichbar."
+    run sh /tmp/tailscale-install.sh
+    rm -f /tmp/tailscale-install.sh
+  fi
+  run systemctl enable --now tailscaled
 
-ts_state() { tailscale status --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.BackendState+" "+((j.Self&&j.Self.DNSName)||"").replace(/\.$/,""))}catch{console.log("? ")}})'; }
+  ts_state() { tailscale status --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(j.BackendState+" "+((j.Self&&j.Self.DNSName)||"").replace(/\.$/,""))}catch{console.log("? ")}})'; }
 
-read -r STATE TS_NAME <<<"$(ts_state)"
-if [[ $STATE != Running ]]; then
-  note "Gleich erscheint ein Link (https://login.tailscale.com/…)."
-  note "Öffne ihn auf dem Handy oder PC und melde dich an, z. B. mit deinem Google-Konto."
-  note "Danach geht es hier von selbst weiter."
-  tailscale up --hostname="$TS_HOSTNAME" </dev/tty || die "Anmeldung bei Tailscale hat nicht geklappt. Einfach das Skript noch einmal starten."
   read -r STATE TS_NAME <<<"$(ts_state)"
-fi
-[[ $STATE == Running && -n $TS_NAME ]] || die "Tailscale läuft nicht richtig (Zustand: $STATE)."
-ok "Tailscale verbunden als $TS_NAME"
+  if [[ $STATE != Running ]]; then
+    note "Gleich erscheint ein Link (https://login.tailscale.com/…)."
+    note "Öffne ihn auf dem Handy oder PC und melde dich an, z. B. mit deinem Google-Konto."
+    note "Danach geht es hier von selbst weiter."
+    tailscale up --hostname="$TS_HOSTNAME" </dev/tty || die "Anmeldung bei Tailscale hat nicht geklappt. Einfach das Skript noch einmal starten."
+    read -r STATE TS_NAME <<<"$(ts_state)"
+  fi
+  [[ $STATE == Running && -n $TS_NAME ]] || die "Tailscale läuft nicht richtig (Zustand: $STATE)."
+  ok "Tailscale verbunden als $TS_NAME"
 
-if tailscale funnel status 2>/dev/null | grep -q "Funnel on" && tailscale funnel status 2>/dev/null | grep -q "127.0.0.1:$PORT"; then
-  ok "Funnel ist schon eingeschaltet"
-else
-  note "Falls gleich ein Link zum Freischalten von 'Funnel' erscheint: öffnen, bestätigen, hier geht es dann weiter."
-  tailscale funnel --bg "$PORT" </dev/tty || die "Funnel konnte nicht eingeschaltet werden. Einfach das Skript noch einmal starten."
-  ok "Funnel eingeschaltet"
-fi
+  # Vorhandene Weiterleitungen anderer Programme (z. B. Homebridge) bleiben unangetastet.
+  read -r FUNNEL_PORT FUNNEL_STATE <<<"$(funnel_plan "$PORT")"
+  [[ -n ${FUNNEL_PORT:-} ]] ||
+    die "Tailscale leitet die Ports 443, 8443 und 10000 schon an andere Programme weiter (anzeigen: tailscale serve status). Einen davon freigeben und das Skript noch einmal starten."
+  if [[ $FUNNEL_STATE == an ]]; then
+    ok "Funnel ist schon eingeschaltet"
+  else
+    if [[ $FUNNEL_STATE == neu && $FUNNEL_PORT != 443 ]]; then
+      note "Tailscale leitet Port 443 schon an ein anderes Programm weiter (z. B. Homebridge)."
+      note "Das bleibt so – die App bekommt Port $FUNNEL_PORT."
+    fi
+    note "Falls gleich ein Link zum Freischalten von 'Funnel' erscheint: öffnen, bestätigen, hier geht es dann weiter."
+    tailscale funnel --bg --https="$FUNNEL_PORT" "$PORT" </dev/tty || die "Funnel konnte nicht eingeschaltet werden. Einfach das Skript noch einmal starten."
+    ok "Funnel eingeschaltet"
+  fi
 
-APP_URL="https://$TS_NAME"
-if [[ $(get_env APP_URL) != "$APP_URL" ]]; then
-  set_env APP_URL "$APP_URL"
-  set_env HOST 127.0.0.1
-  set_env TRUST_PROXY 1
-  run systemctl restart "$SERVICE.service"
-  wait_healthy "http://127.0.0.1:$PORT/gesund" || die "Die App startet nach dem Umstellen nicht: journalctl -u $SERVICE"
-fi
+  APP_URL="https://$TS_NAME"
+  [[ $FUNNEL_PORT == 443 ]] || APP_URL="$APP_URL:$FUNNEL_PORT"
+  if [[ $(get_env APP_URL) != "$APP_URL" ]]; then
+    set_env APP_URL "$APP_URL"
+    set_env HOST 127.0.0.1
+    set_env TRUST_PROXY 1
+    run systemctl restart "$SERVICE.service"
+    wait_healthy "http://127.0.0.1:$PORT/gesund" || die "Die App startet nach dem Umstellen nicht: journalctl -u $SERVICE"
+  fi
 
-note "Prüfe die Adresse (beim ersten Mal kann das ein, zwei Minuten dauern) …"
-TS_IP=$(tailscale ip -4 2>/dev/null | head -n 1)
-if wait_healthy "$APP_URL/gesund" 20 ${TS_IP:+--resolve "$TS_NAME:443:$TS_IP"}; then
-  ok "Erreichbar unter $APP_URL"
-else
-  warn "Noch nicht erreichbar. Das kann bis zu 10 Minuten dauern. Danach einfach $APP_URL im Browser öffnen."
+  note "Prüfe die Adresse (beim ersten Mal kann das ein, zwei Minuten dauern) …"
+  TS_IP=$(tailscale ip -4 2>/dev/null | head -n 1)
+  if wait_healthy "$APP_URL/gesund" 20 ${TS_IP:+--resolve "$TS_NAME:$FUNNEL_PORT:$TS_IP"}; then
+    ok "Erreichbar unter $APP_URL"
+  else
+    warn "Noch nicht erreichbar. Das kann bis zu 10 Minuten dauern. Danach einfach $APP_URL im Browser öffnen."
+  fi
 fi
 
 # --- 7. Test-Mail --------------------------------------------------------------

@@ -29,6 +29,18 @@ healthy() {
   done
   return 1
 }
+# Ist Tailscale Funnel für die App an? (Weiterleitungen anderer Programme, z. B. Homebridge, zählen nicht.)
+funnel_on() {
+  command -v tailscale >/dev/null 2>&1 || return 1
+  tailscale serve status --json 2>/dev/null | node -e '
+    let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+      let j = {}; try { j = JSON.parse(s || "{}") || {}; } catch {}
+      const ours = new RegExp("^(https?://)?(127\\.0\\.0\\.1|localhost):" + process.argv[1] + "/?$");
+      const on = Object.entries(j.Web || {}).some(([hostPort, web]) => (j.AllowFunnel || {})[hostPort] &&
+        Object.values((web && web.Handlers) || {}).some(h => h && ours.test(h.Proxy || "")));
+      process.exit(on ? 0 : 1);
+    });' "$(port)"
+}
 cli() {
   cd "$APP_DIR" || exit 1
   runuser -u "$SERVICE_USER" -- "$(command -v node)" --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts "$@"
@@ -64,10 +76,10 @@ case "${1:-hilfe}" in
     echo "  E-Mail:     $(get_env MAIL_MODE) $(get_env SMTP_USER)"
     last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
     echo "  Sicherung:  ${last:-noch keine}"
-    if command -v tailscale >/dev/null && tailscale funnel status 2>/dev/null | grep -q "Funnel on"; then
+    if funnel_on; then
       ok "Im Internet erreichbar (Tailscale Funnel an)"
     else
-      warn "Tailscale Funnel ist aus – einschalten: sudo tailscale funnel --bg $(port)"
+      warn "Tailscale Funnel ist für die App aus – einschalten mit:  sudo bash $APP_DIR/deploy/install.sh"
     fi
     ;;
 

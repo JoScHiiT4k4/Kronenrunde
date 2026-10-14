@@ -20,6 +20,8 @@ Am Ende läuft die App bei dir zu Hause und ist im Internet unter einer Adresse 
 > ```
 >
 > Passt, wenn dort **Debian 12** (bookworm) oder neuer und **arm64** steht. Dann weiter mit Schritt 2.
+>
+> Nutzt du Tailscale schon für Homebridge, bleibt das unverändert. Die App bekommt dann eine Adresse mit `:8443` am Ende.
 
 1. Am PC **Raspberry Pi Imager** installieren: <https://www.raspberrypi.com/software/> → *Download for Windows*.
 2. SD-Karte in den PC stecken, Imager öffnen und durchklicken:
