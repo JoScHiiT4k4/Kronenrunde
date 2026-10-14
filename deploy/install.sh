@@ -125,6 +125,10 @@ fi
 step "Programme installieren (kann einige Minuten dauern)"
 export DEBIAN_FRONTEND=noninteractive
 run apt-get update
+# Vor dem Installieren prüfen, damit auf einem zu alten System nichts halb eingerichtet wird
+PG_CAND=$(apt-cache policy postgresql 2>/dev/null | awk '/Candidate:/ { print $2 }' | grep -oE '^[0-9]+' || true)
+[[ -z $PG_CAND || $PG_CAND -ge 15 ]] ||
+  die "Dieses System bietet nur PostgreSQL $PG_CAND an (mindestens 15 nötig). Bitte ein System ab Debian 12 verwenden (z. B. aktuelles Raspberry Pi OS)."
 run apt-get install -y ca-certificates curl gnupg git openssh-client postgresql unattended-upgrades
 ok "PostgreSQL, git und automatische Sicherheits-Updates"
 

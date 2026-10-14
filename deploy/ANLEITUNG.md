@@ -12,6 +12,15 @@ Am Ende läuft die App bei dir zu Hause und ist im Internet unter einer Adresse 
 
 Überspringen, wenn auf deinem Pi schon **Raspberry Pi OS (64-bit)** läuft und du dich per SSH verbinden kannst.
 
+> **Homebridge schon auf dem Pi?** Nicht neu aufspielen, die App läuft daneben (Homebridge hat sein eigenes Node.js und Port 8581, die App Port 3000).
+> Vorher in der Homebridge-Oberfläche eine Sicherung herunterladen. Dann per SSH anmelden (`ssh deinname@homebridge.local`) und prüfen:
+>
+> ```
+> grep PRETTY /etc/os-release; dpkg --print-architecture
+> ```
+>
+> Passt, wenn dort **Debian 12** (bookworm) oder neuer und **arm64** steht. Dann weiter mit Schritt 2.
+
 1. Am PC **Raspberry Pi Imager** installieren: <https://www.raspberrypi.com/software/> → *Download for Windows*.
 2. SD-Karte in den PC stecken, Imager öffnen und durchklicken:
    - **Gerät:** Raspberry Pi 4
