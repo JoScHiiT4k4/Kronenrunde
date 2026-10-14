@@ -132,6 +132,17 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     ],
   });
 
+  // Hinweisseite ohne Internet (der Service Worker hält sie bereit)
+  const appNameHtml = html`${config.appName}`.value;
+  const offlinePage = `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keine Verbindung – ${appNameHtml}</title><meta name="theme-color" content="#07111c">
+<link rel="icon" href="${deps.asset('icon.svg')}" type="image/svg+xml"><link rel="stylesheet" href="${deps.asset('app.css')}">
+</head><body><header class="top"><span class="brand">${appNameHtml}</span></header>
+<main class="main"><section class="panel"><h1>Keine Verbindung</h1>
+<p>Gerade gibt es keine Verbindung zum Internet. Sobald sie wieder da ist, lade die Seite neu.</p>
+<p><a class="btn btn-primary" href="/">Neu laden</a></p></section></main></body></html>`;
+
   async function handle(req: IncomingMessage): Promise<Res> {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const method = req.method ?? 'GET';
@@ -153,6 +164,14 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     }
     if (path === '/manifest.webmanifest') {
       return { status: 200, headers: { 'content-type': MIME['.webmanifest'], 'cache-control': 'public, max-age=3600' }, body: manifest };
+    }
+    if (path === '/sw.js') {
+      // Service Worker: muss im Hauptverzeichnis liegen, damit er für die ganze Seite gilt
+      const sw = statics.get('sw.js')!;
+      return { status: 200, headers: { 'content-type': sw.type, 'cache-control': 'no-cache' }, body: sw.body };
+    }
+    if (path === '/offline') {
+      return { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' }, body: offlinePage };
     }
     if (path === '/favicon.ico') return { status: 301, headers: { location: deps.asset('icon.svg') }, body: '' };
     if (path === '/robots.txt') {

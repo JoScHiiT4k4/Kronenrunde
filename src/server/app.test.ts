@@ -163,6 +163,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await stranger.get('/manifest.webmanifest')).status, 200);
     assert.equal((await stranger.get('/gibt-es-nicht')).status, 404);
     assert.equal((await stranger.get('/gesund')).text, 'ok');
+    // Handy-App: Service Worker im Hauptverzeichnis, Hinweisseite ohne Internet
+    const sw = await stranger.get('/sw.js');
+    assert.equal(sw.status, 200);
+    assert.match(sw.headers.get('content-type') ?? '', /javascript/);
+    assert.match(sw.text, /addEventListener\('fetch'/);
+    const offline = await stranger.get('/offline');
+    assert.match(offline.text, /Keine Verbindung/);
+    assert.match(offline.text, /\/static\/app\.css\?v=/);
   });
 
   test('Anmeldung: ungültige E-Mail, Link, Name, Link nur einmal gültig', async () => {

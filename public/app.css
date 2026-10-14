@@ -575,3 +575,32 @@ details > summary > span:first-of-type { flex: 1; }
 }
 
 .preview { max-width: 440px; margin: 20px 0 24px; pointer-events: none; }
+
+/* ---------- Hinweis: aufs Handy legen ---------- */
+
+.install-sheet {
+  --cut: 12px;
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 50;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 16px 18px;
+  background-color: #0f2032;
+  border: 1px solid var(--gold);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  box-shadow: 0 -8px 40px rgb(0 0 0 / 50%);
+}
+.install-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.install-head img { flex: none; }
+.install-head h2 { margin: 0; color: var(--gold-bright); }
+.install-sheet p { margin-bottom: 8px; }
+.install-steps { margin: 0 0 12px; padding-left: 1.3em; }
+.install-steps li + li { margin-top: 4px; }
+.install-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .install-sheet { animation: install-in 260ms ease-out; }
+  @keyframes install-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+}

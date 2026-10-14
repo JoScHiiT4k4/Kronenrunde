@@ -56,7 +56,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 <link rel="stylesheet" href="${ctx.deps.asset('app.css')}">
 <script src="${ctx.deps.asset('app.js')}" defer></script>
 </head>
-<body>
+<body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
   <a class="brand" href="/">${appName}</a>
   <nav class="top-nav">
