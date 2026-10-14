@@ -92,8 +92,9 @@ export function validateTournamentData(data: unknown): string[] {
     }
     if (m.result != null) {
       const need = ([1, 3, 5].includes(m.best_of) ? m.best_of + 1 : 2) / 2;
-      const [a, b] = Array.isArray(m.result) ? m.result : [];
-      const ok = Number.isInteger(a) && Number.isInteger(b) && a >= 0 && b >= 0 && Math.max(a, b) === need && a !== b;
+      const [a, b]: unknown[] = Array.isArray(m.result) ? m.result : [];
+      const ok = typeof a === 'number' && typeof b === 'number' && Number.isInteger(a) && Number.isInteger(b)
+        && a >= 0 && b >= 0 && Math.max(a, b) === need && a !== b;
       if (!ok) errors.push(`${where}: result passt nicht zu Bo${m.best_of} (z. B. [${need}, ${need - 1}]).`);
       if (m.team_a == null || m.team_b == null) errors.push(`${where}: Ein Ergebnis geht nur, wenn beide Teams feststehen.`);
     }
