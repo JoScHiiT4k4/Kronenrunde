@@ -34,6 +34,12 @@ if (slug === 'teams') {
 }
 
 const { leagues } = await get('getLeagues', {});
+if (process.argv[3] === 'roh') {
+  const lg = leagues.find((l) => l.slug === slug);
+  const { schedule } = await get('getSchedule', { leagueId: lg.id });
+  console.log(JSON.stringify({ league: lg, schedule }, null, 1));
+  process.exit(0);
+}
 const league = leagues.find((l) => l.slug === slug);
 if (!league) throw new Error(`Liga "${slug}" nicht gefunden. Vorhanden: ${leagues.map((l) => l.slug).join(', ')}`);
 
