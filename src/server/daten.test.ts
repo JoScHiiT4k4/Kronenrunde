@@ -26,6 +26,14 @@ test('Worlds 2026: Teams, Phasen und Anstoßzeiten (deutsche Zeit) stimmen', () 
   assert.equal(utc('vf-1'), '2026-11-03T22:00:00.000Z'); //    23:00 MEZ
   assert.equal(utc('hf-2'), '2026-11-08T22:00:00.000Z'); //    23:00 MEZ
   assert.equal(utc('finale'), '2026-11-14T19:00:00.000Z'); //  20:00 MEZ
+  // Swiss laut lolesports.com: 8 + 8 Bo1, Runde 3 je 4 Bo1/Bo3, Runde 4 sechs Bo3, Runde 5 drei Bo3
+  const swiss = d.matches.filter((m) => m.key.startsWith('swiss-'));
+  assert.equal(swiss.length, 33);
+  const runde = { r1: '11111111', r2: '11111111', r3: '11331133', r4: '333333', r5: '333' };
+  assert.equal(swiss.map((m) => m.best_of).join(''), Object.values(runde).join(''));
+  assert.equal(utc('swiss-1-1'), '2026-10-23T17:00:00.000Z'); // 19:00 MESZ
+  assert.equal(utc('swiss-3-1'), '2026-10-25T17:00:00.000Z'); // 18:00 MEZ (Zeitumstellung)
+  assert.equal(utc('swiss-5-3'), '2026-10-31T23:00:00.000Z'); // 0:00 MEZ
   const first = d.matches.find((x) => x.key === 'pi-oh-1')!;
   assert.deepEqual([first.team_a, first.team_b, first.best_of], ['KC', 'C9', 5]);
 });

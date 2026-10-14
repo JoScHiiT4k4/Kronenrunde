@@ -85,8 +85,8 @@ jobs:
           docker exec pi tippspiel daten
           docker exec pi tippspiel daten worlds-2026
           docker exec pi tippspiel daten worlds-2026 | tee /tmp/daten
-          grep -q '13 unverändert' /tmp/daten
-          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) from matches')" = 13
+          grep -q '46 unverändert' /tmp/daten
+          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) from matches')" = 46
 
       - name: Zweiter Lauf behält Einstellungen
         run: |

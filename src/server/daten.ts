@@ -182,31 +182,36 @@ async function importInto(q: Queryable, data: TournamentData): Promise<ImportSum
   }
 
   // Spiele: Angaben aus der Datei gelten; fehlt eine Angabe (Team offen, kein Ergebnis), bleibt der Eintrag aus dem Admin-Bereich.
-  // Das Format (Bo) bleibt, sobald jemand getippt hat oder ein Ergebnis steht – sonst würden Tipps oder Ergebnis ungültig.
+  // Hat schon jemand getippt, bleiben Teams und Format (Bo) wie sie sind – sonst würden Tipps ungültig oder
+  // landeten beim anderen Team. Solche Korrekturen gehen nur von Hand im Admin-Bereich.
   let matchesNew = 0;
   let matchesChanged = 0;
   for (const m of data.matches) {
     const [winsA, winsB] = m.result ?? [null, null];
     const row = await q.one<{ inserted: boolean }>(
-      `insert into matches as m (tournament_id, external_id, stage_id, team_a_id, team_b_id, best_of, scheduled_at, wins_a, wins_b, status)
+      `with tipped as (
+         select exists (select 1 from predictions p join matches x on x.id = p.match_id
+                         where x.tournament_id = $1 and x.external_id = $2) as yes
+       )
+       insert into matches as m (tournament_id, external_id, stage_id, team_a_id, team_b_id, best_of, scheduled_at, wins_a, wins_b, status)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, case when $8::smallint is null then 'scheduled' else 'finished' end)
        on conflict (tournament_id, external_id) where external_id is not null do update set
          stage_id     = coalesce(excluded.stage_id, m.stage_id),
-         team_a_id    = coalesce(excluded.team_a_id, m.team_a_id),
-         team_b_id    = coalesce(excluded.team_b_id, m.team_b_id),
-         best_of      = case when m.wins_a is not null or exists (select 1 from predictions p where p.match_id = m.id)
-                             then m.best_of else excluded.best_of end,
+         team_a_id    = case when (select yes from tipped) then m.team_a_id else coalesce(excluded.team_a_id, m.team_a_id) end,
+         team_b_id    = case when (select yes from tipped) then m.team_b_id else coalesce(excluded.team_b_id, m.team_b_id) end,
+         best_of      = case when (select yes from tipped) or m.wins_a is not null then m.best_of else excluded.best_of end,
          scheduled_at = coalesce(excluded.scheduled_at, m.scheduled_at),
          wins_a       = coalesce(excluded.wins_a, m.wins_a),
          wins_b       = coalesce(excluded.wins_b, m.wins_b),
          status       = case when excluded.wins_a is not null and m.status <> 'cancelled' then 'finished' else m.status end
-       where (m.stage_id, m.team_a_id, m.team_b_id, m.scheduled_at, m.wins_a, m.wins_b)
+       where (m.stage_id, m.team_a_id, m.team_b_id, m.best_of, m.scheduled_at, m.wins_a, m.wins_b)
              is distinct from
-             (coalesce(excluded.stage_id, m.stage_id), coalesce(excluded.team_a_id, m.team_a_id),
-              coalesce(excluded.team_b_id, m.team_b_id), coalesce(excluded.scheduled_at, m.scheduled_at),
+             (coalesce(excluded.stage_id, m.stage_id),
+              case when (select yes from tipped) then m.team_a_id else coalesce(excluded.team_a_id, m.team_a_id) end,
+              case when (select yes from tipped) then m.team_b_id else coalesce(excluded.team_b_id, m.team_b_id) end,
+              case when (select yes from tipped) or m.wins_a is not null then m.best_of else excluded.best_of end,
+              coalesce(excluded.scheduled_at, m.scheduled_at),
               coalesce(excluded.wins_a, m.wins_a), coalesce(excluded.wins_b, m.wins_b))
-          or (m.best_of <> excluded.best_of and m.wins_a is null
-              and not exists (select 1 from predictions p where p.match_id = m.id))
        returning (xmax = 0) as inserted`,
       [
         tid,

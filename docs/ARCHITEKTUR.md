@@ -31,6 +31,16 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 
 ## Hinweise für später
 
+- **Riot-Regeln** ([Legal Jibber Jabber](https://www.riotgames.com/de/rechtliches), [Developer Policies](https://developer.riotgames.com/policies/general)), Stand Okt. 2026 – keine Rechtsberatung:
+  - Gut sichtbarer Hinweis, dass Riot das Projekt nicht unterstützt (steht in der Fußzeile).
+  - Keine Riot-Logos, -Marken, -Schriften oder Spielgrafiken; das Design nutzt nur eigene Formen und freie Schriften.
+  - **Domain und App-Name ohne Riot-Marken** (also z. B. nicht `lol-…`); vor Stufe 2 umbenennen.
+  - Werbung („passiv“) ist erlaubt, Paywalls/Crowdfunding nur mit Lizenz; keine Wetten oder Geldeinsätze.
+  - App Store / Play Store nur mit Lizenz oder registriertem API-Key – vor Stufe 3 bei Riot anfragen.
+- **Datenquelle lolesports.com**: Die Seite nutzt eine inoffizielle, nicht dokumentierte Schnittstelle
+  (`scripts/lolesports.mjs`, Abgleich über Actions → „Spielplan von lolesports.com“). Für die private Runde
+  praktisch, für die öffentliche Version nicht verlässlich genug (kann sich jederzeit ändern, nicht von Riot freigegeben).
+  Alternativen: Leaguepedia (Lizenz CC BY-SA) oder ein lizenzierter Datenanbieter.
 - **Werbung**: Die Content-Security-Policy in `src/server/http.ts` erlaubt nur eigene Dateien. Für Werbung (z. B. Google AdSense) muss sie gezielt erweitert werden.
 - **Werbung in der EU**: Für personalisierte Anzeigen verlangt Google ein zertifiziertes Cookie-Banner (IAB TCF).
 - **Öffentlich**: Vor Stufe 2 Impressum und Datenschutzerklärung ergänzen.

@@ -410,7 +410,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const data = JSON.parse(readFileSync(join(root, 'db', 'daten', 'worlds-2026.json'), 'utf8')) as TournamentData;
     const first = await importTournament(db, data);
     // Gen.G, T1, G2 Esports und Karmine Corp hat der Admin schon angelegt
-    assert.deepEqual([first.tournamentNew, first.teamsNew, first.teamsKnown, first.matchesNew], [true, 15, 4, 13]);
+    assert.deepEqual([first.tournamentNew, first.teamsNew, first.teamsKnown, first.matchesNew], [true, 15, 4, 46]);
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from teams'))!.n, 19);
     const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
     const get = (key: string) =>
@@ -452,7 +452,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Zweiter Lauf: nichts doppelt, nichts geändert
     const again = await importTournament(db, data);
-    assert.deepEqual([again.tournamentNew, again.teamsNew, again.matchesNew, again.matchesChanged, again.matchesUnchanged], [false, 0, 0, 0, 13]);
+    assert.deepEqual([again.tournamentNew, again.teamsNew, again.matchesNew, again.matchesChanged, again.matchesUnchanged], [false, 0, 0, 0, 46]);
 
     // Im Admin-Bereich eingetragen: Teams fürs obere Finale, Ergebnis des ersten Spiels
     await db.run(`update matches set team_a_id = $2, team_b_id = $3 where tournament_id = $1 and external_id = 'pi-of'`, [tid, team.KC, team.T1]);
@@ -461,10 +461,23 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const newer = structuredClone(data);
     newer.matches.find((m) => m.key === 'finale')!.scheduled_at = '2026-11-14T15:00:00-05:00';
     const third = await importTournament(db, newer);
-    assert.deepEqual([third.matchesNew, third.matchesChanged, third.matchesUnchanged], [0, 1, 12]);
+    assert.deepEqual([third.matchesNew, third.matchesChanged, third.matchesUnchanged], [0, 1, 45]);
     assert.deepEqual([(await get('pi-of')).a, (await get('pi-of')).b], ['KC', 'T1']);
     assert.deepEqual([(await get('pi-oh-1')).wins_a, (await get('pi-oh-1')).status], [3, 'finished']);
     assert.equal((await get('finale')).scheduled_at.toISOString(), '2026-11-14T20:00:00.000Z');
+
+    // Wurde schon getippt, tauscht ein Import die Teams nicht mehr (sonst landeten Tipps beim anderen Team)
+    const kcMatch = (await db.one<{ id: string }>(`select id from matches where tournament_id = $1 and external_id = 'pi-oh-2'`, [tid]))!.id;
+    await db.tx(async (q) => {
+      await q.exec(`set local app.bypass_lock = 'on'`);
+      await q.run(`insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins) values ($1, $2, $3, 'A', 3, 1)`, [league, kcMatch, adminId]);
+    });
+    const swapped = structuredClone(newer);
+    const m2 = swapped.matches.find((m) => m.key === 'pi-oh-2')!;
+    [m2.team_a, m2.team_b] = [m2.team_b, m2.team_a];
+    const fourth = await importTournament(db, swapped);
+    assert.equal(fourth.matchesChanged, 0);
+    assert.deepEqual([(await get('pi-oh-2')).a, (await get('pi-oh-2')).b], ['FUR', 'MVK']);
 
     // Fehlerhafte Datei: abgelehnt, bevor etwas passiert
     const broken = structuredClone(data);
