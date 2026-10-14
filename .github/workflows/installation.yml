@@ -92,6 +92,7 @@ jobs:
         run: |
           docker exec pi tippspiel abgleich | tee /tmp/abgleich
           grep -q 'Spieler aus 19 von 19 Teams' /tmp/abgleich
+          ! grep -q 'Fehler' /tmp/abgleich
           test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) >= 150 from champions')" = t
 
       - name: Zweiter Lauf behält Einstellungen

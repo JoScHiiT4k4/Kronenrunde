@@ -11,7 +11,15 @@ import type { BestOf } from '../domain/types.ts';
 import type { Db, Queryable } from './db/index.ts';
 
 export interface TournamentData {
-  tournament: { key: string; name: string; game?: string; starts_on?: string | null; ends_on?: string | null };
+  tournament: {
+    key: string;
+    name: string;
+    game?: string;
+    starts_on?: string | null;
+    ends_on?: string | null;
+    /** Automatischer Abgleich von Paarungen und Ergebnissen, z. B. "lolesports:worlds" */
+    source?: string | null;
+  };
   /** Phasen in ihrer Reihenfolge; der Name erscheint bei jedem Spiel. */
   stages?: string[];
   teams: { key: string; name: string; short_name?: string | null; region?: string | null }[];
@@ -51,6 +59,9 @@ export function validateTournamentData(data: unknown): string[] {
   const t = d.tournament;
   if (!t || typeof t.key !== 'string' || !/^[a-z0-9-]{3,60}$/.test(t.key)) errors.push('tournament.key fehlt oder ist ungültig (nur a-z, 0-9, -).');
   if (!t || typeof t.name !== 'string' || !t.name.trim()) errors.push('tournament.name fehlt.');
+  if (t?.source != null && (typeof t.source !== 'string' || !/^lolesports:[a-z0-9_-]{2,40}$/.test(t.source))) {
+    errors.push('tournament.source muss z. B. "lolesports:worlds" sein.');
+  }
   for (const f of ['starts_on', 'ends_on'] as const) {
     const v = t?.[f];
     if (v != null && (typeof v !== 'string' || !DATE.test(v))) errors.push(`tournament.${f} muss JJJJ-MM-TT sein.`);
@@ -160,8 +171,9 @@ async function importInto(q: Queryable, data: TournamentData): Promise<ImportSum
   }
   const tid = tournament!.id;
   await q.run(
-    'update tournaments set starts_on = coalesce($2::date, starts_on), ends_on = coalesce($3::date, ends_on) where id = $1',
-    [tid, data.tournament.starts_on ?? null, data.tournament.ends_on ?? null],
+    `update tournaments set starts_on = coalesce($2::date, starts_on), ends_on = coalesce($3::date, ends_on),
+            source = coalesce($4, source) where id = $1`,
+    [tid, data.tournament.starts_on ?? null, data.tournament.ends_on ?? null, data.tournament.source ?? null],
   );
 
   // Teilnehmende Teams (für Sonderfragen wie "Wer wird Weltmeister?", auch bevor ihre Spiele feststehen)

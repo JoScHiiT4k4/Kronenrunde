@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { fetchChampions, fetchLolesportsTeams, type LolTeam, matchTeam } from './abgleich.ts';
+import { fetchChampions, fetchLolesportsTeams, type LolTeam, matchScheduleTeam, matchTeam } from './abgleich.ts';
 import { fakeRiot, lolesports } from './testdaten/fake-riot.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -53,4 +53,14 @@ test('Spieler: Akademie-Teams, archivierte Teams und unklare Fälle', () => {
   assert.equal(matchTeam({ name: 'Alpha Beta', short_name: 'AB', region: 'LEC', external_id: null }, twins), null);
   // Falsche Liga: nicht zuordnen
   assert.equal(matchTeam({ name: 'Gen.G', short_name: 'GEN', region: 'LEC', external_id: null }, all), null);
+});
+
+test('Spielplan: Teams aus dem Spielplan werden den Turnier-Teams zugeordnet', () => {
+  const ours = (worlds.teams as { key: string; name: string; short_name: string }[]).map((t) => ({ id: t.key, name: t.name, short_name: t.short_name }));
+  assert.equal(matchScheduleTeam({ name: 'Team Liquid Alienware', code: 'TLAW' }, ours), 'TL');
+  assert.equal(matchScheduleTeam({ name: 'Cloud9 Kia', code: 'C9' }, ours), 'C9');
+  assert.equal(matchScheduleTeam({ name: 'Gen.G Esports', code: 'GEN' }, ours), 'GEN');
+  assert.equal(matchScheduleTeam({ name: 'BILIBILI GAMING', code: 'BLG' }, ours), 'BLG');
+  assert.equal(matchScheduleTeam({ name: 'TBD', code: 'TBD' }, ours), null);
+  assert.equal(matchScheduleTeam({ name: 'Unbekannt Esports', code: 'UNB' }, ours), null);
 });

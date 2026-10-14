@@ -1,10 +1,12 @@
-// Datenabgleich mit Riot: Champion-Liste und Spielerkader der Turnier-Teams.
+// Datenabgleich mit Riot: Paarungen und Ergebnisse, Champion-Liste, Spielerkader der Turnier-Teams.
 //
+// - Spielplan: lolesports.com für Turniere mit source = 'lolesports:<liga>' – Paarungen, Ergebnisse, Anstoßzeiten.
 // - Champions: Data Dragon, Riots offizielle, frei nutzbare Datenquelle (deutsche Namen).
 // - Spieler:   lolesports.com (inoffizielle Schnittstelle der Seite – kann sich ändern; siehe docs/ARCHITEKTUR.md).
 //
-// Läuft in der App alle 6 Stunden (DATENABGLEICH, in Produktion an), auf Knopfdruck im Admin-Bereich
-// und mit  tippspiel abgleich. Fehler werden gemeldet, die vorhandenen Daten bleiben dann einfach stehen.
+// Läuft in der App (DATENABGLEICH, in Produktion an): Spielplan alle 10 Minuten, der Rest alle 6 Stunden;
+// außerdem auf Knopfdruck im Admin-Bereich und mit  tippspiel abgleich.
+// Einträge aus dem Admin-Bereich werden nie überschrieben; Fehler werden gemeldet, vorhandene Daten bleiben stehen.
 
 import type { Db } from './db/index.ts';
 
@@ -165,6 +167,188 @@ export async function syncPlayers(db: Db, get: FetchJson = fetchJson): Promise<s
 }
 
 // ---------------------------------------------------------------------
+// Spielplan und Ergebnisse (Turniere mit source = 'lolesports:<liga>')
+// ---------------------------------------------------------------------
+
+interface LolEvent {
+  startTime: string;
+  state?: string; // unstarted, inProgress, completed
+  type?: string;
+  blockName?: string;
+  match?: {
+    id: string;
+    teams?: { name?: string; code?: string; result?: { outcome?: string | null; gameWins?: number } | null }[];
+    strategy?: { type?: string; count?: number };
+  };
+}
+
+async function fetchLeagueEvents(get: FetchJson, leagueId: string, from: number, to: number): Promise<LolEvent[]> {
+  const headers = { 'x-api-key': LOLESPORTS_KEY };
+  const events = new Map<string, LolEvent>();
+  const seen = new Set<string>();
+  const queue: { token: string; dir: 'older' | 'newer' | 'start' }[] = [{ token: '', dir: 'start' }];
+  while (queue.length && seen.size < 15) {
+    const { token, dir } = queue.shift()!;
+    if (seen.has(token)) continue;
+    seen.add(token);
+    const res = (await get(`${LOLESPORTS}/getSchedule?hl=de-DE&leagueId=${encodeURIComponent(leagueId)}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`, headers)) as {
+      data?: { schedule?: { pages?: { older?: string | null; newer?: string | null }; events?: LolEvent[] } };
+    };
+    const schedule = res?.data?.schedule;
+    if (!schedule || !Array.isArray(schedule.events)) throw new Error('lolesports.com: kein Spielplan erhalten');
+    const times = schedule.events.map((e) => Date.parse(e.startTime)).filter((t) => !Number.isNaN(t));
+    for (const e of schedule.events) {
+      const t = Date.parse(e.startTime);
+      if (e.type === 'match' && e.match?.id && t >= from && t <= to) events.set(e.match.id, e);
+    }
+    // Weiterblättern, solange die Seiten in den Zeitraum des Turniers reichen
+    if (schedule.pages?.older && dir !== 'newer' && times.length && Math.min(...times) > from) queue.push({ token: schedule.pages.older, dir: 'older' });
+    if (schedule.pages?.newer && dir !== 'older' && times.length && Math.max(...times) < to) queue.push({ token: schedule.pages.newer, dir: 'newer' });
+  }
+  return [...events.values()];
+}
+
+/** Ordnet ein Team aus dem Spielplan (Name, Kürzel) einem Team des Turniers zu; TBD und Unklares → null. */
+export function matchScheduleTeam(api: { name?: string; code?: string }, ours: { id: string; name: string; short_name: string | null }[]): string | null {
+  const n = norm(api.name);
+  const c = norm(api.code);
+  if (!n || n === 'tbd' || c === 'tbd') return null;
+  const ranked = ours
+    .map((t) => {
+      const tn = norm(t.name);
+      let score = 0;
+      if (c && norm(t.short_name) === c) score += 2;
+      if (tn === n) score += 3;
+      else if (tn && (n.includes(tn) || tn.includes(n))) score += 2;
+      return { id: t.id, score };
+    })
+    .filter((x) => x.score >= 2)
+    .sort((a, b) => b.score - a.score);
+  if (!ranked.length || (ranked.length > 1 && ranked[0].score === ranked[1].score)) return null;
+  return ranked[0].id;
+}
+
+export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<string> {
+  const tours = await db.query<{ id: string; name: string; source: string; starts_on: string | null; ends_on: string | null }>(
+    `select id, name, source, to_char(starts_on, 'YYYY-MM-DD') as starts_on, to_char(ends_on, 'YYYY-MM-DD') as ends_on
+       from tournaments
+      where source like 'lolesports:%'
+        and coalesce(ends_on, current_date) >= current_date - 2
+        and coalesce(starts_on, current_date) <= current_date + 60`,
+  );
+  if (!tours.length) return 'Kein laufendes Turnier mit Anbindung an lolesports.com';
+  const leaguesRes = (await get(`${LOLESPORTS}/getLeagues?hl=de-DE`, { 'x-api-key': LOLESPORTS_KEY })) as {
+    data?: { leagues?: { id: string; slug: string }[] };
+  };
+  const leagues = leaguesRes?.data?.leagues ?? [];
+  const report: string[] = [];
+
+  for (const tour of tours) {
+    const slug = tour.source.slice('lolesports:'.length);
+    const league = leagues.find((l) => l.slug === slug);
+    if (!league) {
+      report.push(`${tour.name}: Liga "${slug}" nicht gefunden`);
+      continue;
+    }
+    const day = 86_400_000;
+    const from = tour.starts_on ? Date.parse(`${tour.starts_on}T00:00:00Z`) - day : Date.now() - 60 * day;
+    const to = tour.ends_on ? Date.parse(`${tour.ends_on}T00:00:00Z`) + 2 * day : Date.now() + 60 * day;
+    const events = await fetchLeagueEvents(get, league.id, from, to);
+
+    const stats = { linked: 0, teams: 0, results: 0, times: 0, live: 0, unknown: 0, conflicts: 0 };
+    await db.tx(async (q) => {
+      const ours = await q.query<{
+        id: string; source_id: string | null; team_a_id: string | null; team_b_id: string | null;
+        best_of: number; scheduled_at: Date | null; wins_a: number | null; status: string;
+      }>(
+        `select id, source_id, team_a_id, team_b_id, best_of, scheduled_at, wins_a, status from matches where tournament_id = $1`,
+        [tour.id],
+      );
+      const teams = await q.query<{ id: string; name: string; short_name: string | null }>(
+        `select t.id, t.name, t.short_name from teams t
+          where t.id in (select team_id from tournament_teams where tournament_id = $1)
+             or t.external_id is not null`,
+        [tour.id],
+      );
+      for (const e of events) {
+        const ev = e.match!;
+        const start = Date.parse(e.startTime);
+        let m = ours.find((x) => x.source_id === ev.id);
+        if (!m) {
+          // Erster Abgleich: über Anstoßzeit und Format verknüpfen (nur wenn eindeutig)
+          const candidates = ours.filter((x) => !x.source_id && x.scheduled_at?.getTime() === start && x.best_of === ev.strategy?.count);
+          if (candidates.length !== 1) {
+            stats.unknown++;
+            continue;
+          }
+          m = candidates[0];
+          m.source_id = ev.id;
+          await q.run('update matches set source_id = $2 where id = $1', [m.id, ev.id]);
+          stats.linked++;
+        }
+        const api = (ev.teams ?? []).slice(0, 2);
+        const ids = api.map((t) => matchScheduleTeam(t, teams));
+
+        // Teams eintragen, wo sie noch fehlen (gesetzte Teams aus dem Admin-Bereich bleiben)
+        if (ids[0] && ids[1] && ids[0] !== ids[1]) {
+          if (!m.team_a_id && !m.team_b_id) {
+            await q.run('update matches set team_a_id = $2, team_b_id = $3 where id = $1', [m.id, ids[0], ids[1]]);
+            [m.team_a_id, m.team_b_id] = [ids[0], ids[1]];
+            stats.teams++;
+          } else if (!m.team_b_id && ids.includes(m.team_a_id)) {
+            m.team_b_id = ids.find((x) => x !== m!.team_a_id)!;
+            await q.run('update matches set team_b_id = $2 where id = $1', [m.id, m.team_b_id]);
+            stats.teams++;
+          } else if (!m.team_a_id && ids.includes(m.team_b_id)) {
+            m.team_a_id = ids.find((x) => x !== m!.team_b_id)!;
+            await q.run('update matches set team_a_id = $2 where id = $1', [m.id, m.team_a_id]);
+            stats.teams++;
+          } else if (!(ids.includes(m.team_a_id) && ids.includes(m.team_b_id))) {
+            stats.conflicts++;
+          }
+        }
+
+        // Anstoßzeit nachziehen, solange das Spiel noch nicht begonnen hat
+        if (e.state === 'unstarted' && !Number.isNaN(start) && m.scheduled_at?.getTime() !== start) {
+          await q.run('update matches set scheduled_at = $2 where id = $1', [m.id, new Date(start)]);
+          stats.times++;
+        }
+        if (e.state === 'inProgress' && m.status === 'scheduled') {
+          await q.run(`update matches set status = 'live' where id = $1`, [m.id]);
+          stats.live++;
+        }
+
+        // Ergebnis eintragen, wenn es fehlt – richtig herum, egal in welcher Reihenfolge Riot die Teams führt
+        if (e.state === 'completed' && m.wins_a === null && m.team_a_id && m.team_b_id) {
+          const aIdx = ids.indexOf(m.team_a_id);
+          const bIdx = ids.indexOf(m.team_b_id);
+          const winsA = aIdx >= 0 ? api[aIdx]?.result?.gameWins : undefined;
+          const winsB = bIdx >= 0 ? api[bIdx]?.result?.gameWins : undefined;
+          const need = (m.best_of + 1) / 2;
+          if (typeof winsA === 'number' && typeof winsB === 'number' && Math.max(winsA, winsB) === need && winsA !== winsB) {
+            await q.run(`update matches set wins_a = $2, wins_b = $3, status = 'finished' where id = $1 and wins_a is null`, [m.id, winsA, winsB]);
+            m.wins_a = winsA;
+            stats.results++;
+          }
+        }
+      }
+    });
+    const parts = [
+      `${events.length} Spiele bei lolesports`,
+      stats.linked && `${stats.linked} neu verknüpft`,
+      stats.teams && `${stats.teams} Paarungen eingetragen`,
+      stats.results && `${stats.results} Ergebnisse eingetragen`,
+      stats.times && `${stats.times} Anstoßzeiten geändert`,
+      stats.live && `${stats.live} laufen gerade`,
+      stats.unknown && `${stats.unknown} ohne Gegenstück hier`,
+      stats.conflicts && `${stats.conflicts} mit abweichenden Teams (bitte im Admin-Bereich prüfen)`,
+    ].filter(Boolean);
+    report.push(`${tour.name}: ${parts.join(', ')}`);
+  }
+  return report.join(' · ');
+}
+
+// ---------------------------------------------------------------------
 // Ablauf
 // ---------------------------------------------------------------------
 
@@ -174,16 +358,17 @@ export interface SyncResult {
   details: string;
 }
 
-const JOBS: { name: string; label: string; run: (db: Db, get: FetchJson) => Promise<string> }[] = [
+const JOBS: { name: string; label: string; run: (db: Db, get: FetchJson) => Promise<string>; often?: boolean }[] = [
+  { name: 'spielplan', label: 'Paarungen und Ergebnisse (lolesports.com)', run: syncMatches, often: true },
   { name: 'champions', label: 'Champions (Riot Data Dragon)', run: syncChampions },
   { name: 'spieler', label: 'Spielerkader (lolesports.com)', run: syncPlayers },
 ];
 export const SYNC_LABELS: Record<string, string> = Object.fromEntries(JOBS.map((j) => [j.name, j.label]));
 
-/** Führt alle Abgleiche aus und merkt sich das Ergebnis in sync_status. Wirft nie. */
-export async function runSync(db: Db, get: FetchJson = fetchJson): Promise<SyncResult[]> {
+/** Führt die Abgleiche aus (alle oder nur die häufigen) und merkt sich das Ergebnis in sync_status. Wirft nie. */
+export async function runSync(db: Db, get: FetchJson = fetchJson, only: 'alle' | 'haeufig' = 'alle'): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
-  for (const job of JOBS) {
+  for (const job of JOBS.filter((j) => only === 'alle' || j.often)) {
     try {
       const details = await job.run(db, get);
       await db.run(
@@ -207,13 +392,28 @@ export async function runSync(db: Db, get: FetchJson = fetchJson): Promise<SyncR
   return results;
 }
 
-/** Abgleich kurz nach dem Start und dann alle 6 Stunden. */
+/**
+ * Abgleich kurz nach dem Start, dann Paarungen/Ergebnisse alle 10 Minuten und alles andere alle 6 Stunden.
+ * Ins Protokoll kommt nur, was sich geändert hat oder schiefging.
+ */
 export function startSyncSchedule(db: Db, log: (msg: string) => void, get: FetchJson = fetchJson): () => void {
+  let last = '';
+  let running = false;
+  let ticks = 0;
   const tick = async () => {
-    for (const r of await runSync(db, get)) log(`Datenabgleich ${SYNC_LABELS[r.name]}: ${r.ok ? r.details : `Fehler – ${r.details}`}`);
+    if (running) return;
+    running = true;
+    try {
+      const results = await runSync(db, get, ticks++ % 36 === 0 ? 'alle' : 'haeufig');
+      const text = results.map((r) => `${SYNC_LABELS[r.name]}: ${r.ok ? r.details : `Fehler – ${r.details}`}`).join(' | ');
+      if (text !== last) log(`Datenabgleich – ${text}`);
+      last = text;
+    } finally {
+      running = false;
+    }
   };
   const first = setTimeout(tick, 20_000);
-  const every = setInterval(tick, 6 * 3_600_000);
+  const every = setInterval(tick, 10 * 60_000);
   first.unref();
   every.unref();
   return () => {

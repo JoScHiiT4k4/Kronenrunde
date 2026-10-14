@@ -15,7 +15,7 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { runSync } from './abgleich.ts';
 import { importTournament, type TournamentData } from './daten.ts';
-import { fakeRiot, lolesports } from './testdaten/fake-riot.ts';
+import { fakeRiot, lolesports, worldsSchedule } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
 
@@ -618,5 +618,70 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.ok(failed.every((x) => !x.ok));
     assert.equal((await db.one<{ c: number }>('select count(*)::int as c from champions'))!.c, 120);
     assert.match((await admin.get('/admin')).text, /Fehler: offline/);
+  });
+
+  test('Spielplan-Abgleich: Paarungen, Ergebnisse (richtig herum), Anstoßzeiten; Admin-Einträge bleiben', async () => {
+    const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
+    // Test unabhängig vom heutigen Datum: Turnier läuft noch
+    await db.run(`update tournaments set ends_on = current_date + 30 where id = $1`, [tid]);
+    assert.equal((await db.one<{ source: string }>('select source from tournaments where id = $1', [tid]))!.source, 'lolesports:worlds');
+    const get = (key: string) =>
+      db.one<{ a: string | null; b: string | null; wins_a: number | null; wins_b: number | null; status: string; scheduled_at: Date; source_id: string | null }>(
+        `select ta.short_name as a, tb.short_name as b, m.wins_a, m.wins_b, m.status, m.scheduled_at, m.source_id
+           from matches m left join teams ta on ta.id = m.team_a_id left join teams tb on tb.id = m.team_b_id
+          where m.tournament_id = $1 and m.external_id = $2`,
+        [tid, key],
+      ).then((r) => r!);
+
+    // Stand heute: alle 40 Spiele werden über Anstoßzeit und Format verknüpft, sonst ändert sich nichts
+    const first = await runSync(db, fakeRiot(), 'haeufig');
+    assert.ok(first[0].ok, first[0].details);
+    assert.match(first[0].details, /40 Spiele bei lolesports/);
+    const linked = (await db.one<{ n: number }>('select count(*)::int as n from matches where tournament_id = $1 and source_id is not null', [tid]))!.n;
+    assert.equal(linked, 40); // alle Spiele aus den Testdaten (Play-In bis Viertelfinale 1)
+    assert.equal((await get('pi-oh-1')).source_id, '115660588583171786');
+
+    // Ein paar Tage später: Ergebnisse, neue Paarung, verschobene Anstoßzeit
+    const later = structuredClone(worldsSchedule);
+    const ev = later.data.schedule.events as { startTime: string; state: string; match: { id: string; teams: { name: string; code: string; result: unknown }[] } }[];
+    const byId = (id: string) => ev.find((e) => e.match.id === id)!;
+    // pi-oh-1 (C9–KC): hat schon ein Ergebnis aus dem Admin-Bereich (3:1 für KC) – Riot meldet etwas anderes
+    Object.assign(byId('115660588583171786'), { state: 'completed' });
+    byId('115660588583171786').match.teams[0].result = { outcome: 'win', gameWins: 3 };
+    byId('115660588583171786').match.teams[1].result = { outcome: 'loss', gameWins: 0 };
+    // pi-oh-2: Riot führt MVK zuerst, bei uns ist FURIA Team A – Ergebnis muss richtig herum landen
+    const e2 = byId('115660588583040710');
+    e2.state = 'completed';
+    e2.match.teams = [
+      { name: 'MVK Esports', code: 'MVK', result: { outcome: 'loss', gameWins: 2 } },
+      { name: 'FURIA', code: 'FUR', result: { outcome: 'win', gameWins: 3 } },
+    ];
+    // unteres Halbfinale am 16.10. (bei uns noch offen): jetzt C9 gegen MVK
+    ev[2].match.teams = [
+      { name: 'Cloud9 Kia', code: 'C9', result: { outcome: null, gameWins: 0 } },
+      { name: 'MVK Esports', code: 'MVK', result: { outcome: null, gameWins: 0 } },
+    ];
+    // oberes Finale: bei uns schon von Hand KC–T1 eingetragen, Riot meldet KC–FURIA → nicht überschreiben, melden
+    ev[3].match.teams = [
+      { name: 'Karmine Corp', code: 'KC', result: null },
+      { name: 'FURIA', code: 'FUR', result: null },
+    ];
+    // Swiss-Auftakt 30 Minuten später
+    const swiss = ev.find((e) => e.startTime === '2026-10-23T17:00:00Z')!;
+    swiss.startTime = '2026-10-23T17:30:00Z';
+
+    const second = await runSync(db, fakeRiot(120, later), 'haeufig');
+    assert.ok(second[0].ok, second[0].details);
+    assert.match(second[0].details, /1 Paarungen eingetragen, 1 Ergebnisse eingetragen, 1 Anstoßzeiten geändert/);
+    assert.match(second[0].details, /1 mit abweichenden Teams/);
+    assert.deepEqual(Object.values(await get('pi-oh-2')).slice(0, 5), ['FUR', 'MVK', 3, 2, 'finished']);
+    assert.deepEqual([(await get('pi-oh-1')).wins_a, (await get('pi-oh-1')).wins_b], [3, 1], 'Admin-Ergebnis bleibt');
+    assert.deepEqual([(await get('pi-uh')).a, (await get('pi-uh')).b], ['C9', 'MVK']);
+    assert.deepEqual([(await get('pi-of')).a, (await get('pi-of')).b], ['KC', 'T1']);
+    assert.equal((await get('swiss-1-1')).scheduled_at.toISOString(), '2026-10-23T17:30:00.000Z');
+
+    // Nochmal: nichts Neues
+    const third = await runSync(db, fakeRiot(120, later), 'haeufig');
+    assert.doesNotMatch(third[0].details, /eingetragen|geändert|verknüpft/);
   });
 });

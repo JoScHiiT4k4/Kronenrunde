@@ -6,7 +6,7 @@
     "Play-In 16.10.: welches Spiel um 20:00 und welches um 01:00 läuft, ist noch nicht veröffentlicht.",
     "Swiss-Paarungen werden ausgelost (18., 23., 24., 26. und 30. Oktober) und dann ergänzt; Runde 3 = 1:1 (Bo1) sowie 2:0 und 0:2 (Bo3)."
   ],
-  "tournament": {"key": "worlds-2026", "name": "Worlds 2026", "game": "lol", "starts_on": "2026-10-15", "ends_on": "2026-11-14"},
+  "tournament": {"key": "worlds-2026", "name": "Worlds 2026", "game": "lol", "starts_on": "2026-10-15", "ends_on": "2026-11-14", "source": "lolesports:worlds"},
   "stages": [
     "Play-In: oberes Halbfinale",
     "Play-In: unteres Halbfinale",

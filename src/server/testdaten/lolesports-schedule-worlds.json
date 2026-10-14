@@ -1,0 +1,1318 @@
+{
+ "_info": "Ausschnitt aus lolesports.com getSchedule (Worlds, 14.10.2026) – Testdaten",
+ "data": {
+  "schedule": {
+   "updated": null,
+   "pages": {
+    "older": null,
+    "newer": null
+   },
+   "events": [
+    {
+     "startTime": "2026-10-15T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660588583171786",
+      "flags": [],
+      "teams": [
+       {
+        "name": "Cloud9 Kia",
+        "code": "C9",
+        "result": {
+         "outcome": null,
+         "gameWins": 0
+        },
+        "record": {
+         "wins": 0,
+         "losses": 0
+        }
+       },
+       {
+        "name": "Karmine Corp",
+        "code": "KC",
+        "result": {
+         "outcome": null,
+         "gameWins": 0
+        },
+        "record": {
+         "wins": 0,
+         "losses": 0
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-15T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660588583040710",
+      "flags": [],
+      "teams": [
+       {
+        "name": "FURIA",
+        "code": "FUR",
+        "result": {
+         "outcome": null,
+         "gameWins": 0
+        },
+        "record": {
+         "wins": 0,
+         "losses": 0
+        }
+       },
+       {
+        "name": "MVK Esports",
+        "code": "MVK",
+        "result": {
+         "outcome": null,
+         "gameWins": 0
+        },
+        "record": {
+         "wins": 0,
+         "losses": 0
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-16T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660588583171790",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-16T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660588583171794",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-17T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660588583171798",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-18T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Vorrunde",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "116299649498303884",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T17:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095005",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095007",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T19:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095009",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095011",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T21:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095013",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T22:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095015",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-23T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095017",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T00:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095019",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T17:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095021",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095023",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T19:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095025",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095027",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T21:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095029",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T22:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095031",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-24T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095033",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-25T00:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095035",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-25T17:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095045",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-25T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095047",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-25T19:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095037",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-25T22:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095041",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-26T17:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095049",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-26T18:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095051",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 1
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-26T19:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095053",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-26T22:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095057",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-28T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095061",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-28T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095065",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-29T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095069",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-29T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095073",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-30T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095077",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-30T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095081",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-31T17:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095085",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-31T20:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095089",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-10-31T23:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Schweizer Phase",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095093",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     }
+    },
+    {
+     "startTime": "2026-11-03T22:00:00Z",
+     "state": "unstarted",
+     "type": "match",
+     "blockName": "Viertelfinale",
+     "league": {
+      "name": "WM",
+      "slug": "worlds"
+     },
+     "match": {
+      "id": "115660540726095097",
+      "flags": [],
+      "teams": [
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       },
+       {
+        "name": "TBD",
+        "code": "TBD",
+        "result": null,
+        "record": null
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     }
+    }
+   ]
+  }
+ }
+}

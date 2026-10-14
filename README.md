@@ -24,6 +24,8 @@ Was die App kann:
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
+- **Automatischer Abgleich mit Riot**: Paarungen, Ergebnisse und Anstoßzeiten alle 10 Minuten (lolesports.com), Champion-Liste und Spielerkader alle 6 Stunden – Stand im Admin-Bereich, `tippspiel abgleich` von Hand.
+- **Auto-Update** auf dem Pi alle 15 Minuten, nur auf GitHub geprüfte Versionen (Zweig `stabil`).
 - **Konto löschen** jederzeit, mit allen Daten.
 - Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; dunkles Design mit Gold, blauer und roter Seite (eigene Formen, freie Schriften Cinzel und Barlow, keine Riot-Grafiken).
 
