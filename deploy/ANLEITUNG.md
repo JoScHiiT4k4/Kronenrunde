@@ -57,6 +57,7 @@ Dein Repository ist privat. Der Pi bekommt deshalb einen eigenen Schlüssel, mit
 
    ```
    sudo apt-get install -y git
+   mkdir -p ~/.ssh && chmod 700 ~/.ssh
    ssh-keygen -t ed25519 -N "" -C "raspberry-pi" -f ~/.ssh/lol-tippspiel
    cat ~/.ssh/lol-tippspiel.pub
    ```
