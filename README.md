@@ -7,26 +7,67 @@ Tippspiel-Web-App für League-of-Legends-Turniere – erst für die private Rund
 | Baustein | Status |
 |---|---|
 | 1. Fundament: Datenbank-Aufbau, Punkte-Logik, Tests | ✅ fertig |
-| 2. Bedienoberfläche & Anmeldung | ⏳ als Nächstes |
-| 3. Online stellen (Cloud oder Raspberry Pi) | offen |
+| 2. Bedienoberfläche & Anmeldung | ✅ fertig |
+| 3. Online stellen (Raspberry Pi / PC oder Cloud), E-Mail-Versand | ⏳ als Nächstes |
 
-Was die App fachlich kann (wie das bisherige Google-Sheets-Tippspiel):
+Was die App kann:
 
-- Sieger und Ergebnis tippen (Bo1: nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1)
-- Punkte: richtiger Sieger + Extrapunkte für exaktes Ergebnis (pro Tipprunde einstellbar)
-- Tippschluss pro Spieltag oder pro Spiel; danach sind alle Tipps sichtbar
-- Sonderfragen mit Frist, mehrere richtige Antworten, Schreibweise egal
-- Rangliste mit Gleichstand-Regel
+- **Anmelden per E-Mail-Link**, ohne Passwort. Beim ersten Mal wählt man seinen Namen für die Rangliste.
+- **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person.
+- **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
+  Team A steht links auf der blauen Seite, Team B rechts auf der roten.
+- **Tippschluss** pro Spieltag (Standard) oder pro Spiel – von der Datenbank erzwungen. Ab Tippschluss sieht jeder die Tipps der anderen.
+- **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
+- **Sonderfragen** mit Frist (Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
+  Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
+- **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
+- **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen.
+- **Konto löschen** jederzeit, mit allen Daten.
+- Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; helles und dunkles Design.
 
 Entscheidungen und Plan: siehe [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md).
+
+## Starten (Raspberry Pi, PC oder Laptop)
+
+Nötig: **Node.js 22** (oder neuer) und **PostgreSQL 15** (oder neuer). Zusatzpakete braucht die App keine.
+
+```bash
+git clone https://github.com/JoScHiiT4k4/lol-tippspiel.git
+cd lol-tippspiel
+cp .env.example .env        # dann .env öffnen: DATABASE_URL und ADMIN_EMAILS eintragen
+npm run db:seed             # optional: Beispieldaten Worlds 2026 (nur einmal ausführen)
+npm start                   # App läuft dann auf http://localhost:3000
+```
+
+Solange `MAIL_MODE=console` eingestellt ist, wird keine E-Mail verschickt: Der Anmelde-Link erscheint im Fenster, in dem `npm start` läuft.
+Einen Link kann man sich auch direkt erzeugen lassen:
+
+```bash
+npm run login-link -- deine@mail.de
+```
+
+Die Datenbank wird beim Start automatisch auf den neuesten Stand gebracht (`npm run db:migrate` geht auch von Hand).
 
 ## Tests
 
 Bei jeder Änderung laufen auf GitHub automatisch alle Tests (Reiter **Actions**).
 
-Lokal (Node.js 22 nötig):
+Lokal:
 
 ```bash
-npm test                     # Punkte-Logik
-TEST_DATABASE_URL=postgres://… npm run test:db   # Datenbank (nur mit LEERER Test-Datenbank)
+npm test                                             # Logik und Server-Bausteine
+TEST_DATABASE_URL=postgres://… npm run test:db       # Datenbank-Regeln   (nur mit LEERER Test-Datenbank)
+TEST_DATABASE_URL=postgres://… npm run test:app      # ganze App im Ablauf (nur mit LEERER Test-Datenbank)
+```
+
+## Aufbau
+
+```
+src/domain/       Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste (reine Logik)
+src/server/       Web-Server: Anmeldung, Seiten, Datenbank-Anschluss
+  routes/         Seiten: Tipprunden & Tippen, Verwalten, Admin, Anmeldung
+  db/             PostgreSQL-Anschluss und Migrationen
+public/           Gestaltung (CSS), kleines JavaScript, App-Symbole
+db/migrations/    Datenbank-Aufbau
+db/seed/          Beispieldaten
 ```
