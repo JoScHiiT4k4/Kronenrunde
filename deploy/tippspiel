@@ -160,6 +160,13 @@ case "${1:-hilfe}" in
     cli mail-test "$2"
     ;;
 
+  daten)
+    # Turnierdaten aus db/daten einspielen (mehrfach ausführbar); ohne Namen: Liste
+    [[ -n ${2:-} ]] || { cli daten; exit; }
+    backup vor-daten
+    cli daten "$2"
+    ;;
+
   login-link)
     [[ -n ${2:-} ]] || die "Bitte E-Mail-Adresse angeben:  tippspiel login-link name@example.de"
     cli login-link "$2"
@@ -192,6 +199,8 @@ LoL-Tippspiel – Befehle:
   tippspiel protokoll               Meldungen der App anzeigen (Fehlersuche)
   tippspiel einstellungen           Einstellungen ändern (Gmail, Admins, …) – Speichern: Strg+O, Enter, Strg+X
   tippspiel mail-test <E-Mail>      Test-Mail verschicken
+  tippspiel daten <Name>            Turnierdaten einspielen, z. B.  tippspiel daten worlds-2026
+                                    (mehrfach ausführbar; ohne Namen: Liste der vorhandenen Daten)
   tippspiel login-link <E-Mail>     Anmelde-Link erzeugen, ohne Mail (falls der Versand mal klemmt)
   tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
   tippspiel sicherungen             Vorhandene Sicherungen anzeigen

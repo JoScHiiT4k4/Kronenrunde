@@ -80,6 +80,14 @@ jobs:
           docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581
           test "$(docker exec pi /opt/homebridge/bin/node -v)" = "$(cat /tmp/homebridge-node-vorher)"
 
+      - name: Turnierdaten einspielen (zweimal)
+        run: |
+          docker exec pi tippspiel daten
+          docker exec pi tippspiel daten worlds-2026
+          docker exec pi tippspiel daten worlds-2026 | tee /tmp/daten
+          grep -q '13 unverändert' /tmp/daten
+          test "$(docker exec pi runuser -u postgres -- psql -d tippspiel -XAtc 'select count(*) from matches')" = 13
+
       - name: Zweiter Lauf behält Einstellungen
         run: |
           docker exec pi sha256sum /opt/lol-tippspiel/.env > /tmp/env-vorher

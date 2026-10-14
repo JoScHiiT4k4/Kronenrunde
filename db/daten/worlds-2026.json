@@ -1,0 +1,58 @@
+{
+  "_info": [
+    "LoL Worlds 2026 – einspielen mit: tippspiel daten worlds-2026 (mehrfach ausführbar).",
+    "Zeiten in Ortszeit des Austragungsorts mit Zeitzone: Los Angeles (PDT -07:00), Allen/Texas (CDT -05:00 bis 31.10., CST -06:00 ab 1.11.), New York (EST -05:00).",
+    "Jeder Tag beginnt zur offiziellen Startzeit; spätere Spiele eines Tages sind geschätzt (Tippschluss = Beginn des Spieltags).",
+    "Play-In 16.10.: Reihenfolge von unterem Halbfinale und oberem Finale noch nicht veröffentlicht.",
+    "Swiss-Spiele werden nach den Auslosungen ergänzt (18., 23., 24., 26. und 30. Oktober).",
+    "Quellen (Stand 14.10.2026): lolesports.com/en-US/news/worlds-2026-primer, strafe.com, insider-gaming.com, esports.gg"
+  ],
+  "tournament": { "key": "worlds-2026", "name": "Worlds 2026", "game": "lol", "starts_on": "2026-10-15", "ends_on": "2026-11-14" },
+  "stages": [
+    "Play-In: oberes Halbfinale",
+    "Play-In: unteres Halbfinale",
+    "Play-In: oberes Finale",
+    "Play-In: unteres Finale",
+    "Play-In: Finale",
+    "Swiss",
+    "Viertelfinale",
+    "Halbfinale",
+    "Finale"
+  ],
+  "teams": [
+    { "key": "GEN", "name": "Gen.G", "short_name": "GEN", "region": "LCK" },
+    { "key": "HLE", "name": "Hanwha Life Esports", "short_name": "HLE", "region": "LCK" },
+    { "key": "T1", "name": "T1", "short_name": "T1", "region": "LCK" },
+    { "key": "DK", "name": "Dplus KIA", "short_name": "DK", "region": "LCK" },
+    { "key": "AL", "name": "Anyone's Legend", "short_name": "AL", "region": "LPL" },
+    { "key": "BLG", "name": "Bilibili Gaming", "short_name": "BLG", "region": "LPL" },
+    { "key": "TES", "name": "Top Esports", "short_name": "TES", "region": "LPL" },
+    { "key": "IG", "name": "Invictus Gaming", "short_name": "IG", "region": "LPL" },
+    { "key": "G2", "name": "G2 Esports", "short_name": "G2", "region": "LEC" },
+    { "key": "MKOI", "name": "Movistar KOI", "short_name": "MKOI", "region": "LEC" },
+    { "key": "KC", "name": "Karmine Corp", "short_name": "KC", "region": "LEC" },
+    { "key": "TL", "name": "Team Liquid", "short_name": "TL", "region": "LCS" },
+    { "key": "LYON", "name": "LYON", "short_name": "LYON", "region": "LCS" },
+    { "key": "C9", "name": "Cloud9", "short_name": "C9", "region": "LCS" },
+    { "key": "TSW", "name": "Team Secret Whales", "short_name": "TSW", "region": "LCP" },
+    { "key": "CFO", "name": "CTBC Flying Oyster", "short_name": "CFO", "region": "LCP" },
+    { "key": "MVK", "name": "MVK Esports", "short_name": "MVK", "region": "LCP" },
+    { "key": "LOS", "name": "LOS", "short_name": "LOS", "region": "CBLOL" },
+    { "key": "FUR", "name": "FURIA", "short_name": "FUR", "region": "CBLOL" }
+  ],
+  "matches": [
+    { "key": "pi-oh-1", "stage": "Play-In: oberes Halbfinale", "team_a": "KC", "team_b": "C9", "best_of": 5, "scheduled_at": "2026-10-15T11:00:00-07:00" },
+    { "key": "pi-oh-2", "stage": "Play-In: oberes Halbfinale", "team_a": "FUR", "team_b": "MVK", "best_of": 5, "scheduled_at": "2026-10-15T16:00:00-07:00" },
+    { "key": "pi-uh", "stage": "Play-In: unteres Halbfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-10-16T11:00:00-07:00" },
+    { "key": "pi-of", "stage": "Play-In: oberes Finale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-10-16T16:00:00-07:00" },
+    { "key": "pi-uf", "stage": "Play-In: unteres Finale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-10-17T11:00:00-07:00" },
+    { "key": "pi-f", "stage": "Play-In: Finale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-10-18T11:00:00-07:00" },
+    { "key": "vf-1", "stage": "Viertelfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-03T16:00:00-06:00" },
+    { "key": "vf-2", "stage": "Viertelfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-04T16:00:00-06:00" },
+    { "key": "vf-3", "stage": "Viertelfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-05T16:00:00-06:00" },
+    { "key": "vf-4", "stage": "Viertelfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-06T16:00:00-06:00" },
+    { "key": "hf-1", "stage": "Halbfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-07T16:00:00-06:00" },
+    { "key": "hf-2", "stage": "Halbfinale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-08T16:00:00-06:00" },
+    { "key": "finale", "stage": "Finale", "team_a": null, "team_b": null, "best_of": 5, "scheduled_at": "2026-11-14T14:00:00-05:00" }
+  ]
+}

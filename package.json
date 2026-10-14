@@ -12,6 +12,7 @@
     "dev": "node --experimental-strip-types --disable-warning=ExperimentalWarning --watch src/server/main.ts",
     "db:migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts migrate",
     "db:seed": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts seed",
+    "daten": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts daten",
     "login-link": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts login-link",
     "mail-test": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/server/cli.ts mail-test",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",

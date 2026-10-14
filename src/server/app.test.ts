@@ -5,6 +5,7 @@
 // Ohne TEST_DATABASE_URL wird der Test übersprungen.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { dirname, join } from 'node:path';
@@ -12,6 +13,7 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { importTournament, type TournamentData } from './daten.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
 
@@ -402,5 +404,60 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const home = await ben.get('/');
     assert.match(home.text, /Tippt die Worlds zusammen/);
     assert.equal((await ben.get(`/r/${slug}/tippen`)).status, 303);
+  });
+
+  test('Turnierdaten einspielen: mehrfach ausführbar, Einträge aus dem Admin-Bereich bleiben', async () => {
+    const data = JSON.parse(readFileSync(join(root, 'db', 'daten', 'worlds-2026.json'), 'utf8')) as TournamentData;
+    const first = await importTournament(db, data);
+    // Gen.G, T1, G2 Esports und Karmine Corp hat der Admin schon angelegt
+    assert.deepEqual([first.tournamentNew, first.teamsNew, first.teamsKnown, first.matchesNew], [true, 15, 4, 13]);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from teams'))!.n, 19);
+    const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
+    const get = (key: string) =>
+      db.one<{ a: string | null; b: string | null; wins_a: number | null; status: string; scheduled_at: Date; matchday_starts_at: Date; stage: string }>(
+        `select ta.short_name as a, tb.short_name as b, m.wins_a, m.status, m.scheduled_at, m.matchday_starts_at, s.name as stage
+           from matches m left join teams ta on ta.id = m.team_a_id left join teams tb on tb.id = m.team_b_id
+           left join stages s on s.id = m.stage_id
+          where m.tournament_id = $1 and m.external_id = $2`,
+        [tid, key],
+      ).then((r) => r!);
+
+    const kc = await get('pi-oh-1');
+    assert.deepEqual([kc.a, kc.b, kc.stage, kc.scheduled_at.toISOString()], ['KC', 'C9', 'Play-In: oberes Halbfinale', '2026-10-15T18:00:00.000Z']);
+    assert.equal((await get('pi-oh-2')).matchday_starts_at.toISOString(), '2026-10-15T18:00:00.000Z', 'beide Spiele am 15.10. = ein Spieltag');
+    assert.equal((await get('pi-of')).matchday_starts_at.toISOString(), '2026-10-16T18:00:00.000Z');
+
+    // Zweiter Lauf: nichts doppelt, nichts geändert
+    const again = await importTournament(db, data);
+    assert.deepEqual([again.tournamentNew, again.teamsNew, again.matchesNew, again.matchesChanged, again.matchesUnchanged], [false, 0, 0, 0, 13]);
+
+    // Im Admin-Bereich eingetragen: Teams fürs obere Finale, Ergebnis des ersten Spiels
+    await db.run(`update matches set team_a_id = $2, team_b_id = $3 where tournament_id = $1 and external_id = 'pi-of'`, [tid, team.KC, team.T1]);
+    await db.run(`update matches set wins_a = 3, wins_b = 1, status = 'finished' where tournament_id = $1 and external_id = 'pi-oh-1'`, [tid]);
+    // Neue Datei-Version: Finale eine Stunde später
+    const newer = structuredClone(data);
+    newer.matches.find((m) => m.key === 'finale')!.scheduled_at = '2026-11-14T15:00:00-05:00';
+    const third = await importTournament(db, newer);
+    assert.deepEqual([third.matchesNew, third.matchesChanged, third.matchesUnchanged], [0, 1, 12]);
+    assert.deepEqual([(await get('pi-of')).a, (await get('pi-of')).b], ['KC', 'T1']);
+    assert.deepEqual([(await get('pi-oh-1')).wins_a, (await get('pi-oh-1')).status], [3, 'finished']);
+    assert.equal((await get('finale')).scheduled_at.toISOString(), '2026-11-14T20:00:00.000Z');
+
+    // Fehlerhafte Datei: abgelehnt, bevor etwas passiert
+    const broken = structuredClone(data);
+    broken.matches[0].team_b = 'XYZ';
+    await assert.rejects(importTournament(db, broken), /team_b "XYZ"/);
+    // Fehler mitten im Import (gleiches Team auf beiden Seiten): alles wird zurückgenommen
+    const clash = structuredClone(newer);
+    clash.teams.push({ key: 'NEU', name: 'Ganz neues Team' });
+    clash.matches.find((m) => m.key === 'pi-of')!.team_b = 'KC';
+    await assert.rejects(importTournament(db, clash));
+    assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from teams where name = 'Ganz neues Team'`))!.n, 0);
+
+    // Ein von Hand angelegtes Turnier mit gleichem Namen wird übernommen statt verdoppelt
+    const manual = await db.one<{ id: string }>(`insert into tournaments (name) values ('Hand Cup') returning id`);
+    const adopted = await importTournament(db, { tournament: { key: 'hand-cup', name: 'Hand Cup' }, teams: [], matches: [] });
+    assert.equal(adopted.tournamentNew, false);
+    assert.equal((await db.one<{ external_id: string }>('select external_id from tournaments where id = $1', [manual!.id]))!.external_id, 'hand-cup');
   });
 });
