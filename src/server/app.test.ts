@@ -65,33 +65,37 @@ class Client {
     return this.request('POST', path, form);
   }
 
-  /** Anmelden über den E-Mail-Link; gibt die Weiterleitung nach dem Bestätigen zurück. */
+  /** Anmelden mit Passwort; gibt es das Konto noch nicht, wird es erstellt (mit Namen). */
   async login(email: string, name?: string, next = '/') {
-    const before = mailer.sent!.length;
-    const r = await this.post('/anmelden', { email, weiter: next });
-    assert.equal(r.status, 200, r.text);
-    const mail = mailer.sent![before];
-    assert.ok(mail, 'Es wurde keine E-Mail verschickt');
-    assert.equal(mail.to, email.toLowerCase());
-    const link = /https?:\/\/[^\s]+\/anmelden\/bestaetigen\?[^\s]+/.exec(mail.text)![0];
-    const url = new URL(link);
-    const confirm = await this.get(url.pathname + url.search);
-    assert.equal(confirm.status, 200);
-    const done = await this.post('/anmelden/bestaetigen', {
-      token: url.searchParams.get('token')!,
-      weiter: url.searchParams.get('weiter') ?? '/',
-    });
-    assert.equal(done.status, 303);
-    if (name && done.location?.startsWith('/willkommen')) {
-      const w = await this.get(done.location);
-      assert.equal(w.status, 200);
-      const target = new URL(done.location, base).searchParams.get('weiter') ?? '/';
-      const saved = await this.post('/willkommen', { display_name: name, weiter: target });
-      assert.equal(saved.status, 303);
-      return { ...done, location: saved.location, link: url };
+    const exists = await db.one('select 1 from users where email = $1', [email.toLowerCase()]);
+    if (!exists) {
+      const form = await this.get(`/registrieren?weiter=${encodeURIComponent(next)}`);
+      assert.equal(form.status, 200);
+      const r = await this.post('/registrieren', { display_name: name ?? email.split('@')[0], email, password: PASSWORT, weiter: next });
+      assert.equal(r.status, 303, r.text);
+      await this.refresh();
+      return r;
     }
-    return { ...done, link: url };
+    const r = await this.post('/anmelden', { email, password: PASSWORT, weiter: next });
+    assert.equal(r.status, 303, r.text);
+    await this.refresh();
+    return r;
   }
+
+  /** Wie ein Browser nach der Anmeldung: eine Seite laden, damit das Formular-Token zur neuen Sitzung passt. */
+  async refresh() {
+    this.csrf = '';
+    await this.get('/konto');
+  }
+}
+
+const PASSWORT = 'richtig-geheim-123';
+
+/** Link aus der zuletzt verschickten Mail an diese Adresse */
+function lastLink(email: string): URL {
+  const mail = [...mailer.sent!].reverse().find((m) => m.to === email);
+  assert.ok(mail, `Keine E-Mail an ${email}`);
+  return new URL(/https?:\/\/[^\s]+\/passwort-neu\?[^\s]+/.exec(mail.text)![0]);
 }
 
 function localInput(d: Date): string {
@@ -173,29 +177,79 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(offline.text, /\/static\/app\.css\?v=/);
   });
 
-  test('Anmeldung: ungültige E-Mail, Link, Name, Link nur einmal gültig', async () => {
-    const bad = await anna.post('/anmelden', { email: 'kein-at-zeichen' });
+  test('Anmeldung: Konto erstellen, Passwort, Fehlversuche, Passwort vergessen, alte Konten', async () => {
+    const bad = await anna.post('/registrieren', { display_name: 'Anna', email: 'kein-at-zeichen', password: PASSWORT });
     assert.equal(bad.status, 400);
     assert.match(bad.text, /gültige E-Mail-Adresse/);
+    const short = await anna.post('/registrieren', { display_name: 'Anna', email: 'anna@example.de', password: 'kurz' });
+    assert.match(short.text, /mindestens 8 Zeichen/);
 
     const r = await anna.login('Anna@Example.de', 'Anna');
     assert.equal(r.location, '/');
     const home = await anna.get('/');
     assert.match(home.text, /Deine Tipprunden/);
     assert.match(home.text, />Anna</);
+    const dup = await new Client().post('/registrieren', { display_name: 'Anna 2', email: 'anna@example.de', password: PASSWORT });
+    assert.match(dup.text, /gibt es schon ein Konto/);
 
-    // derselbe Link funktioniert kein zweites Mal
-    const again = await new Client().post('/anmelden/bestaetigen', { token: r.link.searchParams.get('token')! });
-    assert.equal(again.status, 400);
-    assert.match(again.text, /nicht mehr gültig/);
+    // In der Datenbank steht nur ein Hash, nicht das Passwort
+    const stored = (await db.one<{ password_hash: string }>(`select password_hash from users where email = 'anna@example.de'`))!;
+    assert.match(stored.password_hash, /^scrypt\$/);
+    assert.ok(!stored.password_hash.includes(PASSWORT));
 
-    // In der Datenbank steht nur der Hash
-    const stored = await db.one<{ n: number }>('select count(*)::int as n from login_tokens where token_hash = $1', [r.link.searchParams.get('token')]);
-    assert.equal(stored!.n, 0);
+    // Falsches Passwort, dann richtig
+    const wrong = await new Client().post('/anmelden', { email: 'anna@example.de', password: 'falsch-falsch' });
+    assert.equal(wrong.status, 400);
+    assert.match(wrong.text, /E-Mail-Adresse oder Passwort stimmt nicht/);
+    assert.equal((await new Client().login('anna@example.de')).location, '/');
 
-    // zweites Anmelden: kein Willkommen mehr
-    const second = await new Client().login('anna@example.de');
-    assert.equal(second.location, '/');
+    // Nach 10 Fehlversuchen ist 15 Minuten Pause – auch mit richtigem Passwort
+    const victim = new Client();
+    await victim.login('sperre@example.de', 'Sperre');
+    for (let i = 0; i < 10; i++) await new Client().post('/anmelden', { email: 'sperre@example.de', password: `rate-mal-${i}` });
+    const blocked = await new Client().post('/anmelden', { email: 'sperre@example.de', password: PASSWORT });
+    assert.match(blocked.text, /Zu viele Fehlversuche/);
+
+    // Passwort vergessen: Link per Mail, nur einmal gültig; Unbekannte bekommen dieselbe Antwort, aber keine Mail
+    const before = mailer.sent!.length;
+    const unknown = await new Client().post('/passwort-vergessen', { email: 'niemand@example.de' });
+    assert.match(unknown.text, /Falls es ein Konto mit dieser Adresse gibt/);
+    assert.equal(mailer.sent!.length, before);
+    const forgot = await new Client().post('/passwort-vergessen', { email: 'anna@example.de' });
+    assert.match(forgot.text, /Falls es ein Konto mit dieser Adresse gibt/);
+    const link = lastLink('anna@example.de');
+    const reset = new Client();
+    assert.match((await reset.get(link.pathname + link.search)).text, /Passwort festlegen/);
+    const token = link.searchParams.get('token')!;
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from login_tokens where token_hash = $1', [token]))!.n, 0, 'nur der Hash wird gespeichert');
+    const tooShort = await reset.post('/passwort-neu', { token, password: 'kurz' });
+    assert.match(tooShort.text, /mindestens 8 Zeichen/);
+    const set = await reset.post('/passwort-neu', { token, password: 'ganz-neues-passwort' });
+    assert.equal(set.status, 303);
+    assert.equal(set.location, '/');
+    assert.equal((await reset.get('/konto')).status, 200);
+    assert.match((await new Client().post('/passwort-neu', { token, password: 'noch-ein-passwort' })).text, /nicht mehr gültig/);
+    // Altes Passwort gilt nicht mehr, alte Sitzungen sind beendet
+    assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
+    assert.equal((await anna.get('/konto')).status, 303);
+    // Passwort im Konto zurückändern (braucht das bisherige)
+    const wrongCurrent = await reset.post('/konto/passwort', { current: 'falsch', password: PASSWORT });
+    assert.match(wrongCurrent.text, /bisherige Passwort stimmt nicht/);
+    const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT });
+    assert.equal(changed.location, '/konto?hinweis=passwort-gespeichert');
+    anna.cookies.clear();
+    assert.equal((await anna.login('anna@example.de')).location, '/');
+
+    // Konto aus der Zeit der Anmelde-Links (ohne Passwort): Anmelden schickt einen Link zum Festlegen
+    await db.run(`insert into users (email, display_name) values ('alt@example.de', 'Alt')`);
+    const old = await new Client().post('/anmelden', { email: 'alt@example.de', password: 'irgendwas-langes' });
+    assert.match(old.text, /noch kein Passwort/);
+    const oldLink = lastLink('alt@example.de');
+    const oldClient = new Client();
+    await oldClient.get(oldLink.pathname + oldLink.search);
+    const oldSet = await oldClient.post('/passwort-neu', { token: oldLink.searchParams.get('token')!, password: 'jetzt-mit-passwort' });
+    assert.equal(oldSet.location, '/');
+    assert.equal((await new Client().post('/anmelden', { email: 'alt@example.de', password: 'jetzt-mit-passwort' })).status, 303);
   });
 
   test('Formularschutz: ohne Token und von fremder Seite abgelehnt', async () => {

@@ -227,7 +227,8 @@ function extractCode(value: string): string {
 }
 
 async function joinPage(ctx: Ctx): Promise<Res> {
-  if (!ctx.user) return loginRedirect(ctx);
+  // Eingeladene sind meist neu: gleich zum Konto-Erstellen (dort gibt es auch „Anmelden“)
+  if (!ctx.user) return redirect(`/registrieren?weiter=${encodeURIComponent(ctx.path)}`);
   const code = ctx.params.code.toLowerCase();
   const league = await ctx.deps.db.one<{ id: string; name: string; slug: string; members: number; is_member: boolean }>(
     `select l.id, l.name, l.slug,

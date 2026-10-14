@@ -7,6 +7,7 @@ import { type Html, html, nothing } from '../html.ts';
 const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   abgemeldet: { text: 'Du bist abgemeldet.', kind: 'ok' },
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
+  'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
   abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },

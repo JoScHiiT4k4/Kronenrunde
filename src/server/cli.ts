@@ -1,6 +1,6 @@
 // Hilfsbefehle für den Betrieb:
 //   npm run db:migrate                 Datenbank auf den neuesten Stand bringen
-//   npm run login-link -- name@mail.de Anmelde-Link erzeugen, ohne E-Mail zu verschicken
+//   npm run login-link -- name@mail.de Link zum Passwort-Festlegen erzeugen, ohne E-Mail zu verschicken
 //   npm run db:seed                    Beispieldaten (Worlds 2026) einspielen – nur zum Ausprobieren
 //   npm run mail-test -- name@mail.de  Test-E-Mail verschicken (prüft die E-Mail-Einstellungen)
 //   npm run daten -- worlds-2026       Turnier aus db/daten/worlds-2026.json einspielen (mehrfach ausführbar)
@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hashToken, LOGIN_TOKEN_MINUTES, newToken, normalizeEmail } from './auth.ts';
+import { createPasswordLink, LOGIN_TOKEN_MINUTES, normalizeEmail } from './auth.ts';
 import { loadConfig } from './config.ts';
 import { runSync, SYNC_LABELS } from './abgleich.ts';
 import { describeSummary, importTournament, type TournamentData } from './daten.ts';
@@ -61,12 +61,8 @@ try {
   } else if (command === 'login-link') {
     const email = normalizeEmail(arg ?? '');
     if (!email) throw new Error('Bitte E-Mail-Adresse angeben:  npm run login-link -- name@example.de');
-    const token = newToken();
-    await db.run(
-      `insert into login_tokens (token_hash, email, expires_at) values ($1, $2, now() + make_interval(mins => $3))`,
-      [hashToken(token), email, LOGIN_TOKEN_MINUTES],
-    );
-    console.log(`Anmelde-Link für ${email} (gilt ${LOGIN_TOKEN_MINUTES} Minuten, nur einmal):\n${config.appUrl}/anmelden/bestaetigen?token=${token}`);
+    const link = await createPasswordLink(db, config, email);
+    console.log(`Link zum Passwort-Festlegen für ${email} (gilt ${LOGIN_TOKEN_MINUTES} Minuten, nur einmal):\n${link}`);
   } else if (command === 'mail-test') {
     const email = normalizeEmail(arg ?? '');
     if (!email) throw new Error('Bitte E-Mail-Adresse angeben:  npm run mail-test -- name@example.de');

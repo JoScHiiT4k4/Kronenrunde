@@ -78,7 +78,7 @@ Dein Repository ist privat. Der Pi bekommt deshalb einen eigenen Schlüssel, mit
 
 ## 3. Gmail für die Anmelde-Mails
 
-Die App verschickt die Anmelde-Links über ein Gmail-Konto. Dafür braucht sie ein **App-Passwort**, nicht dein normales Passwort.
+Die App verschickt Mails (z. B. bei „Passwort vergessen“) über ein Gmail-Konto. Dafür braucht sie ein **App-Passwort**, nicht dein normales Passwort.
 
 **Tipp:** Leg dir ein eigenes Gmail-Konto nur fürs Tippspiel an, z. B. `tippspiel.deinname@gmail.com`
 (<https://accounts.google.com/signup>). Dann sehen deine Mitspieler diese Adresse als Absender, und dein privates Postfach bleibt außen vor.

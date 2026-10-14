@@ -15,14 +15,14 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 |---|---|---|
 | Tipprunden | Mehrere Tipprunden von Anfang an (`leagues`) | Öffentlich legt jeder seine eigene an – ohne Umbau |
 | Turniere | Beliebige Turniere/Spiele (`tournaments`, `game`) | Nicht nur Worlds: MSI, LEC, später andere Spiele |
-| Anmeldung | E-Mail-Link ohne Passwort, Logik in der App selbst | An keinen Anbieter gebunden; Konto jederzeit löschbar (App Stores, DSGVO) |
+| Anmeldung | E-Mail + Passwort (scrypt), „Passwort vergessen“ per Mail-Link, Logik in der App selbst | An keinen Anbieter gebunden; Konto jederzeit löschbar (App Stores, DSGVO) |
 | Datenbank | Standard-PostgreSQL, keine Anbieter-Sonderfunktionen | Läuft gleich auf Supabase (Cloud) und auf eigenem Server |
 | Fairness | Tippschluss wird **in der Datenbank** erzwungen | Selbst ein Fehler in der App kann keinen späten Tipp durchlassen |
 | Tippschluss | Standard: Beginn des ersten Spiels eines Spieltags (Spiele < 6 h Abstand = ein Spieltag); pro Tipprunde umstellbar auf „jedes Spiel einzeln“ | Uhrzeiten späterer Spiele sind nur geschätzt |
 | Punkte-Logik | Reines TypeScript ohne Abhängigkeiten (`src/domain`) | Leicht zu testen, überall gleich |
 | Web-Server | Node.js 22 ohne Zusatzpakete; Seiten werden auf dem Server gebaut, JavaScript im Browser ist nur Komfort | Läuft auf dem Raspberry Pi ohne Bauschritt, wenig Angriffsfläche, nichts muss aktualisiert werden. Funktioniert auch ohne JavaScript |
 | Datenbank-Anschluss | Eigener schlanker PostgreSQL-Anschluss (`src/server/db/pg.ts`) mit TLS und SCRAM-Anmeldung, hinter einer kleinen Schnittstelle (`db/index.ts`) | Bei der Entwicklung waren keine Zusatzpakete ladbar. Austauschbar gegen das verbreitete Paket `pg`, indem nur `pg.ts` ersetzt wird |
-| Sicherheit | Anmelde-Links und Sitzungen nur als Hash gespeichert; Formular-Schutz (CSRF) mit Token und Herkunfts-Prüfung; strenge Content-Security-Policy; alle Ausgaben maskiert | Übliche Angriffe (fremde Formulare, eingeschleuster Code, gestohlene Datenbank) laufen ins Leere |
+| Sicherheit | Passwörter als scrypt-Hash, Begrenzung von Fehlversuchen; Passwort-Links und Sitzungen nur als Hash gespeichert; Formular-Schutz (CSRF) mit Token und Herkunfts-Prüfung; strenge Content-Security-Policy; alle Ausgaben maskiert | Übliche Angriffe (fremde Formulare, eingeschleuster Code, gestohlene Datenbank) laufen ins Leere |
 | Datenquelle | Spielplan/Ergebnisse im Admin-Bereich von Hand; dieselben Tabellen kann später ein Daten-Dienst (API) füllen | Erst manuell, später automatisch – ohne Umbau |
 | Hosting | **Raspberry Pi 4 zu Hause** (Raspberry Pi OS 64-bit), öffentlich über **Tailscale Funnel** (`https://lol-tippspiel.….ts.net`). Einrichtung per `deploy/install.sh` | Kostenlos, keine offenen Ports am Router, HTTPS automatisch. Dasselbe Skript läuft auf jedem Debian/Ubuntu (z. B. gemieteter Server) – Umzug = installieren + Sicherung einspielen |
 | Betrieb | systemd-Dienst mit Schutz-Einstellungen, App lauscht nur auf 127.0.0.1; nächtliche Sicherung (14 Stück); automatische Sicherheits-Updates; `tippspiel update` sichert vorher und geht bei Startproblemen automatisch zurück | Wenig Pflege, nichts Wichtiges geht verloren |
@@ -65,7 +65,7 @@ deploy/             install.sh (Einrichtung/Update auf Debian/Raspberry Pi OS), 
 src/server/         Web-Server
   main.ts           Start
   app.ts            Anfragen → Anmeldung prüfen → Seite
-  auth.ts           E-Mail-Link, Sitzungen, Formular-Schutz
+  auth.ts           Passwörter, Passwort-Links, Sitzungen, Formular-Schutz
   routes/           Seiten (Tipprunden/Tippen, Verwalten, Admin, Anmeldung)
   views/layout.ts   Seitenrahmen
   db/               PostgreSQL-Anschluss, Migrationen

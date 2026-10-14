@@ -456,15 +456,16 @@ fi
 printf '\n\033[1;32m✔ Fertig! Deine App: %s\033[0m\n\n' "$APP_URL"
 if [[ $(get_env MAIL_MODE) == console ]]; then
   cat <<EOF
-  E-Mails sind noch nicht eingerichtet. Bis dahin holst du dir einen Anmelde-Link mit:
+  E-Mails sind noch nicht eingerichtet ("Passwort vergessen" geht dann nicht). Einen Link zum
+  Passwort-Festlegen bekommst du bis dahin mit:
     tippspiel login-link ${ADMIN_EMAIL:-deine@mail.de}
   Gmail einrichten (Anleitung, Schritt 3):  tippspiel einstellungen
 
 EOF
 fi
 cat <<EOF
-  So meldest du dich an: Adresse öffnen → deine E-Mail-Adresse eingeben →
-  auf den Link in der Mail tippen. Den Link zur App kannst du an deine Runde schicken.
+  So geht's los: Adresse öffnen → "Konto erstellen" mit deiner E-Mail-Adresse (der Admin-Adresse)
+  und einem Passwort. Den Link zur App kannst du an deine Runde schicken.
 
   Nützliche Befehle (Übersicht: tippspiel hilfe):
     tippspiel status          Läuft alles?

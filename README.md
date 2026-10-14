@@ -13,7 +13,7 @@ Tippspiel-Web-App für League-of-Legends-Turniere – erst für die private Rund
 
 Was die App kann:
 
-- **Anmelden per E-Mail-Link**, ohne Passwort. Beim ersten Mal wählt man seinen Namen für die Rangliste.
+- **Anmelden mit E-Mail und Passwort**; „Passwort vergessen“ schickt einen Link per Mail. Beim Konto-Erstellen wählt man seinen Namen für die Rangliste.
 - **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person.
 - **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
   Team A steht links auf der blauen Seite, Team B rechts auf der roten.
@@ -47,7 +47,7 @@ npm run db:seed             # optional: Beispieldaten Worlds 2026 (nur einmal au
 npm start                   # App läuft dann auf http://localhost:3000
 ```
 
-Solange `MAIL_MODE=console` eingestellt ist, wird keine E-Mail verschickt: Der Anmelde-Link erscheint im Fenster, in dem `npm start` läuft.
+Solange `MAIL_MODE=console` eingestellt ist, wird keine E-Mail verschickt: Links zum Passwort-Festlegen erscheinen im Fenster, in dem `npm start` läuft.
 Einen Link kann man sich auch direkt erzeugen lassen:
 
 ```bash
