@@ -18,6 +18,21 @@ async function get(path, params) {
   return (await res.json()).data;
 }
 
+// Modus "teams": Teams mit Kader zu den angegebenen Kürzeln (z. B. "teams T1,GEN,KC")
+if (slug === 'teams') {
+  const codes = new Set((process.argv[3] ?? '').split(',').map((c) => c.trim().toUpperCase()).filter(Boolean));
+  const { teams } = await get('getTeams', {});
+  const found = teams
+    .filter((t) => codes.has(String(t.code).toUpperCase()))
+    .map((t) => ({
+      id: t.id, slug: t.slug, code: t.code, name: t.name, status: t.status,
+      homeLeague: t.homeLeague ?? null,
+      players: (t.players ?? []).map((p) => ({ id: p.id, summonerName: p.summonerName, firstName: p.firstName, lastName: p.lastName, role: p.role })),
+    }));
+  console.log(JSON.stringify({ fetchedAt: new Date().toISOString(), total: teams.length, keys: Object.keys(teams[0] ?? {}), teams: found }, null, 2));
+  process.exit(0);
+}
+
 const { leagues } = await get('getLeagues', {});
 const league = leagues.find((l) => l.slug === slug);
 if (!league) throw new Error(`Liga "${slug}" nicht gefunden. Vorhanden: ${leagues.map((l) => l.slug).join(', ')}`);

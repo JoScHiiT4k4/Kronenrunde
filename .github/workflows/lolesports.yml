@@ -7,8 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       liga:
-        description: Liga (z. B. worlds, msi, lec)
+        description: Liga (z. B. worlds, msi, lec) oder "teams"
         default: worlds
+      kuerzel:
+        description: Nur bei "teams" – Team-Kürzel mit Komma, z. B. T1,GEN,KC
+        default: ''
 
 permissions:
   contents: write
@@ -24,9 +27,9 @@ jobs:
       - name: Spielplan holen und ablegen
         env:
           LIGA: ${{ inputs.liga }}
+          KUERZEL: ${{ inputs.kuerzel }}
         run: |
-          node scripts/lolesports.mjs "$LIGA" > /tmp/spielplan.json
-          node -e 'const d=require("/tmp/spielplan.json"); console.log(d.league.name + ": " + d.matches.length + " Spiele")'
+          node scripts/lolesports.mjs "$LIGA" "$KUERZEL" > /tmp/spielplan.json
           git fetch -q origin lolesports-abgleich && git checkout -q lolesports-abgleich || git checkout -q --orphan lolesports-abgleich
           git rm -rq --cached . 2>/dev/null || true
           mkdir -p abgleich && cp /tmp/spielplan.json "abgleich/$LIGA.json"
