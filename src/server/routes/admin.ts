@@ -162,11 +162,14 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
       )
     : null;
   if (!t) throw new HttpError(404, 'Dieses Turnier gibt es nicht.');
-  const [stages, matches, teamList] = await Promise.all([
+  const [stages, matches, teamList, entered] = await Promise.all([
     db.query<{ id: string; name: string; position: number }>('select id, name, position from stages where tournament_id = $1 order by position, name', [id]),
     tournamentMatches(db, id),
     teams(ctx),
+    db.query<{ team_id: string }>('select team_id from tournament_teams where tournament_id = $1', [id]),
   ]);
+  const inTournament = new Set(entered.map((r) => r.team_id));
+  const playing = new Set(matches.flatMap((m) => [m.team_a_id, m.team_b_id]).filter((x): x is string => !!x));
 
   const days = new Map<string, MatchRow[]>();
   for (const m of matches) {
@@ -194,6 +197,25 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
     <input type="text" name="name" required maxlength="60" placeholder="Neue Phase" aria-label="Neue Phase">
     <button type="submit" class="btn">Hinzufügen</button>
   </form>
+</section>
+
+<section class="panel">
+  <h2>Teams im Turnier (${new Set([...inTournament, ...playing]).size})</h2>
+  <p class="muted">Diese Teams stehen bei Sonderfragen wie „Wer wird Weltmeister?“ zur Auswahl. Teams mit einem Spiel gehören immer dazu.</p>
+  ${
+    teamList.length
+      ? html`<form method="post" action="${base}/teams" class="stack">
+    ${csrfField(ctx)}
+    <div class="team-checks">
+      ${teamList.map(
+        (tm) => html`<label class="check"><input type="checkbox" name="team" value="${tm.id}"${attr(inTournament.has(tm.id) || playing.has(tm.id), 'checked')}${attr(playing.has(tm.id), 'disabled')}>
+        <span>${tm.name}${tm.region ? html` <small class="muted">${tm.region}</small>` : nothing}</span></label>`,
+      )}
+    </div>
+    <button type="submit" class="btn">Teams speichern</button>
+  </form>`
+      : html`<p class="muted">Noch keine Teams angelegt.</p>`
+  }
 </section>
 
 <section class="panel">
@@ -377,6 +399,27 @@ export function registerAdminRoutes(router: Router<Ctx>) {
       return tournamentPage(ctx, dbError(e));
     }
     return redirect(`/admin/turnier/${ctx.params.id}?hinweis=gespeichert`);
+  });
+
+  post('/admin/turnier/:id/teams', async (ctx) => {
+    const id = ctx.params.id;
+    if (!isUuid(id)) throw new HttpError(404, 'Dieses Turnier gibt es nicht.');
+    const ids = [...new Set(ctx.form.getAll('team').filter(isUuid))];
+    try {
+      await ctx.deps.db.tx(async (q) => {
+        // Abgewählte entfernen – außer Teams, die im Turnier schon ein Spiel haben
+        await q.run(
+          `delete from tournament_teams tt
+            where tt.tournament_id = $1 and not (tt.team_id = any($2::uuid[]))
+              and not exists (select 1 from matches m where m.tournament_id = $1 and tt.team_id in (m.team_a_id, m.team_b_id))`,
+          [id, ids],
+        );
+        await q.run('insert into tournament_teams (tournament_id, team_id) select $1, unnest($2::uuid[]) on conflict do nothing', [id, ids]);
+      });
+    } catch (e) {
+      return tournamentPage(ctx, dbError(e));
+    }
+    return redirect(`/admin/turnier/${id}?hinweis=gespeichert`);
   });
 
   post('/admin/turnier/:id/spiel', async (ctx) => {

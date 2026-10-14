@@ -260,6 +260,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
 .check input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--gold); flex: none; }
 .field .check + .check { margin-top: 8px; }
+.team-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; }
 
 .btn {
   display: inline-flex;

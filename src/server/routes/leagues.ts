@@ -687,7 +687,9 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
     ),
     db.query<{ tournament_id: string; name: string }>(
       `select distinct x.tournament_id, t.name
-         from (select tournament_id, team_a_id as team_id from matches union select tournament_id, team_b_id from matches) x
+         from (select tournament_id, team_id from tournament_teams
+               union select tournament_id, team_a_id from matches
+               union select tournament_id, team_b_id from matches) x
          join teams t on t.id = x.team_id
          join league_tournaments lt on lt.tournament_id = x.tournament_id and lt.league_id = $1
         order by t.name`,

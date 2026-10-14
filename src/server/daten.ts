@@ -164,6 +164,11 @@ async function importInto(q: Queryable, data: TournamentData): Promise<ImportSum
     [tid, data.tournament.starts_on ?? null, data.tournament.ends_on ?? null],
   );
 
+  // Teilnehmende Teams (für Sonderfragen wie "Wer wird Weltmeister?", auch bevor ihre Spiele feststehen)
+  for (const id of teamId.values()) {
+    await q.run('insert into tournament_teams (tournament_id, team_id) values ($1, $2) on conflict do nothing', [tid, id]);
+  }
+
   // Phasen
   const stageId = new Map<string, string>();
   for (const [i, name] of (data.stages ?? []).entries()) {

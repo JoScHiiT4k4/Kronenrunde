@@ -422,6 +422,29 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
         [tid, key],
       ).then((r) => r!);
 
+    // Alle 19 Teams stehen bei Sonderfragen zur Auswahl, auch ohne feststehende Spiele
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from tournament_teams where tournament_id = $1', [tid]))!.n, 19);
+    const league = (await db.one<{ id: string }>('select id from leagues where slug = $1', [slug]))!.id;
+    const adminId = (await db.one<{ id: string }>(`select id from users where email = 'admin@example.de'`))!.id;
+    await db.run(`insert into league_members (league_id, user_id) values ($1, $2) on conflict do nothing`, [league, adminId]);
+    await db.run(`insert into league_tournaments (league_id, tournament_id, bonus_deadline_at) values ($1, $2, now() + interval '1 day')`, [league, tid]);
+    await db.run(`insert into bonus_questions (league_id, tournament_id, question, points, answer_type) values ($1, $2, 'Wer wird Weltmeister?', 5, 'team')`, [league, tid]);
+    const bonus = await admin.get(`/r/${slug}/sonderfragen`);
+    assert.equal(bonus.status, 200);
+    for (const name of ['Bilibili Gaming', 'Gen.G', 'LOS', 'Team Secret Whales']) assert.match(bonus.text, new RegExp(`<option[^>]*>${name}</option>`), name);
+
+    // Admin: Teams abwählen – wer schon ein Spiel hat, bleibt
+    const ids = await db.query<{ id: string; short_name: string }>('select id, short_name from teams');
+    const gen = ids.find((x) => x.short_name === 'GEN')!.id;
+    const page = await admin.get(`/admin/turnier/${tid}`);
+    assert.match(page.text, /Teams im Turnier \(19\)/);
+    const saved = await admin.post(`/admin/turnier/${tid}/teams`, new URLSearchParams([['team', gen]]));
+    assert.equal(saved.status, 303, saved.text);
+    const left = await db.query<{ short_name: string }>(
+      'select t.short_name from tournament_teams tt join teams t on t.id = tt.team_id where tt.tournament_id = $1 order by 1', [tid]);
+    assert.deepEqual(left.map((r) => r.short_name), ['C9', 'FUR', 'GEN', 'KC', 'MVK']);
+    await importTournament(db, data); // stellt alle wieder her
+
     const kc = await get('pi-oh-1');
     assert.deepEqual([kc.a, kc.b, kc.stage, kc.scheduled_at.toISOString()], ['KC', 'C9', 'Play-In: oberes Halbfinale', '2026-10-15T18:00:00.000Z']);
     assert.equal((await get('pi-oh-2')).matchday_starts_at.toISOString(), '2026-10-15T18:00:00.000Z', 'beide Spiele am 15.10. = ein Spieltag');
