@@ -1,0 +1,36 @@
+name: Spielplan von lolesports.com
+
+# Holt den aktuellen Spielplan (inoffizielle Schnittstelle von lolesports.com) und legt ihn
+# im Zweig "lolesports-abgleich" ab – zum Abgleichen der Dateien in db/daten. Nur von Hand starten.
+
+on:
+  workflow_dispatch:
+    inputs:
+      liga:
+        description: Liga (z. B. worlds, msi, lec)
+        default: worlds
+
+permissions:
+  contents: write
+
+jobs:
+  holen:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Spielplan holen und ablegen
+        env:
+          LIGA: ${{ inputs.liga }}
+        run: |
+          node scripts/lolesports.mjs "$LIGA" > /tmp/spielplan.json
+          node -e 'const d=require("/tmp/spielplan.json"); console.log(d.league.name + ": " + d.matches.length + " Spiele")'
+          git fetch -q origin lolesports-abgleich && git checkout -q lolesports-abgleich || git checkout -q --orphan lolesports-abgleich
+          git rm -rq --cached . 2>/dev/null || true
+          mkdir -p abgleich && cp /tmp/spielplan.json "abgleich/$LIGA.json"
+          git add "abgleich/$LIGA.json"
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -qm "Spielplan $LIGA von lolesports.com ($(date -u +%F\ %H:%M) UTC)" || echo "Keine Änderung"
+          git push -q origin HEAD:lolesports-abgleich
