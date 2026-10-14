@@ -48,7 +48,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title}</title>
-<meta name="theme-color" content="#121a33">
+<meta name="theme-color" content="#07111c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="${ctx.deps.asset('icon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
@@ -70,7 +70,8 @@ ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : n
 ${o.body}
 </main>
 <footer class="foot">
-  <span>${appName}</span>
+  <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
+  <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
 </footer>
 </body>
 </html>`;

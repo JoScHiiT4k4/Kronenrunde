@@ -78,7 +78,7 @@ async function homePage(ctx: Ctx): Promise<Res> {
   <p>Sieger und Ergebnis jeder Serie tippen, Sonderfragen beantworten und in der Rangliste sehen, wer die Szene am besten kennt.</p>
   <div class="match preview" aria-hidden="true">
     <div class="match-meta"><span>Finale</span><span class="bo">Bo5</span></div>
-    <div class="teams"><span class="team team-a">Gen.G</span><span class="vs">vs</span><span class="team team-b">T1</span></div>
+    <div class="teams"><span class="team team-a">Gen.G</span><span class="vs">VS</span><span class="team team-b">T1</span></div>
     <div class="picks picks-bo5">
       <div class="side side-a">${['3:0', '3:1', '3:2'].map((s) => html`<span class="chip chip-a"><input type="radio" disabled tabindex="-1"><span>${s}</span></span>`)}</div>
       <div class="side side-b">${['3:2', '3:1', '3:0'].map((s) => html`<span class="chip chip-b"><input type="radio" disabled tabindex="-1"${attr(s === '3:2', 'checked')}><span>${s}</span></span>`)}</div>
@@ -301,9 +301,9 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>`;
   const teams = html`<div class="teams">
-    <span class="team team-a">${m.team_a ?? 'Steht noch nicht fest'}</span>
-    <span class="vs">vs</span>
-    <span class="team team-b">${m.team_b ?? 'Steht noch nicht fest'}</span>
+    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ?? 'Steht noch nicht fest'}</span>
+    <span class="vs">VS</span>
+    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ?? 'Steht noch nicht fest'}</span>
   </div>`;
 
   if (open && teamsKnown) {
@@ -566,7 +566,7 @@ ${
 
   const body = html`<section class="panel">
   <p><a href="/r/${league.slug}/tippen#spiel-${m.id}">Zurück zu den Spielen</a></p>
-  <h1 class="versus"><span class="team-a">${m.team_a ?? 'offen'}</span> <span class="vs">vs</span> <span class="team-b">${m.team_b ?? 'offen'}</span></h1>
+  <h1 class="versus"><span class="team-a">${m.team_a ?? 'offen'}</span> <span class="vs">VS</span> <span class="team-b">${m.team_b ?? 'offen'}</span></h1>
   <p class="muted">${m.tournament}${m.stage ? `, ${m.stage}` : ''}, Bo${m.best_of}${m.scheduled_at ? `, ${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : ''}</p>
   ${result ? html`<p class="result">Ergebnis: <strong>${result}</strong></p>` : nothing}
   ${content}

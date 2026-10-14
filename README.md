@@ -25,7 +25,7 @@ Was die App kann:
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
 - **Konto löschen** jederzeit, mit allen Daten.
-- Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; helles und dunkles Design.
+- Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; dunkles Design mit Gold, blauer und roter Seite (eigene Formen, freie Schriften Cinzel und Barlow, keine Riot-Grafiken).
 
 Entscheidungen und Plan: siehe [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md).
 
