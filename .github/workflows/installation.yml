@@ -47,7 +47,7 @@ jobs:
             docker exec pi systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded' && break
             sleep 1
           done
-          docker exec pi git config --global --add safe.directory '*'
+          docker exec pi git config --system --add safe.directory '*'
 
       - name: Homebridge installieren (wie auf Homebridge OS)
         run: |

@@ -349,6 +349,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+Environment=HOME=/root
 ExecStart=/usr/local/bin/tippspiel update --auto
 EOF
 
