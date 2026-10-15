@@ -775,3 +775,19 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
   background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(255 255 255 / 4%) 6px 12px);
 }
 .bk-out .bk-name, .bk-out .bk-score { color: var(--muted); font-weight: 600; }
+
+/* Turnier-Leiste im Kopf: Countdown bzw. Livestream-Links */
+.tbar { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; flex: 1 1 auto; font-size: 0.9rem; }
+.tbar-label { color: var(--muted, #a09b8c); white-space: nowrap; }
+.tbar-count { font-family: var(--font-display); font-weight: 700; color: var(--gold-bright); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbar-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; font-weight: 600; }
+.tbar-link:hover { color: var(--gold-bright); }
+.tbar-link .ico { width: 16px; height: 16px; fill: currentColor; }
+.tbar-live { display: inline-flex; align-items: center; gap: 6px; color: #3ddc84; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; text-shadow: 0 0 10px rgb(61 220 132 / 55%); }
+.tbar-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; animation: tbar-pulse 1.6s ease-in-out infinite; }
+@keyframes tbar-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tbar-live::before { animation: none; } }
+@media (max-width: 640px) {
+  .top { flex-wrap: wrap; }
+  .tbar { order: 3; flex-basis: 100%; }
+}
