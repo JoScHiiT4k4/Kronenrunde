@@ -1,6 +1,7 @@
 // Admin-Bereich (nur für ADMIN_EMAILS): Teams, Turniere, Phasen, Spiele und Ergebnisse.
 // Das ist die "Datenquelle von Hand". Später kann ein Daten-Dienst (API) dieselben Tabellen füllen.
 
+import { stageLabel } from '../../domain/bracket.ts';
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
 import { runSync, SYNC_LABELS } from '../abgleich.ts';
@@ -241,7 +242,7 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="submit" class="btn">Speichern</button>
   </form>
   <h2>Phasen</h2>
-  <p>${stages.map((s, i) => html`${i ? ', ' : ''}${s.name}`)}${stages.length ? '' : html`<span class="muted">Keine</span>`}</p>
+  <p>${stages.map((s, i) => html`${i ? ', ' : ''}${stageLabel(s.name)}`)}${stages.length ? '' : html`<span class="muted">Keine</span>`}</p>
   <form method="post" action="${base}/phase" class="team-row">
     ${csrfField(ctx)}
     <input type="text" name="name" required maxlength="60" placeholder="Neue Phase" aria-label="Neue Phase">
@@ -277,7 +278,7 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
     ${ms.map(
       (m) => html`<div class="admin-match${m.wins_a === null && m.scheduled_at && m.scheduled_at < ctx.now ? ' needs-result' : ''}">
       <div><strong>${m.team_a ?? 'offen'} – ${m.team_b ?? 'offen'}</strong>
-        <small class="muted">${m.scheduled_at ? formatDateTime(m.scheduled_at, tz) : 'ohne Termin'}, Bo${m.best_of}${m.stage ? `, ${m.stage}` : ''}${m.status === 'cancelled' ? ', abgesagt' : ''}</small></div>
+        <small class="muted">${m.scheduled_at ? formatDateTime(m.scheduled_at, tz) : 'ohne Termin'}, Bo${m.best_of}${m.stage ? `, ${stageLabel(m.stage)}` : ''}${m.status === 'cancelled' ? ', abgesagt' : ''}</small></div>
       ${
         m.team_a_id && m.team_b_id
           ? html`<form method="post" action="/admin/spiel/${m.id}/ergebnis" class="inline-form">
@@ -326,7 +327,7 @@ function matchFields(ctx: Ctx, m: MatchRow | null, stages: { id: string; name: s
     <label class="field"><span>Phase</span>
       <select name="stage_id">
         <option value="">Keine</option>
-        ${stages.map((s) => html`<option value="${s.id}"${attr(m?.stage === s.name, 'selected')}>${s.name}</option>`)}
+        ${stages.map((s) => html`<option value="${s.id}"${attr(m?.stage === s.name, 'selected')}>${stageLabel(s.name)}</option>`)}
       </select></label>`;
 }
 

@@ -461,6 +461,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((tips.text.match(/class="pct pct-even"/g) ?? []).length, 2);
     assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
     assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
+    assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
+    assert.match(tips.text, /class="foot-version">Version /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.match(tips.text, new RegExp(`href="/r/${slug}/spiel/${match['GEN-T1']}">Tipps zu diesem Spiel</a>`));
 

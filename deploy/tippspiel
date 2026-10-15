@@ -107,6 +107,7 @@ case "${1:-hilfe}" in
     else
       branch=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
     fi
+    touch "$APP_DIR/.update-check"   # die Seite zeigt unten links, wann zuletzt nach Updates geschaut wurde
     new=$(git rev-parse "$branch")
     if [[ $old == "$new" ]] || git merge-base --is-ancestor "$new" "$old"; then
       [[ $auto == 1 ]] || ok "Schon die neueste geprüfte Version ($(git log -1 --format=%h))."
