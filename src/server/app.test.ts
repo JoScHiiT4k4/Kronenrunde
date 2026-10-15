@@ -451,7 +451,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(status, { status: 'finished', wins_a: 1, wins_b: 2 });
 
     const table = await anna.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
     const tips = await anna.get(`/r/${slug}/tippen`);
@@ -494,6 +494,23 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(after, /Max &lt;b&gt;Muster/);
     assert.doesNotMatch(after, /Name fehlt noch/);
     await db.run(`delete from app_settings where key like 'legal\\_%'`);
+  });
+
+  test('Avatare: Upload, Rangliste, Abruf nur angemeldet', async () => {
+    // kleines gültiges JPEG-Gerüst (Prüfung nur auf Kopf/Ende und Größe)
+    const body = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 1), Buffer.from([0xff, 0xd9])]);
+    const url = `data:image/jpeg;base64,${body.toString('base64')}`;
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/png;base64,AAAA' })).location, '/konto?hinweis=avatar-fehler');
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/jpeg;base64,' + Buffer.alloc(60_000, 7).toString('base64') })).location, '/konto?hinweis=avatar-fehler', 'zu groß / kein JPEG');
+    assert.equal((await anna.post('/konto/avatar', { avatar: url })).location, '/konto?hinweis=avatar-gespeichert');
+    const id = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
+    const img = await anna.get(`/avatar/${id}`);
+    assert.equal(img.status, 200);
+    assert.equal(img.headers.get('content-type'), 'image/jpeg');
+    assert.equal((await new Client().get(`/avatar/${id}`)).status, 303, 'nicht ohne Anmeldung');
+    assert.match((await anna.get(`/r/${slug}/rangliste`)).text, new RegExp(`src="/avatar/${id}\\?v=\\d+"`));
+    assert.equal((await anna.post('/konto/avatar/loeschen')).location, '/konto?hinweis=avatar-geloescht');
+    assert.equal((await anna.get(`/avatar/${id}`)).status, 404);
   });
 
   test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
@@ -576,7 +593,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 

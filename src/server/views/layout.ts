@@ -11,6 +11,9 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
   'email-gesendet': { text: 'Wir haben dir eine Mail an die neue Adresse geschickt. Mit dem Link darin wird sie übernommen.', kind: 'ok' },
   'email-geaendert': { text: 'Deine E-Mail-Adresse ist geändert.', kind: 'ok' },
+  'avatar-gespeichert': { text: 'Dein Profilbild ist gespeichert.', kind: 'ok' },
+  'avatar-geloescht': { text: 'Dein Profilbild ist entfernt.', kind: 'ok' },
+  'avatar-fehler': { text: 'Das Bild konnte nicht gespeichert werden. Bitte wähle ein anderes Bild (JPG, PNG oder WebP).', kind: 'warn' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
   abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },
   beigetreten: { text: 'Willkommen in der Tipprunde!', kind: 'ok' },
@@ -141,6 +144,13 @@ function leagueNav(l: LeagueNav): Html {
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
   </div>
 </nav>`;
+}
+
+/** Kleines rundes Profilbild; ohne Bild der Anfangsbuchstabe. */
+export function avatar(userId: string, name: string, version: Date | null, size: 'sm' | 'lg' = 'sm'): Html {
+  return version
+    ? html`<img class="avatar avatar-${size}" src="/avatar/${userId}?v=${String(version.getTime())}" alt="" width="${size === 'lg' ? 96 : 28}" height="${size === 'lg' ? 96 : 28}" loading="lazy">`
+    : html`<span class="avatar avatar-${size} avatar-ph" aria-hidden="true">${[...name][0]?.toUpperCase() ?? '?'}</span>`;
 }
 
 export function csrfField(ctx: Ctx): Html {

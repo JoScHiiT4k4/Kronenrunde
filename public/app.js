@@ -186,3 +186,38 @@ if ('serviceWorker' in navigator) {
   const timer = setInterval(tick, 1000);
   tick();
 })();
+
+// Profilbild: im Browser auf 128x128 zuschneiden und verkleinern (JPEG), dann als Text mitschicken
+(() => {
+  const form = document.querySelector('[data-avatar-form]');
+  if (!form) return;
+  const file = form.querySelector('[data-avatar-file]');
+  const hidden = form.querySelector('input[name="avatar"]');
+  const submit = form.querySelector('[data-avatar-submit]');
+  file.addEventListener('change', () => {
+    submit.disabled = true;
+    hidden.value = '';
+    const f = file.files && file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!side) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+        hidden.value = canvas.toDataURL('image/jpeg', 0.85);
+        submit.disabled = false;
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  });
+})();

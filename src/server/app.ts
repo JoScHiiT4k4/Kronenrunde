@@ -25,6 +25,7 @@ import {
 } from './http.ts';
 import type { Mailer } from './mail.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
+import { registerAvatarRoutes } from './routes/avatar.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerBracketRoutes } from './routes/bracket.ts';
 import { registerLegalRoutes } from './routes/legal.ts';
@@ -123,6 +124,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
   registerManageRoutes(router);
   registerAdminRoutes(router);
   registerLegalRoutes(router);
+  registerAvatarRoutes(router);
 
   const manifest = JSON.stringify({
     name: config.appName,
