@@ -5,7 +5,8 @@
 // Ohne TEST_DATABASE_URL wird der Test übersprungen.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { dirname, join } from 'node:path';
@@ -126,6 +127,8 @@ async function postponeTournament(tid: string): Promise<() => Promise<void>> {
   };
 }
 
+const UPDATE_FILE = join(tmpdir(), `tippspiel-update-anfrage-${process.pid}`);
+
 describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht gesetzt' }, () => {
   before(async () => {
     db = createDb(DB_URL!, { max: 4 });
@@ -143,6 +146,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       SUGGESTIONS_TO: 'vorschlaege@example.de',
       MAIL_MODE: 'memory',
       APP_SECRET: 'test-geheimnis',
+      UPDATE_REQUEST_FILE: UPDATE_FILE,
     });
     mailer = createMailer(config);
     const app = createApp({
@@ -462,7 +466,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
     assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
-    assert.match(tips.text, /class="foot-version">Version [^]*?Letztes Update /);
+    assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
     assert.match(tips.text, /<summary>Tipps der Mitspieler<\/summary>[^]*?<td>Ben<\/td>/);
@@ -908,6 +912,19 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((pub.text.match(/class="ad ad-right"/g) ?? []).length, 1);
     assert.match(pub.text, /class="ad ad-ghost" aria-hidden="true"/);
     assert.doesNotMatch(pub.text, /ad-left/);
+  });
+
+  test('Administrator: Update sofort anfordern (legt nur eine Anfrage-Datei ab)', async () => {
+    rmSync(UPDATE_FILE, { force: true });
+    const page = await admin.get('/admin?bereich=system');
+    assert.match(page.text, /Jetzt aktualisieren/);
+    assert.match(page.text, /Version &amp; Update/);
+    const r = await admin.post('/admin/update-erzwingen');
+    assert.equal(r.status, 303, r.text);
+    assert.match(r.location ?? '', /hinweis=update-angefordert/);
+    assert.ok(existsSync(UPDATE_FILE));
+    assert.match((await admin.get('/admin?bereich=system')).text, /Ein Update ist angefordert/);
+    rmSync(UPDATE_FILE, { force: true });
   });
 
   test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
