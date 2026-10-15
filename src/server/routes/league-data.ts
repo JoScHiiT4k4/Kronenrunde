@@ -64,12 +64,13 @@ export async function loadLeague(ctx: Ctx, slug: string, o: { allowAdmin?: boole
 export interface LeagueTournament {
   id: string;
   name: string;
+  /** Frist der Sonderfragen: automatisch der Start des ersten Spiels; null, solange noch kein Spiel mit Termin feststeht */
   bonus_deadline_at: Date | null;
 }
 
 export function leagueTournaments(db: Queryable, leagueId: string): Promise<LeagueTournament[]> {
   return db.query<LeagueTournament>(
-    `select t.id, t.name, lt.bonus_deadline_at
+    `select t.id, t.name, tournament_start(t.id) as bonus_deadline_at
        from league_tournaments lt join tournaments t on t.id = lt.tournament_id
       where lt.league_id = $1
       order by t.starts_on desc nulls last, t.name`,

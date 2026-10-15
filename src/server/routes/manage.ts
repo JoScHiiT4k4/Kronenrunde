@@ -2,7 +2,7 @@
 
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
-import { formatDateTime, isLocalInput, toLocalInput } from '../format.ts';
+import { formatDateTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { csrfField, layout, postButton } from '../views/layout.ts';
@@ -159,11 +159,9 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     (t) => html`<form method="post" action="${base}/turnier/${t.id}" class="stack bordered">
     ${csrfField(ctx)}
     <h3>${t.name}</h3>
-    <label class="field"><span>Frist für die Sonderfragen</span>
-      <input type="datetime-local" name="bonus_deadline_at" value="${toLocalInput(t.bonus_deadline_at, tz)}"></label>
+    <p class="muted">Die Sonderfragen schließen automatisch, sobald das erste Spiel beginnt${t.bonus_deadline_at ? ` (${formatDateTime(t.bonus_deadline_at, tz)} Uhr)` : ''}.</p>
     <div class="row">
-      <button type="submit" name="aktion" value="speichern" class="btn">Frist speichern</button>
-      <button type="submit" name="aktion" value="entfernen" class="btn btn-quiet" data-confirm="Turnier aus der Tipprunde entfernen? Die Sonderfragen dazu werden gelöscht.">Entfernen</button>
+      <button type="submit" name="aktion" value="entfernen" class="btn btn-quiet" data-confirm="Turnier aus der Tipprunde entfernen? Die Sonderfragen dazu werden gelöscht.">Turnier entfernen</button>
     </div>
   </form>`,
   )}
@@ -319,9 +317,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
     const id = ctx.form.get('tournament_id');
     if (!isUuid(id)) return 'Bitte wähle ein Turnier aus.';
     await ctx.deps.db.run(
-      `insert into league_tournaments (league_id, tournament_id, bonus_deadline_at)
-       select $1, t.id, (select min(scheduled_at) from matches where tournament_id = t.id and scheduled_at > now())
-         from tournaments t where t.id = $2
+      `insert into league_tournaments (league_id, tournament_id) select $1, t.id from tournaments t where t.id = $2
        on conflict do nothing`,
       [league.id, id],
     );
@@ -334,13 +330,6 @@ export function registerManageRoutes(router: Router<Ctx>) {
       await ctx.deps.db.run('delete from league_tournaments where league_id = $1 and tournament_id = $2', [league.id, tid]);
       return;
     }
-    const value = ctx.form.get('bonus_deadline_at') ?? '';
-    if (value && !isLocalInput(value)) return 'Bitte gib Datum und Uhrzeit vollständig an.';
-    await ctx.deps.db.run(
-      `update league_tournaments set bonus_deadline_at = case when $3 = '' then null else ($3::timestamp at time zone $4) end
-        where league_id = $1 and tournament_id = $2`,
-      [league.id, tid, value, ctx.deps.config.timeZone],
-    );
   });
 
   post('/typische-fragen', async (ctx, { league }) => {

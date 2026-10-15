@@ -88,10 +88,10 @@ function leagueNav(l: LeagueNav): Html {
   <div class="league-name">${l.name}</div>
   <div class="tabs">
     ${tab('tippen', 'Tippen')}
+    ${tab('sonderfragen', 'Sonderfragen')}
+    ${tab('rangliste', 'Rangliste')}
     ${tab('alle-tipps', 'Alle Tipps')}
     ${tab('turnierbaum', 'Turnierbaum')}
-    ${tab('rangliste', 'Rangliste')}
-    ${tab('sonderfragen', 'Sonderfragen')}
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
   </div>
 </nav>`;

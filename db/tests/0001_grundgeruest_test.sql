@@ -144,13 +144,46 @@ insert into bonus_questions (id, league_id, tournament_id, question, points, ans
    'Wer gewinnt?', 4, 'team', '{}'),
   ('00000000-0000-0000-0000-00000000b002', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f1',
    'Erster Pentakill?', 2, 'team', '{"Kein Pentakill"}');
+-- Frist = Start des ersten Spiels (hier: Spiel 4 ist schon vorbei). Nur mit Ausnahme-Schalter lässt sich noch etwas eintragen.
+begin;
+set local app.bypass_lock = 'on';
 insert into bonus_answers (question_id, league_id, user_id, answer) values
   ('00000000-0000-0000-0000-00000000b001', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000a1', 'Cloud9');
-update league_tournaments set bonus_deadline_at = now() - interval '1 minute';
+commit;
 do $$
 begin
   perform pg_temp.expect_error($q$insert into bonus_answers values ('00000000-0000-0000-0000-00000000b001','00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000b1','T1')$q$, 'Sonderfragen sind geschlossen');
   perform pg_temp.expect_error($q$update bonus_answers set answer = 'T1'$q$, 'Sonderfragen sind geschlossen');
+end $$;
+
+-- Turnier, dessen erstes Spiel noch bevorsteht: offen; ab dem Start geschlossen
+insert into tournaments (id, name) values ('00000000-0000-0000-0000-0000000000f2', 'Zukunfts-Turnier');
+insert into matches (id, tournament_id, team_a_id, team_b_id, best_of, scheduled_at) values
+  ('00000000-0000-0000-0000-0000000000e6', '00000000-0000-0000-0000-0000000000f2',
+   '00000000-0000-0000-0000-00000000c001', '00000000-0000-0000-0000-00000000c002', 5, now() + interval '3 hours');
+insert into league_tournaments (league_id, tournament_id) values
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f2');
+insert into bonus_questions (id, league_id, tournament_id, question, points, answer_type) values
+  ('00000000-0000-0000-0000-00000000b003', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f2', 'Wer wird Weltmeister?', 5, 'team');
+insert into bonus_answers (question_id, league_id, user_id, answer) values
+  ('00000000-0000-0000-0000-00000000b003', '00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000b1', 'T1');
+do $$
+begin
+  if tournament_start('00000000-0000-0000-0000-0000000000f2') is null or tournament_start('00000000-0000-0000-0000-0000000000f2') < now() then
+    raise exception 'TEST FEHLGESCHLAGEN: Start des Turniers falsch';
+  end if;
+  -- Spiel noch ohne Termin: keine Frist, Antworten möglich
+  update matches set scheduled_at = null where id = '00000000-0000-0000-0000-0000000000e6';
+  update bonus_answers set answer = 'G2' where question_id = '00000000-0000-0000-0000-00000000b003';
+  -- Erstes Spiel läuft, obwohl der angesetzte Termin später liegt: geschlossen
+  update matches set scheduled_at = now() + interval '5 hours', status = 'live' where id = '00000000-0000-0000-0000-0000000000e6';
+  perform pg_temp.expect_error($q$update bonus_answers set answer = 'T1' where question_id = '00000000-0000-0000-0000-00000000b003'$q$, 'Sonderfragen sind geschlossen');
+  -- Abgesagte Spiele zählen nicht
+  update matches set status = 'cancelled', live_at = null where id = '00000000-0000-0000-0000-0000000000e6';
+  update bonus_answers set answer = 'T1' where question_id = '00000000-0000-0000-0000-00000000b003';
+  -- Termin erreicht: geschlossen
+  update matches set status = 'scheduled', scheduled_at = now() - interval '1 minute' where id = '00000000-0000-0000-0000-0000000000e6';
+  perform pg_temp.expect_error($q$update bonus_answers set answer = 'G2' where question_id = '00000000-0000-0000-0000-00000000b003'$q$, 'Sonderfragen sind geschlossen');
 end $$;
 
 -- Konto löschen: alles des Nutzers verschwindet, auch nach Tippschluss
