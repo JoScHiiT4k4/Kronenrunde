@@ -462,7 +462,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
     assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
-    assert.match(tips.text, /class="foot-version">Version /);
+    assert.match(tips.text, /class="foot-version">Version [^]*?Letztes Update /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
     assert.match(tips.text, /<summary>Tipps der Mitspieler<\/summary>[^]*?<td>Ben<\/td>/);
@@ -894,7 +894,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tipPage.text, /<nav class="phase-tabs"/);
     assert.match(tipPage.text, /<a href="\/r\/[a-z0-9-]+\/tippen\?phase=play-in" aria-current="page">Play-In/);
     assert.match(tipPage.text, /phase=swiss" class="later">Swiss/);
-    assert.match(tipPage.text, /Cloud9/);
+    assert.match(tipPage.text, />C9</);
     assert.match(tipPage.text, /weitere Spiele dieser Phase erscheinen hier/);
     const swissPage = await admin.get(`/r/${slug}/tippen?phase=swiss`);
     assert.match(swissPage.text, /Die Paarungen für Swiss stehen noch nicht fest/);
@@ -966,6 +966,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // K.-o.-Phase: Viertelfinale, Halbfinale, Finale als Spalten
     const ko = await admin.get(`${path}?turnier=${tid}&phase=knockout-stage`);
     for (const round of ['Quarterfinals', 'Semifinals', 'Final']) assert.match(ko.text, new RegExp(`class="bk-rtitle" x="\\d+" y="\\d+">${round}</text>`));
+    // Reiter "Statistiken" neben dem Turnierbaum
+    const stats = await admin.get(`/r/${slug}/statistiken?turnier=${tid}`);
+    assert.equal(stats.status, 200);
+    assert.match(stats.text, /<a href="\/r\/[a-z0-9-]+\/statistiken" aria-current="page">Statistiken<\/a>/);
+    assert.match(stats.text, /<h1 class="bk-title">Statistiken – Worlds 2026<\/h1>/);
+    assert.match(stats.text, /Das Turnier in Zahlen/);
+    assert.match(stats.text, /<strong>MVK<\/strong>/, 'Teams mit Kürzel in der Tabelle');
+    assert.match(stats.text, /Tipps der Runde/);
     // Unbekannte Phase → die aktuelle wird gezeigt
     assert.equal((await admin.get(`${path}?turnier=${tid}&phase=gibt-es-nicht`)).status, 200);
   });

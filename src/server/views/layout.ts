@@ -38,7 +38,7 @@ export interface LeagueNav {
   slug: string;
   name: string;
   canManage: boolean;
-  active: 'tippen' | 'alle-tipps' | 'turnierbaum' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
+  active: 'tippen' | 'alle-tipps' | 'turnierbaum' | 'statistiken' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
 }
 
 export interface PageOptions {
@@ -103,8 +103,7 @@ function versionNote(ctx: Ctx): Html {
   const tz = ctx.deps.config.timeZone;
   const b = buildInfo();
   const check = lastUpdateCheck();
-  const built = b.committedAt ? ` · Stand ${formatDateTime(b.committedAt, tz)} Uhr` : '';
-  return html`<p class="foot-version">Version ${b.version}${b.commit ? html` (${b.commit})` : nothing}${built}${check ? html` · Update zuletzt geprüft: ${formatTime(check, tz)} Uhr` : nothing}</p>`;
+  return html`<p class="foot-version">Version ${b.version}${b.commit ? html` (${b.commit})` : nothing} · Letztes Update ${formatDateTime(b.updatedAt, tz)} Uhr${check ? html` · zuletzt geprüft ${formatTime(check, tz)} Uhr` : nothing}</p>`;
 }
 
 const TWITCH_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 2.5 7v13H7v3h3l3-3h4l5-5V3H4Zm15 11-3 3h-4l-3 3v-3H6V5h13v9Zm-3-6h-2v5h2V8Zm-5 0H9v5h2V8Z"/></svg>`;
@@ -204,6 +203,7 @@ function leagueNav(l: LeagueNav): Html {
     ${tab('rangliste', 'Rangliste')}
     ${tab('alle-tipps', 'Alle Tipps')}
     ${tab('turnierbaum', 'Turnierbaum')}
+    ${tab('statistiken', 'Statistiken')}
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
   </div>
 </nav>`;
