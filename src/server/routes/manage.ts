@@ -2,13 +2,13 @@
 
 import type { Ctx } from '../app.ts';
 import { ANSWER_TYPE_LABELS, type AnswerType, QUESTION_CATALOG } from '../../domain/questions.ts';
-import { missingTips } from '../../domain/missing.ts';
+import { missingAnswers, missingTips } from '../../domain/missing.ts';
 import { formatDateTime, formatRemaining } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, layout, postButton, tabMenu } from '../views/layout.ts';
+import { csrfField, layout, postButton, progress, tabMenu } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
-import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, toDomainMatch } from './league-data.ts';
+import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, shortA, shortB, toDomainMatch } from './league-data.ts';
 import { clearChat } from './chat.ts';
 import { lockModeOptions, parseLockMode } from './leagues.ts';
 
@@ -114,11 +114,20 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
 
   // Wer hat die anstehenden Spiele noch nicht getippt? Nur Anzahl und Frist, nie der Inhalt der Tipps.
   let missing: ReturnType<typeof missingTips> = [];
+  let missingQ: ReturnType<typeof missingAnswers> = [];
+  let openQuestions = 0;
+  const matchLabel = new Map<string, string>();
   if (area === 'uebersicht') {
-    const [matches, tipped] = await Promise.all([
+    const [matches, tipped, answered] = await Promise.all([
       leagueMatches(db, league.id),
       db.query<{ user_id: string; match_id: string }>('select user_id, match_id from predictions where league_id = $1', [league.id]),
+      db.query<{ user_id: string; question_id: string }>('select user_id, question_id from bonus_answers where league_id = $1', [league.id]),
     ]);
+    for (const m of matches) matchLabel.set(m.id, `${shortA(m)} – ${shortB(m)}`);
+    const openIds = new Set(tournaments.filter((t) => !t.bonus_deadline_at || t.bonus_deadline_at > ctx.now).map((t) => t.id));
+    const open = questions.filter((q) => openIds.has(q.tournament_id));
+    openQuestions = open.length;
+    missingQ = missingAnswers(members.map((m) => m.user_id), open, new Set(answered.map((a) => `${a.user_id}:${a.question_id}`)));
     missing = missingTips(
       members.map((m) => m.user_id),
       matches.map(toDomainMatch),
@@ -140,20 +149,38 @@ ${tabMenu('sub-tabs', 'Bereiche', AREAS.map(([key, label]) => ({
 
 ${area === 'uebersicht' ? html`
 <section class="panel">
-  <h2>Noch nicht getippt</h2>
+  <h2>Tipps ${progress(members.length - missing.length, members.length, 'getippt')}</h2>
   ${
     missing.length
       ? html`<p class="muted">Diese Mitspieler haben für anstehende Spiele noch keinen Tipp abgegeben. Die Tipps selbst siehst du – wie alle anderen – erst nach Tippschluss.</p>
   <table class="table">
-    <thead><tr><th>Name</th><th class="num">Offen</th><th>Nächster Tippschluss</th></tr></thead>
+    <thead><tr><th>Name</th><th>Fehlt</th><th>Nächster Tippschluss</th></tr></thead>
     <tbody>
     ${missing.map(
-      (r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td><td class="num">${r.missing}</td>
+      (r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td>
+      <td class="bad">${r.matchIds.slice(0, 4).map((id) => matchLabel.get(id) ?? '?').join(', ')}${r.matchIds.length > 4 ? ` und ${r.matchIds.length - 4} weitere` : ''}</td>
       <td>${formatDateTime(r.nextLock, tz)} Uhr <span class="muted">(${formatRemaining(r.nextLock, ctx.now)})</span></td></tr>`,
     )}
     </tbody>
   </table>`
       : html`<p class="muted">Alle haben die anstehenden Spiele getippt – oder es steht gerade kein Spiel zum Tippen an.</p>`
+  }
+</section>
+
+<section class="panel">
+  <h2>Sonderfragen ${openQuestions ? progress(members.length - missingQ.length, members.length, 'Fragen beantwortet') : nothing}</h2>
+  ${
+    !openQuestions
+      ? html`<p class="muted">Gerade gibt es keine offenen Sonderfragen.</p>`
+      : missingQ.length
+        ? html`<p class="muted">Diese Mitspieler haben noch nicht alle offenen Sonderfragen beantwortet.</p>
+  <table class="table">
+    <thead><tr><th>Name</th><th>Unbeantwortet</th></tr></thead>
+    <tbody>
+    ${missingQ.map((r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td><td class="bad">${r.questions.join(' · ')}</td></tr>`)}
+    </tbody>
+  </table>`
+        : html`<p class="muted">Alle haben alle offenen Sonderfragen beantwortet.</p>`
   }
 </section>
 

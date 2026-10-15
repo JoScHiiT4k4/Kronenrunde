@@ -334,6 +334,12 @@ export function filterBar(target: string, placeholder: string, regions: string[]
 </div>`;
 }
 
+/** Fortschritt „5/7 …“: grün, wenn alles erledigt ist, sonst rot. */
+export function progress(done: number, total: number, label: string, paren = false): Html {
+  const text = `${done}/${total} ${label}`;
+  return html`<span class="progress ${done >= total ? 'progress-ok' : 'progress-bad'}">${paren ? `(${text})` : text}</span>`;
+}
+
 export function emptyState(text: string, action?: Html): Html {
   return html`<div class="empty"><p>${text}</p>${action ?? nothing}</div>`;
 }

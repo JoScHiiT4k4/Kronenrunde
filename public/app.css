@@ -1184,3 +1184,9 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
   .top-nav > .role-switch > summary { justify-content: flex-start; }
   .top-nav .role-menu { right: auto; left: 0; top: calc(100% + 2px); }
 }
+
+/* Fortschritt: grün = erledigt, rot = offen */
+.progress { display: inline-block; margin-left: 6px; padding: 2px 10px; border: 1px solid currentColor; border-radius: 12px; font-family: var(--font-body); font-size: 0.85rem; font-weight: 700; vertical-align: middle; white-space: nowrap; }
+.progress-ok { color: var(--ok); background: rgb(63 199 165 / 12%); }
+.progress-bad { color: var(--red); background: rgb(236 91 82 / 12%); }
+td.bad { color: var(--red); }
