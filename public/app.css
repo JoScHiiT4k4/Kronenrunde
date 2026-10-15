@@ -833,3 +833,17 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 .who { display: flex; align-items: center; gap: 10px; }
 .avatar-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 12px 0 18px; }
 .avatar-edit .stack { flex: 1 1 220px; }
+/* Umschalter Spielleiter / Administrator (nur Betreiber) */
+.role-switch { position: relative; }
+.role-switch summary { cursor: pointer; list-style: none; font-weight: 600; color: var(--gold-text); white-space: nowrap; }
+.role-switch summary::-webkit-details-marker { display: none; }
+.role-switch summary::after { content: " ▾"; font-size: 0.8em; }
+.role-switch[open] summary, .role-switch summary:hover { color: var(--gold-bright); }
+.role-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 160px;
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--frame);
+}
+.role-menu a { padding: 10px 14px; color: var(--text); text-decoration: none; max-width: none; }
+.role-menu a:hover { color: var(--gold-bright); background: rgb(200 170 110 / 10%); }
+.role-menu a[aria-current] { color: var(--gold-bright); }

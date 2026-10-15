@@ -12,7 +12,7 @@ import { lockModeOptions, parseLockMode } from './leagues.ts';
 
 async function manageAccess(ctx: Ctx): Promise<LeagueAccess> {
   const access = await loadLeague(ctx, ctx.params.slug, { allowAdmin: true });
-  if (!access.canManage) throw new HttpError(403, 'Nur die Leitung der Tipprunde kann das ändern.');
+  if (!access.canManage) throw new HttpError(403, 'Nur der Spielleiter der Tipprunde kann das ändern.');
   return access;
 }
 
@@ -74,7 +74,7 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
   const inviteLink = `${config.appUrl}/beitreten/${league.invite_code}`;
   const base = `/r/${league.slug}/verwalten`;
   const available = allTournaments.filter((t) => !tournaments.some((x) => x.id === t.id));
-  const roleLabel: Record<string, string> = { owner: 'Leitung', admin: 'Mitleitung', member: 'Mitglied' };
+  const roleLabel: Record<string, string> = { owner: 'Spielleiter', admin: 'Mit-Spielleiter', member: 'Mitglied' };
 
   const body = html`
 <section class="panel">
@@ -208,8 +208,8 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
           ? html`<form method="post" action="${base}/mitglied/${m.user_id}" class="inline-form">
           ${csrfField(ctx)}
           <select name="aktion" aria-label="Aktion für ${m.display_name}">
-            ${m.role === 'member' ? html`<option value="admin">Zur Mitleitung machen</option>` : html`<option value="member">Zum Mitglied machen</option>`}
-            <option value="owner">Leitung übergeben</option>
+            ${m.role === 'member' ? html`<option value="admin">Zum Mit-Spielleiter machen</option>` : html`<option value="member">Zum Mitglied machen</option>`}
+            <option value="owner">Spielleitung übergeben</option>
             <option value="entfernen">Aus der Runde entfernen</option>
           </select>
           <button type="submit" class="btn" data-confirm="Wirklich ausführen?">OK</button>
@@ -360,7 +360,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
   post('/mitglied/:uid', async (ctx, access) => {
     const { league } = access;
     const uid = ctx.params.uid;
-    if (!access.isOwner) throw new HttpError(403, 'Nur die Leitung der Tipprunde kann Mitglieder verwalten.');
+    if (!access.isOwner) throw new HttpError(403, 'Nur der Spielleiter der Tipprunde kann Mitglieder verwalten.');
     if (!isUuid(uid)) throw new HttpError(404, 'Dieses Mitglied gibt es nicht.');
     const action = ctx.form.get('aktion');
     const { db } = ctx.deps;
@@ -382,7 +382,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
   });
 
   post('/loeschen', async (ctx, access) => {
-    if (!access.isOwner) throw new HttpError(403, 'Nur die Leitung kann die Tipprunde löschen.');
+    if (!access.isOwner) throw new HttpError(403, 'Nur der Spielleiter kann die Tipprunde löschen.');
     if ((ctx.form.get('name') ?? '').trim() !== access.league.name) return 'Der eingegebene Name stimmt nicht. Die Tipprunde wurde nicht gelöscht.';
     await ctx.deps.db.run('delete from leagues where id = $1', [access.league.id]);
     return redirect('/?hinweis=runde-geloescht');
