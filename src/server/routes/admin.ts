@@ -11,6 +11,7 @@ import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { csrfField, layout, postButton } from '../views/layout.ts';
 import { cleanName, isUuid, loginRedirect } from './common.ts';
+import { LEGAL_FIELDS, type LegalKey, loadLegal } from './legal.ts';
 import { leagueCreation, type MatchRow, oneMatch, shortA, shortB, tournamentMatches } from './league-data.ts';
 
 function requireAdmin(ctx: Ctx) {
@@ -76,56 +77,56 @@ function resultSelect(m: MatchRow, name = 'ergebnis'): Html {
 }
 
 // ---------------------------------------------------------------------
-// Übersicht: Turniere und Teams
+// Administrator-Bereich der ganzen Seite (Betreiber), in Reitern
 // ---------------------------------------------------------------------
+
+const ADMIN_AREAS = [
+  ['uebersicht', 'Übersicht'],
+  ['nutzer', 'Nutzer'],
+  ['abgleich', 'Datenabgleich'],
+  ['impressum', 'Impressum'],
+  ['datenschutz', 'Datenschutz'],
+] as const;
+type AdminArea = (typeof ADMIN_AREAS)[number][0];
+
+function legalForm(ctx: Ctx, area: AdminArea, keys: LegalKey[], legal: Record<LegalKey, string>, view: string, intro: string): Html {
+  return html`<section class="panel">
+  <h2>${area === 'impressum' ? 'Impressum' : 'Datenschutzerklärung'}</h2>
+  <p class="muted">${intro} <a href="${view}">Seite ansehen</a>. Die Texte sind Vorlagen und keine Rechtsberatung – bitte vor der Veröffentlichung prüfen.</p>
+  <form method="post" action="/admin/rechtliches" class="stack">
+    ${csrfField(ctx)}
+    <input type="hidden" name="bereich" value="${area}">
+    ${LEGAL_FIELDS.filter((f) => keys.includes(f.key)).map(
+      (f) => html`<label class="field"><span>${f.label}${f.hint ? html` <small class="muted">${f.hint}</small>` : nothing}</span>
+      <input type="text" name="${f.key}" value="${legal[f.key]}" maxlength="${f.max}"></label>`,
+    )}
+    <button type="submit" class="btn btn-primary">Speichern</button>
+  </form>
+</section>`;
+}
 
 async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   const { db } = ctx.deps;
-  const [tournaments, teamList, syncRows, counts, creation] = await Promise.all([
-    db.query<{ id: string; name: string; starts_on: string | null; ends_on: string | null; matches: number; open_results: number }>(
-      `select t.id, t.name, t.starts_on, t.ends_on,
-              (select count(*)::int from matches m where m.tournament_id = t.id) as matches,
-              (select count(*)::int from matches m where m.tournament_id = t.id and m.wins_a is null
-                  and m.status <> 'cancelled' and m.scheduled_at < now() - interval '30 minutes') as open_results
-         from tournaments t order by t.starts_on desc nulls last, t.name`,
-    ),
-    teams(ctx),
-    db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),
-    db.one<{ champions: number; players: number }>(
-      'select (select count(*)::int from champions) as champions, (select count(*)::int from players where active) as players',
-    ),
-    leagueCreation(db),
-  ]);
+  const wanted = ctx.query.get('bereich');
+  const area: AdminArea = ADMIN_AREAS.find(([k]) => k === wanted)?.[0] ?? 'uebersicht';
   const tz = ctx.deps.config.timeZone;
-  const body = html`<section class="panel">
-  <h1>Administrator</h1>
-  <p class="muted">Turniere, Teams, Spiele und Ergebnisse gelten für alle Tipprunden.</p>
-  <p><a href="/admin/rechtliches">Rechtliche Angaben (Impressum, Datenschutz)</a></p>
-  <h2>Turniere</h2>
-  <ul class="league-list">
-    ${tournaments.map(
-      (t) => html`<li><a href="/admin/turnier/${t.id}"><span class="league-list-name">${t.name}</span>
-      <span class="muted">${t.matches} Spiele${t.open_results ? html`, <strong class="warn">${t.open_results} ohne Ergebnis</strong>` : ''}</span></a></li>`,
-    )}
-  </ul>
-  <form method="post" action="/admin/turnier" class="stack bordered">
-    ${csrfField(ctx)}
-    <h3>Neues Turnier</h3>
-    <label class="field"><span>Name</span><input type="text" name="name" required maxlength="80" placeholder="z. B. MSI 2027"></label>
-    <div class="row">
-      <label class="field small"><span>Beginn</span><input type="date" name="starts_on"></label>
-      <label class="field small"><span>Ende</span><input type="date" name="ends_on"></label>
-    </div>
-    <label class="field"><span>Phasen <small class="muted">(eine pro Zeile, in Reihenfolge)</small></span>
-      <textarea name="stages" rows="4">Play-In
-Swiss
-Viertelfinale
-Halbfinale
-Finale</textarea></label>
-    <button type="submit" class="btn btn-primary">Turnier anlegen</button>
-  </form>
-</section>
+  let content: Html = nothing;
 
+  if (area === 'uebersicht') {
+    const [stats, creation] = await Promise.all([
+      db.one<{ users: number; leagues: number; tips: number }>(
+        'select (select count(*)::int from users) as users, (select count(*)::int from leagues) as leagues, (select count(*)::int from predictions) as tips',
+      ),
+      leagueCreation(db),
+    ]);
+    content = html`<section class="panel">
+  <h2>Die Seite in Zahlen</h2>
+  <table class="table compact"><tbody>
+    <tr><td>Nutzer</td><td class="num">${stats!.users}</td></tr>
+    <tr><td>Tipprunden</td><td class="num">${stats!.leagues}</td></tr>
+    <tr><td>Abgegebene Tipps</td><td class="num">${stats!.tips}</td></tr>
+  </tbody></table>
+</section>
 <section class="panel">
   <h2>Neue Tipprunden</h2>
   <form method="post" action="/admin/einstellungen" class="stack">
@@ -133,17 +134,37 @@ Finale</textarea></label>
     <fieldset class="field">
       <legend>Wer darf neue Tipprunden anlegen?</legend>
       <label class="check"><input type="radio" name="league_creation" value="admins"${attr(creation === 'admins', 'checked')}>
-        <span>Nur Administratoren <span class="muted">– für alle anderen ist „Tipprunde erstellen“ ausgeblendet; sie treten über deinen Einladungslink bei</span></span></label>
+        <span>Nur Administratoren <span class="muted">– für alle anderen ist „Tipprunde erstellen“ ausgeblendet; sie treten über den Einladungslink bei</span></span></label>
       <label class="check"><input type="radio" name="league_creation" value="alle"${attr(creation === 'alle', 'checked')}>
         <span>Jeder mit Konto</span></label>
     </fieldset>
     <button type="submit" class="btn">Speichern</button>
   </form>
-</section>
-
-<section class="panel">
-  <h2>Datenabgleich mit Riot</h2>
-  <p class="muted">Champions und Spielerkader für die Auswahl bei Sonderfragen. Läuft automatisch alle 6 Stunden.
+</section>`;
+  } else if (area === 'nutzer') {
+    const users = await db.query<{ id: string; display_name: string; email: string; created_at: Date; leagues: number }>(
+      `select u.id, u.display_name, u.email, u.created_at, (select count(*)::int from league_members lm where lm.user_id = u.id) as leagues
+         from users u order by u.created_at desc limit 300`,
+    );
+    content = html`<section class="panel">
+  <h2>Nutzer (${users.length})</h2>
+  <table class="table compact">
+    <thead><tr><th>Name</th><th>E-Mail</th><th class="num">Runden</th><th>Seit</th></tr></thead>
+    <tbody>
+    ${users.map((u) => html`<tr><td>${u.display_name}</td><td>${u.email}</td><td class="num">${u.leagues}</td><td>${formatDateTime(u.created_at, tz)}</td></tr>`)}
+    </tbody>
+  </table>
+</section>`;
+  } else if (area === 'abgleich') {
+    const [syncRows, counts] = await Promise.all([
+      db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),
+      db.one<{ champions: number; players: number }>(
+        'select (select count(*)::int from champions) as champions, (select count(*)::int from players where active) as players',
+      ),
+    ]);
+    content = html`<section class="panel">
+  <h2>Datenabgleich</h2>
+  <p class="muted">Turniere, Spielpläne, Ergebnisse, Champions und Spielerkader kommen automatisch aus den Datenquellen (alle 6 Stunden).
     Bisher: ${counts!.champions} Champions, ${counts!.players} Spieler.</p>
   <table class="table compact"><tbody>
     ${Object.entries(SYNC_LABELS).map(([key, label]) => {
@@ -159,34 +180,20 @@ Finale</textarea></label>
     ${csrfField(ctx)}
     <button type="submit" class="btn">Jetzt abgleichen</button>
   </form>
-</section>
-
-<section class="panel">
-  <h2>Teams (${teamList.length})</h2>
-  <table class="table compact">
-    <thead><tr><th>Name</th><th>Kürzel</th><th>Region</th><th></th></tr></thead>
-    <tbody>
-    ${teamList.map(
-      (t) => html`<tr><td colspan="4">
-      <form method="post" action="/admin/team/${t.id}" class="team-row">
-        ${csrfField(ctx)}
-        <input type="text" name="name" value="${t.name}" required maxlength="80" aria-label="Name">
-        <input type="text" name="short_name" value="${t.short_name ?? ''}" maxlength="8" aria-label="Kürzel">
-        <input type="text" name="region" value="${t.region ?? ''}" maxlength="20" aria-label="Region">
-        <button type="submit" class="btn">Speichern</button>
-      </form></td></tr>`,
-    )}
-    </tbody>
-  </table>
-  <form method="post" action="/admin/team" class="team-row bordered">
-    ${csrfField(ctx)}
-    <input type="text" name="name" required maxlength="80" placeholder="Neues Team" aria-label="Name">
-    <input type="text" name="short_name" maxlength="8" placeholder="Kürzel" aria-label="Kürzel">
-    <input type="text" name="region" maxlength="20" placeholder="Region" aria-label="Region">
-    <button type="submit" class="btn btn-primary">Anlegen</button>
-  </form>
-  <p class="muted">Teamnamen nachträglich ändern ist unproblematisch: Tipps hängen am Team, nicht am Namen.</p>
 </section>`;
+  } else {
+    const legal = await loadLegal(ctx);
+    content =
+      area === 'impressum'
+        ? legalForm(ctx, area, ['name', 'street', 'city', 'country', 'email', 'phone'], legal, '/impressum', 'Diese Angaben erscheinen im Impressum.')
+        : legalForm(ctx, area, ['hosting'], legal, '/datenschutz', 'Name und Anschrift kommen aus dem Impressum; hier steht nur, wo die Seite läuft.');
+  }
+
+  const body = html`<h1 class="small-title">Administrator</h1>
+<nav class="sub-tabs" aria-label="Bereiche">
+  ${ADMIN_AREAS.map(([key, label]) => html`<a href="/admin?bereich=${key}"${area === key ? html` aria-current="page"` : nothing}>${label}</a>`)}
+</nav>
+${content}`;
   return page(ctx, 'Administrator', body, error);
 }
 
@@ -401,7 +408,7 @@ export function registerAdminRoutes(router: Router<Ctx>) {
        on conflict (key) do update set value = excluded.value, updated_at = now()`,
       [value],
     );
-    return redirect('/admin?hinweis=gespeichert');
+    return redirect('/admin?bereich=uebersicht&hinweis=gespeichert');
   });
   get('/admin/turnier/:id', (ctx) => tournamentPage(ctx));
   get('/admin/spiel/:id', (ctx) => matchPage(ctx));
@@ -458,7 +465,7 @@ export function registerAdminRoutes(router: Router<Ctx>) {
     const results = await runSync(ctx.deps.db, ctx.deps.fetchJson);
     const failed = results.filter((r) => !r.ok);
     if (failed.length) return adminHome(ctx, `Abgleich fehlgeschlagen: ${failed.map((r) => `${SYNC_LABELS[r.name]} – ${r.details}`).join('; ')}`);
-    return redirect('/admin?hinweis=abgeglichen');
+    return redirect('/admin?bereich=abgleich&hinweis=abgeglichen');
   });
 
   post('/admin/turnier/:id/teams', async (ctx) => {
@@ -559,7 +566,7 @@ export function registerAdminRoutes(router: Router<Ctx>) {
     } catch (e) {
       return adminHome(ctx, dbError(e));
     }
-    return redirect('/admin?hinweis=gespeichert');
+    return redirect('/admin?bereich=uebersicht&hinweis=gespeichert');
   });
 
   post('/admin/team/:id', async (ctx) => {
@@ -575,6 +582,6 @@ export function registerAdminRoutes(router: Router<Ctx>) {
     } catch (e) {
       return adminHome(ctx, dbError(e));
     }
-    return redirect('/admin?hinweis=gespeichert');
+    return redirect('/admin?bereich=uebersicht&hinweis=gespeichert');
   });
 }

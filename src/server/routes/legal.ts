@@ -5,7 +5,7 @@ import type { Ctx } from '../app.ts';
 import { cleanName } from './common.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { type Html, html, nothing } from '../html.ts';
-import { csrfField, layout } from '../views/layout.ts';
+import { layout } from '../views/layout.ts';
 import { loginRedirect } from './common.ts';
 
 export const LEGAL_FIELDS = [
@@ -17,7 +17,7 @@ export const LEGAL_FIELDS = [
   { key: 'phone', label: 'Telefon (optional)', hint: 'Nur wenn du es angeben willst', max: 40 },
   { key: 'hosting', label: 'Hosting', hint: 'z. B. „Eigener Server (Raspberry Pi) zu Hause in Deutschland“', max: 200 },
 ] as const;
-type LegalKey = (typeof LEGAL_FIELDS)[number]['key'];
+export type LegalKey = (typeof LEGAL_FIELDS)[number]['key'];
 
 export async function loadLegal(ctx: Ctx): Promise<Record<LegalKey, string>> {
   const rows = await ctx.deps.db.query<{ key: string; value: string }>(`select key, value from app_settings where key like 'legal\\_%'`);
@@ -87,23 +87,6 @@ async function datenschutz(ctx: Ctx): Promise<Res> {
   return page(ctx, 'Datenschutz', body);
 }
 
-async function legalForm(ctx: Ctx, error?: string): Promise<Res> {
-  const l = await loadLegal(ctx);
-  const body = html`<section class="panel narrow">
-  <h1>Rechtliche Angaben</h1>
-  <p class="muted">Diese Angaben erscheinen im <a href="/impressum">Impressum</a> und in der <a href="/datenschutz">Datenschutzerklärung</a>. Die Texte sind Vorlagen und keine Rechtsberatung – bitte vor der Veröffentlichung prüfen.</p>
-  <form method="post" action="/admin/rechtliches" class="stack">
-    ${csrfField(ctx)}
-    ${LEGAL_FIELDS.map(
-      (f) => html`<label class="field"><span>${f.label}${f.hint ? html` <small class="muted">${f.hint}</small>` : nothing}</span>
-      <input type="text" name="${f.key}" value="${l[f.key]}" maxlength="${f.max}"></label>`,
-    )}
-    <button type="submit" class="btn btn-primary">Speichern</button>
-  </form>
-</section>`;
-  return htmlResponse(layout(ctx, { title: 'Rechtliche Angaben', body, error }), error ? 400 : 200);
-}
-
 export function registerLegalRoutes(router: Router<Ctx>) {
   router.get('/impressum', impressum);
   router.get('/datenschutz', datenschutz);
@@ -112,12 +95,13 @@ export function registerLegalRoutes(router: Router<Ctx>) {
     if (!ctx.isAdmin) throw new HttpError(404, 'Diese Seite gibt es nicht.');
     return null;
   };
-  router.get('/admin/rechtliches', async (ctx) => guard(ctx) ?? legalForm(ctx));
+  router.get('/admin/rechtliches', async (ctx) => guard(ctx) ?? redirect('/admin?bereich=impressum'));
   router.post('/admin/rechtliches', async (ctx) => {
     const denied = guard(ctx);
     if (denied) return denied;
     await ctx.deps.db.tx(async (q) => {
-      for (const f of LEGAL_FIELDS) {
+      // Nur Felder speichern, die im Formular vorkommen (Impressum und Datenschutz haben getrennte Formulare)
+      for (const f of LEGAL_FIELDS.filter((x) => ctx.form.has(x.key))) {
         const v = cleanName(ctx.form.get(f.key), f.max) ?? '';
         await q.run(
           `insert into app_settings (key, value) values ($1, $2)
@@ -126,6 +110,7 @@ export function registerLegalRoutes(router: Router<Ctx>) {
         );
       }
     });
-    return redirect('/admin/rechtliches?hinweis=gespeichert');
+    const area = ctx.form.get('bereich') === 'datenschutz' ? 'datenschutz' : 'impressum';
+    return redirect(`/admin?bereich=${area}&hinweis=gespeichert`);
   });
 }

@@ -155,7 +155,7 @@ async function bracketPage(ctx: Ctx): Promise<Res> {
   if (!tournaments.length) {
     const body = emptyState(
       'Diese Tipprunde hat noch kein Turnier.',
-      access.canManage ? html`<a class="btn" href="/r/${league.slug}/verwalten#turniere">Turnier auswählen</a>` : undefined,
+      access.canManage ? html`<a class="btn" href="/r/${league.slug}/verwalten?bereich=turniere">Turnier auswählen</a>` : undefined,
     );
     return htmlResponse(layout(ctx, { title: `Turnierbaum – ${league.name}`, body, league: nav }));
   }
