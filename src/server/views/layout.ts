@@ -69,6 +69,8 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="stylesheet" href="${ctx.deps.asset('app.css')}">
 <script src="${ctx.deps.asset('app.js')}" defer></script>
+${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('chat.css')}">
+<script src="${ctx.deps.asset('chat.js')}" defer></script>` : nothing}
 </head>
 <body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
@@ -90,6 +92,7 @@ ${o.body}
 </main>
 ${rankBox(ctx)}
 </div>
+${chatWidget(ctx)}
 <footer class="foot">
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
@@ -98,6 +101,27 @@ ${rankBox(ctx)}
 </footer>
 </body>
 </html>`;
+}
+
+const CHAT_ICON = html`<svg class="chat-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>`;
+
+/** Chat der aktuellen Tipprunde: Sprechblase unten rechts, klappt auf und zu. Ohne JavaScript bleibt er verborgen. */
+function chatWidget(ctx: Ctx): Html {
+  if (!ctx.user || !ctx.sidebar) return nothing;
+  return html`<div class="chat" data-chat data-slug="${ctx.sidebar.slug}" data-csrf="${ctx.csrf}" hidden>
+  <section class="chat-panel" id="chat-panel" aria-label="Chat" hidden>
+    <header class="chat-head"><strong>Chat</strong><span class="muted">${ctx.sidebar.leagueName}</span><button type="button" class="chat-close" data-chat-close aria-label="Chat schließen">×</button></header>
+    <div class="chat-log" data-chat-log role="log" aria-live="polite"><p class="muted chat-empty">Noch keine Nachrichten.</p></div>
+    <form class="chat-form" data-chat-form autocomplete="off">
+      <input type="text" name="text" maxlength="500" placeholder="Nachricht schreiben …" aria-label="Nachricht" required>
+      <button type="submit" class="btn btn-primary">Senden</button>
+    </form>
+    <p class="chat-note muted">Nachrichten werden nach 7 Tagen gelöscht.</p>
+  </section>
+  <button type="button" class="chat-toggle" data-chat-toggle aria-expanded="false" aria-controls="chat-panel" aria-label="Chat öffnen">
+    ${CHAT_ICON}<span class="chat-label">Chat</span><span class="chat-badge" data-chat-badge hidden>0</span>
+  </button>
+</div>`;
 }
 
 /** Fußnote unten links: laufende Version und Zeitpunkt der letzten Änderung (Stand des Programms). */
