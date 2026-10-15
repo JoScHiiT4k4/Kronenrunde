@@ -69,11 +69,15 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
+<div class="page${o.wide ? ' page-wide' : ''}">
+${adBox('left')}
 <main class="main${o.wide ? ' main-wide' : ''}">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
 </main>
+${adBox('right')}
+</div>
 <footer class="foot">
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
@@ -111,6 +115,11 @@ function tournamentBar(ctx: Ctx): Html {
     <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
     <a class="tbar-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>
   </div>`;
+}
+
+/** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
+function adBox(side: 'left' | 'right'): Html {
+  return html`<aside class="ad ad-${side}" aria-label="Werbung"><div class="ad-box"><span class="ad-label">Anzeige</span></div></aside>`;
 }
 
 function leagueNav(l: LeagueNav): Html {
