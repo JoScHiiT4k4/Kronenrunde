@@ -970,3 +970,22 @@ a.rank-box:hover .rank-more { color: var(--gold-bright); }
 .sys-tables { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .sys-tables li { display: grid; grid-template-columns: 170px 1fr 80px; gap: 12px; align-items: center; font-size: 0.9rem; }
 .sys-tables li > :last-child { text-align: right; }
+
+/* Statistiken */
+.st-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 10px; }
+.st-tile { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface); }
+.st-tile strong { font-size: 1.8rem; line-height: 1; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+.st-tile span { font-size: 0.82rem; color: var(--muted); }
+.st-bar { display: block; width: 100%; height: 8px; border-radius: 2px; }
+.st-track { fill: var(--line); }
+.st-fill { fill: var(--gold); }
+.st-quote { min-width: 150px; }
+.st-quote .st-bar { display: inline-block; width: 90px; vertical-align: middle; margin-right: 8px; }
+.st-pct { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.st-streak { font-weight: 700; padding: 1px 7px; border: 1px solid currentColor; font-size: 0.85rem; }
+.st-win { color: #3ddc84; }
+.st-loss { color: #ff6b6b; }
+.st-hint { margin-top: 8px; font-size: 0.82rem; }
+.st-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.st-list li { display: grid; grid-template-columns: minmax(90px, 170px) 1fr 44px; gap: 12px; align-items: center; font-size: 0.92rem; }
+.st-list li > :last-child { text-align: right; }

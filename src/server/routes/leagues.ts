@@ -337,9 +337,9 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
       ? html` <span class="pct ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">(${mine} %)</span>`
       : nothing;
   const teams = html`<div class="teams">
-    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ?? 'Steht noch nicht fest'}${pct(shares?.a, shares?.b)}</span>
+    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}${pct(shares?.a, shares?.b)}</span>
     <span class="vs">VS</span>
-    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ?? 'Steht noch nicht fest'}${pct(shares?.b, shares?.a)}</span>
+    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}${pct(shares?.b, shares?.a)}</span>
   </div>`;
 
   if (open && teamsKnown) {
@@ -347,7 +347,7 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     const current = own ? pickValue({ winner: own.winner, winnerWins: own.winner_wins, loserWins: own.loser_wins }) : '';
     const chip = (o: ResultOption) => {
       const value = pickValue(o);
-      const team = o.winner === 'A' ? m.team_a : m.team_b;
+      const team = o.winner === 'A' ? shortA(m) : shortB(m);
       const label = o.winnerWins === null ? (o.winner === 'A' ? shortA(m) : shortB(m)) : `${o.winnerWins}:${o.loserWins}`;
       const aria = o.winnerWins === null ? `${team} gewinnt` : `${team} gewinnt ${o.winnerWins}:${o.loserWins}`;
       return html`<label class="chip chip-${o.winner.toLowerCase()}"><input type="radio" name="tipp_${m.id}" value="${value}"${attr(value === current, 'checked')} aria-label="${aria}"><span>${label}</span></label>`;
@@ -357,7 +357,7 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     return html`<article class="match" id="spiel-${m.id}">
   ${meta}${teams}
   <fieldset class="picks picks-bo${m.best_of}">
-    <legend class="sr-only">Dein Tipp für ${m.team_a} gegen ${m.team_b}</legend>
+    <legend class="sr-only">Dein Tipp für ${shortA(m)} gegen ${shortB(m)}</legend>
     <div class="side side-a">${sideA.map(chip)}</div>
     <div class="side side-b">${sideB.map(chip)}</div>
   </fieldset>
@@ -696,12 +696,12 @@ ${
 
   const body = html`<section class="panel">
   <p><a href="/r/${league.slug}/tippen?phase=${phaseSlug(phaseName(m))}#spiel-${m.id}">Zurück zu den Spielen</a></p>
-  <h1 class="versus"><span class="team-a">${m.team_a ?? 'offen'}</span> <span class="vs">VS</span> <span class="team-b">${m.team_b ?? 'offen'}</span></h1>
+  <h1 class="versus"><span class="team-a">${shortA(m)}</span> <span class="vs">VS</span> <span class="team-b">${shortB(m)}</span></h1>
   <p class="muted">${m.tournament}${m.stage ? `, ${stageLabel(m.stage)}` : ''}, Bo${m.best_of}${m.scheduled_at ? `, ${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : ''}</p>
   ${result ? html`<p class="result">Ergebnis: <strong>${result}</strong></p>` : nothing}
   ${content}
 </section>`;
-  return htmlResponse(layout(ctx, { title: `${m.team_a ?? '?'} vs ${m.team_b ?? '?'}`, body, league: leagueNav(access, 'spiel') }));
+  return htmlResponse(layout(ctx, { title: `${m.team_a ? shortA(m) : '?'} vs ${m.team_b ? shortB(m) : '?'}`, body, league: leagueNav(access, 'spiel') }));
 }
 
 // ---------------------------------------------------------------------
@@ -762,9 +762,9 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   <div class="teams">
-    <span class="team team-a">${m.team_a}</span>
+    <span class="team team-a">${shortA(m)}</span>
     <span class="vs">VS</span>
-    <span class="team team-b">${m.team_b}</span>
+    <span class="team team-b">${shortB(m)}</span>
   </div>
   <p class="tips-result">${result ? html`Ergebnis: <strong>${result}</strong>` : html`<span class="muted">Noch kein Ergebnis</span>`}</p>
   <table class="table compact tips-table">

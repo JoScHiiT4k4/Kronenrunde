@@ -29,6 +29,7 @@ import { registerAdminRoutes } from './routes/admin.ts';
 import { registerAvatarRoutes } from './routes/avatar.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerBracketRoutes } from './routes/bracket.ts';
+import { registerStatisticsRoutes } from './routes/statistics.ts';
 import { registerLegalRoutes } from './routes/legal.ts';
 import { registerLeagueRoutes } from './routes/leagues.ts';
 import { registerManageRoutes } from './routes/manage.ts';
@@ -124,6 +125,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
   registerAuthRoutes(router);
   registerLeagueRoutes(router);
   registerBracketRoutes(router);
+  registerStatisticsRoutes(router);
   registerManageRoutes(router);
   registerAdminRoutes(router);
   registerLegalRoutes(router);
