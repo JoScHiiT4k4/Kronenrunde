@@ -12,7 +12,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, filterBar, layout, postButton, scaleBar } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, layout, postButton, scaleBar, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
@@ -472,13 +472,17 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
 
   const anyTippable = shown.some((m) => isOpen(toDomainMatch(m), league.lock_mode, ctx.now));
   const phaseTabs = phases.length > 1
-    ? html`<nav class="phase-tabs" aria-label="Phasen">
-    ${phases.map(
-      (p) => html`<a href="/r/${league.slug}/tippen?phase=${p.slug}"${p === current ? html` aria-current="page"` : nothing}${p.matches.some(known) ? nothing : html` class="later"`}>${p.name}${
-        p.missing ? html` <span class="missing" title="${p.missing} noch nicht getippt">${p.missing}</span>` : nothing
-      }</a>`,
-    )}
-  </nav>`
+    ? tabMenu(
+        'phase-tabs',
+        'Phasen',
+        phases.map((p) => ({
+          href: `/r/${league.slug}/tippen?phase=${p.slug}`,
+          label: p.name,
+          current: p === current,
+          later: !p.matches.some(known),
+          extra: p.missing ? html` <span class="missing" title="${p.missing} noch nicht getippt">${p.missing}</span>` : undefined,
+        })),
+      )
     : nothing;
   const firstOfPhase = current?.matches.map((m) => m.scheduled_at).filter((d): d is Date => !!d).sort((a, b) => a.getTime() - b.getTime())[0];
   const hiddenNote = hidden
@@ -743,9 +747,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   const latest = visible.at(-1);
   const current = phases.find((p) => p.slug === ctx.query.get('phase')) ?? phases.find((p) => latest && p.name === phaseName(latest));
   const phaseTabs = phases.length > 1
-    ? html`<nav class="phase-tabs" aria-label="Phasen">
-    ${phases.map((p) => html`<a href="/r/${league.slug}/alle-tipps?phase=${p.slug}"${p === current ? html` aria-current="page"` : nothing}>${p.name}</a>`)}
-  </nav>`
+    ? tabMenu('phase-tabs', 'Phasen', phases.map((p) => ({ href: `/r/${league.slug}/alle-tipps?phase=${p.slug}`, label: p.name, current: p === current })))
     : nothing;
   // Neueste Spieltage zuerst
   const days = groupMatchdays(current?.matches ?? [], tz).reverse();

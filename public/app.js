@@ -314,3 +314,10 @@ document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
     status.textContent = 'Push ist auf diesem Gerät abgeschaltet.';
   });
 })();
+
+// Dropdowns (Handy-Menüs, Spielleiter/Administrator): Tipp daneben schließt sie wieder
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open]').forEach((d) => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});

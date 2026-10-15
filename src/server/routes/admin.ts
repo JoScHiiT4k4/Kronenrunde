@@ -13,7 +13,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatTime, isLocalInput, toLocalInput } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, filterBar, layout, postButton } from '../views/layout.ts';
+import { csrfField, filterBar, layout, postButton, tabMenu } from '../views/layout.ts';
 import { cleanName, isUuid, loginRedirect } from './common.ts';
 import { LEGAL_FIELDS, type LegalKey, loadLegal } from './legal.ts';
 import { leagueCreation, type MatchRow, oneMatch, shortA, shortB, tournamentMatches } from './league-data.ts';
@@ -269,9 +269,7 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   }
 
   const body = html`<h1 class="small-title">Administrator</h1>
-<nav class="sub-tabs" aria-label="Bereiche">
-  ${ADMIN_AREAS.map(([key, label]) => html`<a href="/admin?bereich=${key}"${area === key ? html` aria-current="page"` : nothing}>${label}</a>`)}
-</nav>
+${tabMenu('sub-tabs', 'Bereiche', ADMIN_AREAS.map(([key, label]) => ({ href: `/admin?bereich=${key}`, label, current: area === key })))}
 ${content}`;
   return page(ctx, 'Administrator', body, error);
 }
