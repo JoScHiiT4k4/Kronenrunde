@@ -1101,3 +1101,64 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
 .req-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .req { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-2); }
 .tab-badge { display: inline-block; min-width: 1.3em; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: var(--red); color: #fff; font-size: 0.75rem; line-height: 1.5; text-align: center; }
+
+/* ---------- Handy (bis 640 px): Reiter und Menüs als Dropdowns ---------- */
+
+/* Im Browser bleiben die Reiter; das Dropdown ist dort verborgen */
+.m-menu { display: none; }
+
+@media (max-width: 640px) {
+  /* Reiter-Leisten ersetzt das Dropdown */
+  .league-nav .tabs, .sub-tabs, .phase-tabs { display: none; }
+  .m-menu { display: block; position: relative; max-width: 720px; margin: 8px auto 14px; }
+  .league-nav .m-menu { margin: 8px auto 12px; }
+
+  .m-menu > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 14px; cursor: pointer; list-style: none;
+    background: var(--surface-2); border: 1px solid var(--frame); color: var(--gold-bright);
+    font-weight: 700; font-size: 1.02rem;
+  }
+  .m-menu > summary::-webkit-details-marker { display: none; }
+  .m-menu > summary::before { content: none; }
+  .m-menu > summary::after { content: "▾"; flex: none; color: var(--gold); }
+  .m-menu[open] > summary { border-color: var(--gold); }
+  .m-menu[open] > summary::after { content: "▴"; }
+  .m-menu > summary .m-menu-now { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-menu > summary > span:first-of-type { flex: 1; }
+
+  .m-menu-list {
+    display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--frame); border-top: 0;
+  }
+  .m-menu-list a {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 14px; color: var(--text); text-decoration: none; font-weight: 600;
+    border-bottom: 1px solid var(--line);
+  }
+  .m-menu-list a:last-child { border-bottom: 0; }
+  .m-menu-list a:hover, .m-menu-list a:focus-visible { color: var(--gold-bright); background: rgb(200 170 110 / 10%); outline: none; }
+  .m-menu-list a.later { color: var(--muted); }
+  .m-menu-list a[aria-current] { color: var(--gold-bright); background: rgb(200 170 110 / 8%); box-shadow: inset 3px 0 0 var(--gold); }
+  .m-menu .missing, .m-menu .tab-badge { margin-left: 0; }
+  .m-menu .missing {
+    display: inline-block; min-width: 1.3em; padding: 0 6px; border-radius: 10px; text-align: center;
+    background: var(--red); color: #fff; font-size: 0.75rem; line-height: 1.5;
+  }
+
+  /* Kopfzeile: Logo links, Profilname und Abmelden rechts daneben; Spielleiter/Administrator wandert in eine eigene Zeile darunter */
+  .top { flex-wrap: wrap; row-gap: 8px; }
+  .brand { font-size: 1rem; letter-spacing: 0.05em; gap: 8px; }
+  .brand img { width: 26px; height: 26px; }
+  .top-nav { display: contents; }
+  .top-nav > a:not(.role-single) { order: 1; margin-left: auto; max-width: 30vw; font-size: 0.95rem; }
+  .top-nav > .top-logout { order: 2; flex: none; }
+  .tbar { order: 3; flex-basis: 100%; }
+  .top-nav > .role-switch, .top-nav > .role-single {
+    order: 4; flex: 1 1 100%; position: relative;
+    padding-top: 8px; border-top: 1px solid var(--line);
+  }
+  .top-nav > .role-single { display: block; }
+  .top-nav > .role-switch > summary { justify-content: flex-start; padding: 0; }
+  .top-nav .role-menu { right: auto; left: 0; top: calc(100% + 2px); }
+}

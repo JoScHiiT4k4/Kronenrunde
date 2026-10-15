@@ -228,20 +228,54 @@ function roleSwitch(ctx: Ctx, league: LeagueNav | undefined): Html {
   </details>`;
 }
 
+/** Ein Eintrag in einer Reiter-Leiste. */
+export interface TabItem {
+  href: string;
+  label: string;
+  current: boolean;
+  /** Zusatz hinter dem Namen, z. B. eine Zahl für offene Tipps oder Anfragen */
+  extra?: Html;
+  /** Für Phasen, die noch nicht begonnen haben (gedämpft dargestellt) */
+  later?: boolean;
+}
+
+/** Reiter-Leiste: im Browser wie gewohnt als Reiter, auf dem Handy (bis 640 px) als Dropdown mit dem aktuellen Eintrag.
+ *  Beides steht im HTML, das CSS blendet je nach Bildschirmbreite eines aus – funktioniert also auch ohne JavaScript. */
+export function tabMenu(cls: 'sub-tabs' | 'phase-tabs', ariaLabel: string, items: TabItem[]): Html {
+  const link = (t: TabItem) =>
+    html`<a href="${t.href}"${t.current ? html` aria-current="page"` : nothing}${t.later ? html` class="later"` : nothing}>${t.label}${t.extra ?? nothing}</a>`;
+  return html`<nav class="${cls}" aria-label="${ariaLabel}">
+  ${items.map(link)}
+</nav>${mobileMenu(cls, ariaLabel, items, link)}`;
+}
+
+function mobileMenu(cls: string, ariaLabel: string, items: TabItem[], link: (t: TabItem) => Html): Html {
+  if (!items.length) return nothing;
+  const current = items.find((t) => t.current) ?? items[0];
+  return html`<details class="m-menu m-menu-${cls}" data-m-menu>
+  <summary aria-label="${ariaLabel}"><span class="m-menu-now">${current.label}</span>${current.extra ?? nothing}</summary>
+  <div class="m-menu-list" role="navigation" aria-label="${ariaLabel}">${items.map(link)}</div>
+</details>`;
+}
+
 function leagueNav(l: LeagueNav): Html {
-  const tab = (key: LeagueNav['active'], label: string) =>
-    html`<a href="/r/${l.slug}/${key}"${l.active === key ? html` aria-current="page"` : nothing}>${label}</a>`;
+  const tab = (key: LeagueNav['active'], label: string): TabItem => ({ href: `/r/${l.slug}/${key}`, label, current: l.active === key });
+  const items: TabItem[] = [
+    tab('tippen', 'Tippen'),
+    tab('sonderfragen', 'Sonderfragen'),
+    tab('rangliste', 'Rangliste'),
+    tab('alle-tipps', 'Alle Tipps'),
+    tab('turnierbaum', 'Turnierbaum'),
+    tab('statistiken', 'Statistiken'),
+    ...(l.canManage ? [tab('verwalten', 'Verwalten')] : []),
+  ];
+  const link = (t: TabItem) => html`<a href="${t.href}"${t.current ? html` aria-current="page"` : nothing}>${t.label}</a>`;
   return html`<nav class="league-nav" aria-label="${l.name}">
   <div class="league-name">${l.name}</div>
   <div class="tabs">
-    ${tab('tippen', 'Tippen')}
-    ${tab('sonderfragen', 'Sonderfragen')}
-    ${tab('rangliste', 'Rangliste')}
-    ${tab('alle-tipps', 'Alle Tipps')}
-    ${tab('turnierbaum', 'Turnierbaum')}
-    ${tab('statistiken', 'Statistiken')}
-    ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
+    ${items.map(link)}
   </div>
+  ${mobileMenu('league-tabs', l.name, items, link)}
 </nav>`;
 }
 

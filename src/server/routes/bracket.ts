@@ -16,7 +16,7 @@ import type { Ctx } from '../app.ts';
 import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, type Res, type Router } from '../http.ts';
-import { emptyState, filterBar, layout } from '../views/layout.ts';
+import { emptyState, filterBar, layout, tabMenu } from '../views/layout.ts';
 import { isUuid, loginRedirect, slugify } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 
@@ -259,15 +259,11 @@ async function bracketPage(ctx: Ctx): Promise<Res> {
     `/r/${league.slug}/turnierbaum?${tournaments.length > 1 ? `turnier=${tournament.id}&` : ''}phase=${phaseSlug(phase.name)}`;
   const tournamentTabs =
     tournaments.length > 1
-      ? html`<nav class="phase-tabs" aria-label="Turniere">
-    ${tournaments.map((t) => html`<a href="/r/${league.slug}/turnierbaum?turnier=${t.id}"${t.id === tournament.id ? html` aria-current="page"` : nothing}>${t.name}</a>`)}
-  </nav>`
+      ? tabMenu('phase-tabs', 'Turniere', tournaments.map((t) => ({ href: `/r/${league.slug}/turnierbaum?turnier=${t.id}`, label: t.name, current: t.id === tournament.id })))
       : nothing;
   const phaseTabs =
     phases.length > 1
-      ? html`<nav class="phase-tabs" aria-label="Phasen">
-    ${phases.map((p) => html`<a href="${href(p)}"${p === current ? html` aria-current="page"` : nothing}>${p.name}</a>`)}
-  </nav>`
+      ? tabMenu('phase-tabs', 'Phasen', phases.map((p) => ({ href: href(p), label: p.name, current: p === current })))
       : nothing;
 
   const hasMarks = !!current && current.kind !== 'offen';

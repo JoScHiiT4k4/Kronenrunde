@@ -26,7 +26,7 @@ import {
 import { PgError } from '../db/index.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
-import { avatar, csrfField, layout, postButton } from '../views/layout.ts';
+import { avatar, csrfField, layout, postButton, tabMenu } from '../views/layout.ts';
 import { leadLabel } from '../benachrichtigung.ts';
 import { loadVapid, validEndpoint } from '../webpush.ts';
 import { cleanFirstName, cleanName, FIRST_NAME_HELP, FIRST_NAME_PATTERN, intField, loginRedirect } from './common.ts';
@@ -545,9 +545,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
   const { db } = ctx.deps;
   const wanted = forced ?? ctx.query.get('bereich');
   const area = ACCOUNT_AREAS.find(([k]) => k === wanted)?.[0] ?? 'profil';
-  const tabs = html`<nav class="sub-tabs" aria-label="Bereiche">
-  ${ACCOUNT_AREAS.map(([k, label]) => html`<a href="/konto?bereich=${k}"${k === area ? html` aria-current="page"` : nothing}>${label}</a>`)}
-</nav>`;
+  const tabs = tabMenu('sub-tabs', 'Bereiche', ACCOUNT_AREAS.map(([k, label]) => ({ href: `/konto?bereich=${k}`, label, current: k === area })));
   let content: Html = nothing;
 
   if (area === 'profil') {

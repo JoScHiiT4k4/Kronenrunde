@@ -6,7 +6,7 @@ import { regionCounts, type StatMatch, type StatTeam, teamStats, tournamentStat 
 import type { Ctx } from '../app.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, type Res, type Router } from '../http.ts';
-import { emptyState, filterBar, layout } from '../views/layout.ts';
+import { emptyState, filterBar, layout, tabMenu } from '../views/layout.ts';
 import { isUuid, loginRedirect } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 
@@ -120,7 +120,7 @@ async function statisticsPage(ctx: Ctx): Promise<Res> {
 
   const tabs =
     tournaments.length > 1
-      ? html`<nav class="phase-tabs" aria-label="Turniere">${tournaments.map((x) => html`<a href="/r/${league.slug}/statistiken?turnier=${x.id}"${x.id === tournament.id ? html` aria-current="page"` : nothing}>${x.name}</a>`)}</nav>`
+      ? tabMenu('phase-tabs', 'Turniere', tournaments.map((x) => ({ href: `/r/${league.slug}/statistiken?turnier=${x.id}`, label: x.name, current: x.id === tournament.id })))
       : nothing;
 
   const body = html`${tabs}

@@ -6,7 +6,7 @@ import { missingTips } from '../../domain/missing.ts';
 import { formatDateTime, formatRemaining } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, layout, postButton } from '../views/layout.ts';
+import { csrfField, layout, postButton, tabMenu } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
 import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, toDomainMatch } from './league-data.ts';
 import { lockModeOptions, parseLockMode } from './leagues.ts';
@@ -130,9 +130,12 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
 
   const body = html`
 <h1 class="small-title">Verwalten</h1>
-<nav class="sub-tabs" aria-label="Bereiche">
-  ${AREAS.map(([key, label]) => html`<a href="${areaHref(league.slug, key)}"${area === key ? html` aria-current="page"` : nothing}>${label}${key === 'anfragen' && requests.length ? html` <span class="tab-badge" aria-label="${requests.length} offen">${requests.length}</span>` : nothing}</a>`)}
-</nav>
+${tabMenu('sub-tabs', 'Bereiche', AREAS.map(([key, label]) => ({
+  href: areaHref(league.slug, key),
+  label,
+  current: area === key,
+  extra: key === 'anfragen' && requests.length ? html` <span class="tab-badge" aria-label="${requests.length} offen">${requests.length}</span>` : undefined,
+})))}
 
 ${area === 'uebersicht' ? html`
 <section class="panel">
