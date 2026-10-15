@@ -176,7 +176,7 @@ function rounds(slug: string, phase: Phase, tz: string): Html {
   if (phase.kind === 'swiss') return swissRounds(slug, phase, tz);
   const layout = layoutTree(phase);
   if (layout) return tree(slug, phase, layout, tz);
-  const flow = phase.kind === 'swiss' || phase.kind === 'offen';
+  const flow = phase.kind === 'offen';
   return html`<div class="bracket${flow ? ' is-flow' : ''}" tabindex="0" role="region" aria-label="Turnierbaum ${phase.name}">
   ${phase.rounds.map(
     (r) => html`<section class="bk-round">

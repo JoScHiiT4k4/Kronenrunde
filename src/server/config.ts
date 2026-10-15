@@ -19,6 +19,8 @@ export interface Config {
   timeZone: string;
   /** Offizielle Livestreams (Links im Kopf, sobald ein Turnier läuft). */
   streams: { twitch: string; youtube: string };
+  /** Datei, mit der der Administrator ein sofortiges Update anfordert (der Pi beobachtet sie, siehe deploy/install.sh) */
+  updateRequestFile: string;
   mail: {
     mode: MailMode;
     from: string;
@@ -67,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         .filter(Boolean),
     ),
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
+    updateRequestFile: env.UPDATE_REQUEST_FILE?.trim() || '/run/lol-tippspiel/update-anfrage',
     streams: {
       twitch: env.STREAM_TWITCH_URL?.trim() || 'https://www.twitch.tv/lolesports',
       youtube: env.STREAM_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@lolesports',

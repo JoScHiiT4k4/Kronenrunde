@@ -292,6 +292,9 @@ Environment=NODE_ENV=production
 ExecStart=$NODE_BIN --experimental-strip-types --disable-warning=ExperimentalWarning src/server/main.ts
 Restart=always
 RestartSec=5
+# /run/$SERVICE: hier legt die App Anfragen ab (z. B. "Update jetzt" aus dem Administrator-Bereich)
+RuntimeDirectory=$SERVICE
+RuntimeDirectoryPreserve=yes
 # Schutz: Die App darf nur lesen und übers Netzwerk sprechen.
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -366,9 +369,35 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
+# Update sofort: Der Administrator legt im Browser eine Anfrage-Datei ab, systemd startet daraufhin das Update (als root)
+cat >/etc/systemd/system/$SERVICE-update-jetzt.service <<EOF
+[Unit]
+Description=LoL-Tippspiel: Update sofort (im Administrator-Bereich angefordert)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+ExecStartPre=/bin/rm -f /run/$SERVICE/update-anfrage
+ExecStart=/usr/local/bin/tippspiel update --auto
+EOF
+
+cat >/etc/systemd/system/$SERVICE-update-jetzt.path <<EOF
+[Unit]
+Description=LoL-Tippspiel: wartet auf die Update-Anfrage aus dem Administrator-Bereich
+
+[Path]
+PathExists=/run/$SERVICE/update-anfrage
+Unit=$SERVICE-update-jetzt.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 run systemctl daemon-reload
-run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer"
-run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer"
+run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path"
+run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path"
 run systemctl restart "$SERVICE.service"
 if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
   journalctl -u "$SERVICE" -n 20 --no-pager >&2 || true
