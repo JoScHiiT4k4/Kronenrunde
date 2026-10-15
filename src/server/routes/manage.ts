@@ -247,22 +247,6 @@ ${
   );
 }
 
-type Q = { question: string; points: number; position: number; answer_type: string; choices: string[]; hint: string | null; correct_answers: string[] };
-
-function readQuestion(f: URLSearchParams): Q | string {
-  const question = cleanName(f.get('question'), 300);
-  const points = intField(f.get('points'), 0, 50);
-  const position = intField(f.get('position') || '0', 0, 999);
-  const answer_type = f.get('answer_type') ?? '';
-  if (!question) return 'Bitte gib eine Frage ein.';
-  if (points === null) return 'Bitte gib Punkte von 0 bis 50 ein.';
-  if (position === null) return 'Die Reihenfolge muss eine Zahl von 0 bis 999 sein.';
-  if (!(answer_type in ANSWER_TYPES)) return 'Bitte wähle aus, wie geantwortet wird.';
-  const choices = lines(f.get('choices'));
-  if (answer_type === 'choice' && !choices.length) return 'Bitte gib bei „Aus eigener Liste“ mindestens eine Möglichkeit an.';
-  return { question, points, position, answer_type, choices, hint: cleanName(f.get('hint'), 200), correct_answers: lines(f.get('correct_answers')) };
-}
-
 export function registerManageRoutes(router: Router<Ctx>) {
   router.get('/r/:slug/verwalten', (ctx) => managePage(ctx));
 
