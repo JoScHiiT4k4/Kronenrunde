@@ -369,7 +369,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal(r.status, 303, r.text);
     slug = /\/r\/([^/]+)\//.exec(r.location!)![1];
     assert.equal(slug, 'die-rift-runde');
-    const manage = await anna.get(`/r/${slug}/verwalten`);
+    const manage = await anna.get(`/r/${slug}/verwalten?bereich=mitglieder`);
     assert.equal(manage.status, 200);
     invite = /\/beitreten\/([0-9a-f]+)/.exec(manage.text)![1];
 
@@ -551,12 +551,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Verwalten: Untermenü und Übersicht "Noch nicht getippt" ohne Tipp-Inhalte', async () => {
     const start = await anna.get(`/r/${slug}/verwalten`);
     assert.match(start.text, /class="sub-tabs"/);
-    assert.match(start.text, /\d+\/\d+ getippt/);
+    assert.match(start.text, /\d+\/\d+ Teilnehmer haben getippt/);
     assert.doesNotMatch(start.text, /id="turniere"|id="fragen"/, 'andere Bereiche stehen auf eigenen Seiten');
     for (const area of ['einstellungen', 'turniere', 'fragen', 'mitglieder']) {
       const r = await anna.get(`/r/${slug}/verwalten?bereich=${area}`);
       assert.equal(r.status, 200, area);
-      assert.doesNotMatch(r.text, /\d+\/\d+ getippt/);
+      assert.doesNotMatch(r.text, /\d+\/\d+ Teilnehmer haben getippt/);
     }
     assert.match((await anna.get(`/r/${slug}/verwalten?bereich=mitglieder`)).text, /Mitglieder \(\d+\)/);
     // Mit offenem Spiel in der Zukunft taucht Ben ohne Tipp auf – nur mit Anzahl und Frist
@@ -564,7 +564,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const open = await anna.get(`/r/${slug}/verwalten`);
     assert.match(open.text, /Nächster Tippschluss/);
     assert.match(open.text, /Ben/);
-    assert.match(open.text, /progress-bad">\d+\/\d+ getippt/, 'offene Tipps rot');
+    assert.match(open.text, /progress-bad">\d+\/\d+ Teilnehmer haben getippt/, 'offene Tipps rot');
     await restore();
   });
 
@@ -654,7 +654,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Verwalten: nur Spielleiter; Einladungslink erneuern; Mitglied zum Mit-Spielleiter machen', async () => {
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 403);
     const renew = await anna.post(`/r/${slug}/verwalten/einladung-neu`);
-    assert.equal(renew.status, 303);
+    assert.match(renew.location ?? "", /bereich=mitglieder&hinweis=link-erneuert/);
     assert.equal((await stranger.get(`/beitreten/${invite}`)).status, 404);
     const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
     await anna.post(`/r/${slug}/verwalten/mitglied/${benId}`, { aktion: 'admin' });
