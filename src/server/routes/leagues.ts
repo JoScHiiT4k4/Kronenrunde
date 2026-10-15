@@ -208,9 +208,7 @@ async function createLeague(ctx: Ctx): Promise<Res> {
     await q.run(`insert into league_members (league_id, user_id, role) values ($1, $2, 'owner')`, [league!.id, user.id]);
     if (tournamentId) {
       const added = await q.run(
-        `insert into league_tournaments (league_id, tournament_id, bonus_deadline_at)
-         select $1, t.id, (select min(scheduled_at) from matches where tournament_id = t.id and scheduled_at > now())
-           from tournaments t where t.id = $2`,
+        `insert into league_tournaments (league_id, tournament_id) select $1, t.id from tournaments t where t.id = $2`,
         [league!.id, tournamentId],
       );
       if (!added) throw new HttpError(400, 'Dieses Turnier gibt es nicht.');
@@ -891,7 +889,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
 
   const sections = tournaments.map((t) => {
     const qs = questions.filter((q) => q.tournament_id === t.id);
-    const closed = !t.bonus_deadline_at || ctx.now >= t.bonus_deadline_at;
+    const closed = !!t.bonus_deadline_at && ctx.now >= t.bonus_deadline_at;
     const teamNames = teams.filter((x) => x.tournament_id === t.id).map((x) => x.name);
     if (!qs.length) {
       return html`<section class="panel"><h2>${t.name}</h2><p class="muted">Für dieses Turnier gibt es keine Sonderfragen.</p>
@@ -901,7 +899,11 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
     if (!closed) {
       return html`<section class="panel">
   <h2>${t.name}</h2>
-  <p><span class="lock">Antworten bis ${formatDateTime(t.bonus_deadline_at!, tz)} Uhr</span> <span class="muted">(${formatRemaining(t.bonus_deadline_at!, ctx.now)})</span>. Danach sind sie fest und alle sehen die Antworten der anderen.</p>
+  ${
+    t.bonus_deadline_at
+      ? html`<p><span class="lock">Antworten bis zum Start des ersten Spiels: ${formatDateTime(t.bonus_deadline_at, tz)} Uhr</span> <span class="muted">(${formatRemaining(t.bonus_deadline_at, ctx.now)})</span>. Danach sind sie fest und alle sehen die Antworten der anderen.</p>`
+      : html`<p><span class="lock">Antworten bis zum Start des ersten Spiels.</span> <span class="muted">Der erste Anstoß steht noch nicht fest.</span> Danach sind die Antworten fest und alle sehen die Antworten der anderen.</p>`
+  }
   <form method="post" action="/r/${league.slug}/sonderfragen" class="stack">
     ${csrfField(ctx)}
     ${qs.map((q) => {
@@ -955,7 +957,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
 
     return html`<section class="panel">
   <h2>${t.name}</h2>
-  <p class="muted">${t.bonus_deadline_at ? html`Geschlossen seit ${formatDateTime(t.bonus_deadline_at, tz)} Uhr.` : 'Noch keine Frist festgelegt – Antworten sind noch nicht möglich.'}</p>
+  <p class="muted">Geschlossen seit dem Start des ersten Spiels (${formatDateTime(t.bonus_deadline_at!, tz)} Uhr).</p>
   ${qs.map((q) => {
     const resolved = q.correct_answers.length > 0;
     return html`<div class="question-result">
@@ -996,9 +998,8 @@ async function saveBonus(ctx: Ctx): Promise<Res> {
   const { db } = ctx.deps;
   const user = ctx.user;
   const questions = await db.query<{ id: string; open: boolean }>(
-    `select q.id, coalesce(lt.bonus_deadline_at > now(), false) as open
+    `select q.id, coalesce(tournament_start(q.tournament_id) > now(), true) as open
        from bonus_questions q
-       join league_tournaments lt on lt.league_id = q.league_id and lt.tournament_id = q.tournament_id
       where q.league_id = $1`,
     [league.id],
   );

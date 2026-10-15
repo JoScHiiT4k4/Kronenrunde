@@ -108,6 +108,24 @@ function localInput(d: Date): string {
 
 const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
 
+/**
+ * Sonderfragen sind nur vor dem ersten Spiel offen. Damit die Tests nicht vom heutigen Datum abhängen,
+ * wird ein Turnier hier "noch nicht begonnen" – die Rückgabe stellt die echten Zeiten wieder her.
+ */
+async function postponeTournament(tid: string): Promise<() => Promise<void>> {
+  const saved = await db.query<{ id: string; scheduled_at: Date | null; live_at: Date | null }>(
+    'select id, scheduled_at, live_at from matches where tournament_id = $1',
+    [tid],
+  );
+  await db.run(
+    `update matches set scheduled_at = scheduled_at + interval '30 days', live_at = live_at + interval '30 days' where tournament_id = $1`,
+    [tid],
+  );
+  return async () => {
+    for (const m of saved) await db.run('update matches set scheduled_at = $2, live_at = $3 where id = $1', [m.id, m.scheduled_at, m.live_at]);
+  };
+}
+
 describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht gesetzt' }, () => {
   before(async () => {
     db = createDb(DB_URL!, { max: 4 });
@@ -434,9 +452,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const champ = qs.find((q) => q.question.includes('Weltmeister'))!;
     const mvp = qs.find((q) => q.question.includes('MVP'))!;
 
-    // Frist auf morgen setzen
-    await anna.post(`/r/${slug}/verwalten/turnier/${tournamentId}`, { aktion: 'speichern', bonus_deadline_at: localInput(hours(20)) });
+    // Frist = Start des ersten Spiels; hier noch in der Zukunft
+    const restore = await postponeTournament(tournamentId);
     const form = await ben.get(`/r/${slug}/sonderfragen`);
+    assert.match(form.text, /Antworten bis zum Start des ersten Spiels/);
+    assert.doesNotMatch((await anna.get(`/r/${slug}/verwalten`)).text, /bonus_deadline_at/, 'keine Frist mehr zum Einstellen');
     assert.match(form.text, /Antworten speichern/);
     assert.match(form.text, /<option value="Gen.G">Gen.G<\/option>/);
     const saved = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'Gen.G', [`antwort_${mvp.id}`]: '  chovy ' });
@@ -446,8 +466,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Vor der Frist sieht man die Antworten der anderen nicht
     assert.doesNotMatch((await anna.get(`/r/${slug}/sonderfragen`)).text, /chovy/);
 
-    // Frist vorbei → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
-    await anna.post(`/r/${slug}/verwalten/turnier/${tournamentId}`, { aktion: 'speichern', bonus_deadline_at: localInput(hours(-1)) });
+    // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
+    await restore();
     const late = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'T1' });
     assert.equal(late.location, `/r/${slug}/sonderfragen?hinweis=antworten-zu-spaet`);
     const closed = await ben.get(`/r/${slug}/sonderfragen`);
@@ -525,11 +545,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const league = (await db.one<{ id: string }>('select id from leagues where slug = $1', [slug]))!.id;
     const adminId = (await db.one<{ id: string }>(`select id from users where email = 'admin@example.de'`))!.id;
     await db.run(`insert into league_members (league_id, user_id) values ($1, $2) on conflict do nothing`, [league, adminId]);
-    await db.run(`insert into league_tournaments (league_id, tournament_id, bonus_deadline_at) values ($1, $2, now() + interval '1 day')`, [league, tid]);
+    await db.run(`insert into league_tournaments (league_id, tournament_id) values ($1, $2)`, [league, tid]);
+    const restoreWorlds = await postponeTournament(tid); // Sonderfragen nur vor dem ersten Spiel offen
     await db.run(`insert into bonus_questions (league_id, tournament_id, question, points, answer_type) values ($1, $2, 'Wer wird Weltmeister?', 5, 'team')`, [league, tid]);
     const bonus = await admin.get(`/r/${slug}/sonderfragen`);
     assert.equal(bonus.status, 200);
     for (const name of ['Bilibili Gaming', 'Gen.G', 'LOS', 'Team Secret Whales']) assert.match(bonus.text, new RegExp(`<option[^>]*>${name}</option>`), name);
+    await restoreWorlds();
 
     // Admin: Teams abwählen – wer schon ein Spiel hat, bleibt
     const ids = await db.query<{ id: string; short_name: string }>('select id, short_name from teams');
@@ -624,6 +646,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       `insert into bonus_questions (league_id, tournament_id, question, points, answer_type, choices) values ($1, $2, 'Meistgebannt?', 3, 'champion', '{}') returning id`,
       [league, tid],
     ))!.id;
+    const restoreAgain = await postponeTournament(tid);
     const page = await admin.get(`/r/${slug}/sonderfragen`);
     assert.match(page.text, /<optgroup label="T1">/);
     assert.match(page.text, /<option value="Faker">Faker \(Mid\)<\/option>/);
@@ -649,6 +672,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.ok(failed.every((x) => !x.ok));
     assert.equal((await db.one<{ c: number }>('select count(*)::int as c from champions'))!.c, 120);
     assert.match((await admin.get('/admin')).text, /Fehler: offline/);
+    await restoreAgain();
   });
 
   test('Spielplan-Abgleich: Paarungen, Ergebnisse (richtig herum), Anstoßzeiten; Admin-Einträge bleiben', async () => {
