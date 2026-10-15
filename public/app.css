@@ -775,3 +775,9 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
   background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(255 255 255 / 4%) 6px 12px);
 }
 .bk-out .bk-name, .bk-out .bk-score { color: var(--muted); font-weight: 600; }
+
+/* Rechtliches */
+.foot-links a { color: var(--muted); }
+.foot-links a:hover { color: var(--gold-bright); }
+.legal h2 { margin-top: 1.4em; font-size: 1.05rem; }
+.placeholder { background: rgb(200 170 110 / 25%); color: var(--text); padding: 0 4px; }
