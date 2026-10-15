@@ -818,21 +818,22 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   <table class="table standings">
     <thead><tr>
       <th class="num">Platz</th><th>Name</th>
-      <th class="scale-col" title="Grün: geholte Punkte, rot: liegen gelassen (von ${possible} bisher möglichen)">Ausbeute</th>
-      <th class="num" title="Richtige Sieger">Sieger</th>
-      <th class="num" title="Exakte Ergebnisse">Exakt</th>
-      ${hasBonus ? html`<th class="num" title="Punkte aus Sonderfragen">Sonder</th>` : nothing}
+      <th class="scale-col col-x" title="Grün: geholte Punkte, rot: liegen gelassen (von ${possible} bisher möglichen)">Ausbeute</th>
+      <th class="num col-x" title="Richtige Sieger">Sieger</th>
+      <th class="num col-x" title="Exakte Ergebnisse">Exakt</th>
+      ${hasBonus ? html`<th class="num col-x" title="Punkte aus Sonderfragen">Sonder</th>` : nothing}
       <th class="num">Punkte</th>
     </tr></thead>
     <tbody>
     ${rows.map(
       (r) => html`<tr class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
-        <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span></td>
-        <td class="scale-col">${scaleBar(r.points, possible)}</td>
-        <td class="num">${r.correctWinners}</td>
-        <td class="num">${r.exactResults}</td>
-        ${hasBonus ? html`<td class="num">${r.bonusPoints}</td>` : nothing}
+        <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span>
+          <span class="rk-sub">${scaleBar(r.points, possible)}<small>${r.correctWinners} Sieger · ${r.exactResults} exakt${hasBonus ? ` · ${r.bonusPoints} Sonder` : ''}</small></span></td>
+        <td class="scale-col col-x">${scaleBar(r.points, possible)}</td>
+        <td class="num col-x">${r.correctWinners}</td>
+        <td class="num col-x">${r.exactResults}</td>
+        ${hasBonus ? html`<td class="num col-x">${r.bonusPoints}</td>` : nothing}
         <td class="num total">${r.points}</td>
       </tr>`,
     )}

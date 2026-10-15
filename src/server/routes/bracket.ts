@@ -142,7 +142,38 @@ function tree(slug: string, phase: Phase, t: TreeLayout, tz: string): Html {
 </div>`;
 }
 
+/** Swiss: eine Zeile je Spiel statt großer Kästen; die Runden klappen auf und zu (die aktuelle ist offen). */
+function swissRounds(slug: string, phase: Phase, tz: string): Html {
+  const isOpen = (r: Phase['rounds'][number]) => r.matches.some((m) => m.status === 'live');
+  // Aufgeklappt: Runde mit laufendem Spiel, sonst die erste mit offenen Spielen, sonst die letzte
+  const target = phase.rounds.find(isOpen) ?? phase.rounds.find((r) => r.matches.some((m) => m.status === 'scheduled')) ?? phase.rounds.at(-1);
+  const line = (m: BracketMatch): Html => {
+    const o = outcome(m);
+    const side = (t: BracketTeam | null, cls: 'a' | 'b'): Html => {
+      const mark = t ? markFor(phase, t.id, m.id) : null;
+      const result = o && t ? (o.winner.id === t.id ? ' sw-won' : ' sw-lost') : '';
+      return html`<span class="sw-team sw-${cls}${result}${mark === 'ausgeschieden' ? ' bk-out' : ''}">${t ? html`<span class="sw-name" title="${t.name}">${t.short || t.name}</span>` : html`<span class="sw-name bk-tbd">offen</span>`}</span>`;
+    };
+    const score = o ? html`<span class="sw-score">${m.winsA}<i>:</i>${m.winsB}</span>` : html`<span class="sw-score sw-vs">vs</span>`;
+    const meta = html`<span class="sw-meta">${m.status === 'live' ? html`<span class="live">läuft</span> ` : nothing}${m.scheduledAt ? formatDateTime(m.scheduledAt, tz) : 'Termin offen'} · Bo${m.bestOf}</span>`;
+    const inner = html`${side(m.teamA, 'a')}${score}${side(m.teamB, 'b')}${meta}`;
+    return m.teamA && m.teamB
+      ? html`<a class="sw-match${m.status === 'live' ? ' sw-live' : ''}" href="/r/${slug}/spiel/${m.id}" aria-label="${m.teamA.name} gegen ${m.teamB.name}">${inner}</a>`
+      : html`<div class="sw-match sw-open">${inner}</div>`;
+  };
+  return html`<div class="swiss-rounds" aria-label="Spiele ${phase.name}">
+  ${phase.rounds.map((r) => {
+    const done = r.matches.filter((m) => outcome(m)).length;
+    return html`<details class="sw-round"${r === target ? html` open` : nothing}>
+    <summary><span class="sw-title">${r.name}</span><span class="sw-count">${done}/${r.matches.length} gespielt</span></summary>
+    <div class="sw-list">${r.matches.map(line)}</div>
+  </details>`;
+  })}
+</div>`;
+}
+
 function rounds(slug: string, phase: Phase, tz: string): Html {
+  if (phase.kind === 'swiss') return swissRounds(slug, phase, tz);
   const layout = layoutTree(phase);
   if (layout) return tree(slug, phase, layout, tz);
   const flow = phase.kind === 'swiss' || phase.kind === 'offen';
