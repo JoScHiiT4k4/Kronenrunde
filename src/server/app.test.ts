@@ -140,6 +140,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       PORT: '0',
       APP_URL: 'http://127.0.0.1',
       ADMIN_EMAILS: 'admin@example.de',
+      SUGGESTIONS_TO: 'vorschlaege@example.de',
       MAIL_MODE: 'memory',
       APP_SECRET: 'test-geheimnis',
     });
@@ -444,19 +445,41 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rowsOf(match['G2-KC']), [['Anna', 'KC 2:0', '1', false], ['Ben', 'KC 2:1', '2', true]]);
   });
 
-  test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
-    const add = await anna.post(`/r/${slug}/verwalten/typische-fragen`, { tournament_id: tournamentId });
-    assert.equal(add.status, 303);
-    const qs = await db.query<{ id: string; question: string; answer_type: string }>('select id, question, answer_type from bonus_questions order by position');
-    assert.equal(qs.length, 6);
-    const champ = qs.find((q) => q.question.includes('Weltmeister'))!;
-    const mvp = qs.find((q) => q.question.includes('MVP'))!;
-
-    // Frist = Start des ersten Spiels; hier noch in der Zukunft
+  test('Sonderfragen: auswählen, beantworten, Frist, Auflösung', async () => {
+    // Frist = Start des ersten Spiels; hier noch in der Zukunft, damit die Auswahl offen ist
     const restore = await postponeTournament(tournamentId);
+    const manage = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(manage.text, /name="frage" value="weltmeister"/);
+    assert.doesNotMatch(manage.text, /<fieldset class="field" disabled>/);
+    assert.doesNotMatch(manage.text, /name="answer_type"|name="choices"|name="hint"|bonus_deadline_at/, 'keine komplizierten Felder mehr');
+    assert.doesNotMatch(manage.text, /Neue Sonderfrage|action="[^"]*\/verwalten\/frage"/, 'niemand legt selbst Fragen an');
+    const all = new URLSearchParams([['tournament_id', tournamentId], ...['weltmeister', 'finals-mvp', 'meistgebannt', 'kuerzestes-spiel', 'pentakill-team', 'pentakill-spieler'].map((k) => ['frage', k])]);
+    const add = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, all);
+    assert.equal(add.status, 303);
+    const qs = await db.query<{ id: string; question: string; answer_type: string; catalog_key: string }>('select id, question, answer_type, catalog_key from bonus_questions order by position');
+    assert.equal(qs.length, 6);
+    assert.deepEqual(qs.map((q) => q.answer_type), ['team', 'player', 'champion', 'team', 'team', 'player']);
+    const champ = qs.find((q) => q.catalog_key === 'weltmeister')!;
+    const mvp = qs.find((q) => q.catalog_key === 'finals-mvp')!;
+    // Abwählen löscht die Frage, Wiederholen ändert nichts
+    const less = new URLSearchParams(all);
+    less.delete('frage', 'pentakill-spieler');
+    await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
+    await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, all);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 6);
+    // Nur die Leitung darf wählen
+    assert.equal((await ben.post(`/r/${slug}/verwalten/fragen-auswahl`, all)).status, 403);
+
+    // Vorschlag für neue Fragen geht per E-Mail an den Betreiber
+    assert.equal((await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: '   ' })).status, 400);
+    const sug = await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: 'Wer holt den ersten Baron?' });
+    assert.equal(sug.location, `/r/${slug}/verwalten?hinweis=vorschlag-gesendet#fragen`);
+    const mail = [...mailer.sent!].reverse().find((m) => m.to === 'vorschlaege@example.de')!;
+    assert.match(mail.text, /Wer holt den ersten Baron\?/);
+    assert.match(mail.text, /Anna/);
     const form = await ben.get(`/r/${slug}/sonderfragen`);
     assert.match(form.text, /Antworten bis zum Start des ersten Spiels/);
-    assert.doesNotMatch((await anna.get(`/r/${slug}/verwalten`)).text, /bonus_deadline_at/, 'keine Frist mehr zum Einstellen');
     assert.match(form.text, /Antworten speichern/);
     assert.match(form.text, /<option value="Gen.G">Gen.G<\/option>/);
     const saved = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'Gen.G', [`antwort_${mvp.id}`]: '  chovy ' });
@@ -468,6 +491,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();
+    const locked = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(locked.text, /<fieldset class="field" disabled>/);
+    assert.match(locked.text, /Die Auswahl ist gesperrt/);
+    assert.match(locked.text, /Frage löschen/);
+    const refused = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
+    assert.equal(refused.status, 400);
+    assert.match(refused.text, /schon begonnen/);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 6);
     const late = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'T1' });
     assert.equal(late.location, `/r/${slug}/sonderfragen?hinweis=antworten-zu-spaet`);
     const closed = await ben.get(`/r/${slug}/sonderfragen`);
@@ -477,13 +508,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Auflösen: Weltmeister Gen.G (5 Punkte), MVP "Chovy" – Schreibweise egal (3 Punkte)
     const q = (id: string) => db.one<Record<string, unknown>>('select * from bonus_questions where id = $1', [id]);
-    const c = (await q(champ.id))!;
-    await anna.post(`/r/${slug}/verwalten/frage/${champ.id}`, {
-      aktion: 'speichern', question: String(c.question), points: '5', position: '1', answer_type: 'team', choices: '', hint: '', correct_answers: 'Gen.G',
-    });
-    await anna.post(`/r/${slug}/verwalten/frage/${mvp.id}`, {
-      aktion: 'speichern', question: 'Wer wird Finals-MVP?', points: '3', position: '2', answer_type: 'text', choices: '', hint: '', correct_answers: 'Chovy',
-    });
+    await anna.post(`/r/${slug}/verwalten/frage/${champ.id}`, { aktion: 'speichern', points: '5', correct_answers: 'Gen.G' });
+    await anna.post(`/r/${slug}/verwalten/frage/${mvp.id}`, { aktion: 'speichern', points: '3', correct_answers: 'Chovy' });
+    assert.equal((await q(champ.id))!.question, 'Wer wird Weltmeister?', 'Frage und Antwortart bleiben fest');
+    // Nach dem Start lässt sich eine Frage nur noch über ihre Einstellungen löschen
+    const weg = qs.find((x) => x.catalog_key === 'kuerzestes-spiel')!;
+    await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
     const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);

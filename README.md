@@ -22,7 +22,7 @@ Was die App kann:
 - **Alle Tipps**: alle Spiele mit abgelaufenem Tippschluss und was jeder getippt hat (nach Phase, neueste zuerst); einzelne Spiele auch über „Tipps zu diesem Spiel“.
 - **Turnierbaum** (Reiter neben „Alle Tipps“): alle Phasen des Turniers (Play-In, Swiss, K.-o.-Phase …) mit Teams, Begegnungen und Ergebnissen; Swiss mit Bilanz-Tabelle. Ausgeschiedene Teams sind grau, Teams, die weiter sind, golden markiert – berechnet aus den eingetragenen Ergebnissen.
 - **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
-- **Sonderfragen** mit automatischer Frist (Start des ersten Spiels; Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
+- **Sonderfragen** mit automatischer Frist (Start des ersten Spiels): Die Leitung wählt per Checkbox aus einem festen Katalog (Antwortart fest: Team, Spieler, Champion); nach Turnierstart gesperrt, Löschen nur über die Einstellungen der Frage. Neue Fragen werden per E-Mail vorgeschlagen (`SUGGESTIONS_TO`, sonst `MAIL_FROM`). Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.

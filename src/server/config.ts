@@ -25,6 +25,8 @@ export interface Config {
     /** Für MAIL_MODE=smtp, z. B. Gmail: smtp.gmail.com, Port 465, Gmail-Adresse, App-Passwort */
     smtp: { host: string; port: number; user: string; password: string };
   };
+  /** Hierhin gehen Vorschläge für neue Sonderfragen (Standard: die Absenderadresse der App) */
+  suggestionsTo: string;
   /** Läuft hinter einem Proxy (Caddy, nginx, Cloudflare)? Dann zählt X-Forwarded-For als Adresse. */
   trustProxy: boolean;
   secureCookies: boolean;
@@ -75,6 +77,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         password: env.SMTP_PASSWORD ?? '',
       },
     },
+    suggestionsTo: (env.SUGGESTIONS_TO || env.MAIL_FROM || (mode === 'smtp' ? env.SMTP_USER : '') || '').trim(),
     trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
     secureCookies: appUrl.startsWith('https://'),
     autoMigrate: env.AUTO_MIGRATE !== '0' && env.AUTO_MIGRATE !== 'false',
