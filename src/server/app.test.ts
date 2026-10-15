@@ -651,6 +651,19 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 
+  test('Tippen: begonnene Spiele zeigen Gewinnchance und Tipps der anderen auch an einem Tag mit noch offenem Spiel', async () => {
+    const saved = await db.one<{ scheduled_at: Date }>('select scheduled_at from matches where id = $1', [match['T1-KC']]);
+    const mode = await db.one<{ lock_mode: string }>('select lock_mode from leagues where slug = $1', [slug]);
+    await db.run(`update leagues set lock_mode = 'match' where slug = $1`, [slug]);
+    await db.run(`update matches set scheduled_at = now() + interval '2 hours' where id = $1`, [match['T1-KC']]);
+    const page = await anna.get(`/r/${slug}/tippen`);
+    assert.match(page.text, new RegExp(`name="tipp_${match['T1-KC']}"`), 'T1–KC ist noch tippbar');
+    assert.equal((page.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'Tipps der anderen bei den zwei begonnenen Spielen');
+    assert.match(page.text, /class="pct pct-up"/);
+    await db.run(`update matches set scheduled_at = $2 where id = $1`, [match['T1-KC'], saved!.scheduled_at]);
+    await db.run('update leagues set lock_mode = $2 where slug = $1', [slug, mode!.lock_mode]);
+  });
+
   test('Verwalten: nur Spielleiter; Einladungslink erneuern; Mitglied zum Mit-Spielleiter machen', async () => {
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 403);
     const renew = await anna.post(`/r/${slug}/verwalten/einladung-neu`);
@@ -994,9 +1007,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     t1.players = t1.players.filter((p: { summonerName: string }) => p.summonerName !== 'Faker');
     const base = fakeRiot();
     await runSync(db, async (url, headers) => (url.includes('/getTeams') ? changed : base(url, headers)));
+    // Der Abgleich setzt die Anstoßzeiten zurück (15.10. 18:00) – für die Auswahl muss das Turnier wieder in der Zukunft liegen
+    const restoreSync = await postponeTournament(tid);
     const after = await admin.get(`/r/${slug}/sonderfragen`);
     assert.doesNotMatch(after.text, /Faker \(Mid\)/);
     assert.match(after.text, /<option value="Faker" selected>Faker<\/option>/);
+    await restoreSync();
 
     // Quelle nicht erreichbar: Fehler wird angezeigt, vorhandene Listen bleiben
     const failed = await runSync(db, async () => {

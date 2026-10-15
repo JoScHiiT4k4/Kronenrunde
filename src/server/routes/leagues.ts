@@ -551,7 +551,7 @@ ${
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
     ${tournamentNames ? html`<p class="muted">${tournamentNames.get(d.matches[0].tournament_id)}</p>` : nothing}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), null, tippedOf(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), sharesOf(m), tippedOf(m), foldOf(m)))}
   </section>`,
   )}
   ${unscheduled.map(
