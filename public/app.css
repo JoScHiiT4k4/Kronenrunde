@@ -1055,3 +1055,11 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .filter-bar .filter-region { flex: 0 1 12rem; min-width: 0; }
 /* Rollen-Auswahl: nur ein Pfeil (der globale Details-Pfeil entfällt) */
 .role-switch > summary::before, .role-switch[open] > summary::before { content: none; }
+
+/* Benachrichtigungen im Konto */
+.lead-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.lead-field legend { padding: 0; margin-bottom: .35rem; }
+.lead-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: .25rem; }
+.lead-row input[type=number] { width: 5rem; }
+.push-box { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--line, rgba(200,170,110,.25)); display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+.push-box[hidden] { display: none; }

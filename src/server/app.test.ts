@@ -19,6 +19,7 @@ import { importTournament, type TournamentData } from './daten.ts';
 import { fakeRiot, lolesports, worldsSchedule } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
+import { notifyDue } from './benachrichtigung.ts';
 
 const DB_URL = process.env.TEST_DATABASE_URL;
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -654,6 +655,48 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Mit-Spielleiter darf keine Rollen ändern
     const annaId = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
     assert.equal((await ben.post(`/r/${slug}/verwalten/mitglied/${annaId}`, { aktion: 'entfernen' })).status, 403);
+  });
+
+  test('Benachrichtigungen: Einstellung im Konto, Push-Gerät, Erinnerung nur bei fehlenden Tipps und nur einmal', async () => {
+    const page = await ben.get('/konto');
+    assert.match(page.text, /Benachrichtigungen/);
+    assert.match(page.text, /name="stunden"/);
+    assert.match(page.text, /data-push data-key="[A-Za-z0-9_-]{80,100}"/);
+
+    const bad = await ben.post('/konto/benachrichtigung', { email: 'ja', stunden: '0', minuten: '2' });
+    assert.equal(bad.status, 400);
+    const ok = await ben.post('/konto/benachrichtigung', { email: 'ja', stunden: '200', minuten: '0' });
+    assert.equal(ok.status, 400, 'mehr als 7 Tage');
+    const saved = await ben.post('/konto/benachrichtigung', { email: 'ja', stunden: '168', minuten: '0' });
+    assert.match(saved.location ?? '', /hinweis=benachrichtigung-gespeichert/);
+    const prefs = await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
+      `select p.* from notification_prefs p join users u on u.id = p.user_id where u.email = 'ben@example.de'`,
+    );
+    assert.deepEqual([prefs!.email_enabled, prefs!.push_enabled, prefs!.lead_minutes], [true, false, 10080]);
+    assert.match((await ben.get('/konto')).text, /Aktuell: 7 Std\. 0 Min|Aktuell: 168 Std\./);
+
+    // Push-Gerät: nur gültige https-Adressen
+    assert.equal((await ben.post('/konto/push', { endpoint: 'http://127.0.0.1/x', p256dh: 'a', auth: 'b' })).status, 400);
+    const key = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString('base64url');
+    const sub = await ben.post('/konto/push', { endpoint: 'https://push.example.com/abc', p256dh: key, auth: Buffer.alloc(16, 1).toString('base64url') });
+    assert.equal(sub.status, 204);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from push_subscriptions'))!.n, 1);
+    assert.equal((await ben.post('/konto/push/entfernen', { endpoint: 'https://push.example.com/abc' })).status, 204);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from push_subscriptions'))!.n, 0);
+    await db.run(`update notification_prefs set push_enabled = false`);
+
+    // Erinnerung: Ben hat noch offene Spiele ohne Tipp → eine Mail, beim zweiten Lauf keine weitere
+    const config = loadConfig({ DATABASE_URL: DB_URL!, APP_URL: base, MAIL_MODE: 'memory', APP_SECRET: 'x' });
+    const before = mailer.sent!.length;
+    const first = await notifyDue(db, config, mailer, new Date());
+    const mails = mailer.sent!.slice(before).filter((m) => m.to === 'ben@example.de');
+    assert.equal(first, mails.length);
+    const again = await notifyDue(db, config, mailer, new Date());
+    assert.equal(again, 0, 'pro Tippschluss nur eine Erinnerung');
+    assert.ok(mails.length, 'Ben hat offene Spiele ohne Tipp');
+    assert.match(mails[0].subject, /Tipp/);
+    // Anna hat nichts aktiviert → keine Mail
+    assert.equal(mailer.sent!.slice(before).filter((m) => m.to !== 'ben@example.de').length, 0);
   });
 
   test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {

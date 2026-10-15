@@ -27,7 +27,9 @@ import { PgError } from '../db/index.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
 import { avatar, csrfField, layout } from '../views/layout.ts';
-import { cleanName, loginRedirect } from './common.ts';
+import { leadLabel } from '../benachrichtigung.ts';
+import { loadVapid, validEndpoint } from '../webpush.ts';
+import { cleanName, intField, loginRedirect } from './common.ts';
 
 const withNext = (path: string, next: string) => (next !== '/' ? `${path}?weiter=${encodeURIComponent(next)}` : path);
 
@@ -322,6 +324,47 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return redirect('/konto?hinweis=name-gespeichert');
   });
 
+  router.post('/konto/benachrichtigung', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const h = intField(ctx.form.get('stunden') || '0', 0, 168);
+    const m = intField(ctx.form.get('minuten') || '0', 0, 59);
+    const minutes = h === null || m === null ? null : h * 60 + m;
+    if (minutes === null || minutes < 5 || minutes > 10080) return accountPage(ctx, 'Bitte wähle eine Vorlaufzeit zwischen 5 Minuten und 7 Tagen.');
+    await ctx.deps.db.run(
+      `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes) values ($1, $2, $3, $4)
+       on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, updated_at = now()`,
+      [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes],
+    );
+    return redirect('/konto?hinweis=benachrichtigung-gespeichert#benachrichtigungen');
+  });
+
+  // Dieses Gerät für Push an- oder abmelden (vom Browser-Skript aufgerufen)
+  router.post('/konto/push', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const endpoint = ctx.form.get('endpoint') ?? '';
+    const p256dh = ctx.form.get('p256dh') ?? '';
+    const auth = ctx.form.get('auth') ?? '';
+    if (!validEndpoint(endpoint) || !/^[A-Za-z0-9_-]{80,100}$/.test(p256dh) || !/^[A-Za-z0-9_-]{16,32}$/.test(auth)) {
+      return { status: 400, headers: {}, body: 'ungültig' };
+    }
+    await ctx.deps.db.run(
+      `insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, $2, $3, $4)
+       on conflict (endpoint) do update set user_id = $1, p256dh = $3, auth = $4`,
+      [ctx.user.id, endpoint, p256dh, auth],
+    );
+    await ctx.deps.db.run(
+      `insert into notification_prefs (user_id, push_enabled) values ($1, true) on conflict (user_id) do update set push_enabled = true, updated_at = now()`,
+      [ctx.user.id],
+    );
+    return { status: 204, headers: {}, body: '' };
+  });
+
+  router.post('/konto/push/entfernen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run('delete from push_subscriptions where user_id = $1 and endpoint = $2', [ctx.user.id, ctx.form.get('endpoint') ?? '']);
+    return { status: 204, headers: {}, body: '' };
+  });
+
   router.post('/konto/passwort', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const { db } = ctx.deps;
@@ -444,6 +487,12 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
   const user = ctx.user!;
   const hasPassword = !!(await ctx.deps.db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
   const av = await ctx.deps.db.one<{ avatar_updated_at: Date | null }>('select avatar_updated_at from users where id = $1', [user.id]);
+  const prefs = (await ctx.deps.db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
+    'select email_enabled, push_enabled, lead_minutes from notification_prefs where user_id = $1',
+    [user.id],
+  )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120 };
+  const devices = (await ctx.deps.db.one<{ n: number }>('select count(*)::int as n from push_subscriptions where user_id = $1', [user.id]))?.n ?? 0;
+  const vapid = await loadVapid(ctx.deps.db);
   const body = html`<section class="panel narrow">
   <h1>Dein Konto</h1>
   <p class="muted">Angemeldet als ${user.email}</p>
@@ -468,6 +517,30 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     </label>
     <button type="submit" class="btn">Name speichern</button>
   </form>
+</section>
+<section class="panel narrow" id="benachrichtigungen">
+  <h2>Benachrichtigungen</h2>
+  <form method="post" action="/konto/benachrichtigung" class="stack">
+    ${csrfField(ctx)}
+    <p class="muted">Erinnerung, wenn für ein anstehendes Spiel noch dein Tipp fehlt.</p>
+    <label class="check"><input type="checkbox" name="email" value="ja"${prefs.email_enabled ? html` checked` : nothing}> Per E-Mail an ${user.email}</label>
+    <label class="check"><input type="checkbox" name="push" value="ja"${prefs.push_enabled ? html` checked` : nothing}> Als Push-Nachricht auf diesem Gerät (Handy oder PC)</label>
+    <fieldset class="field lead-field">
+      <legend>Wie lange vor dem Tippschluss?</legend>
+      <div class="lead-row">
+        <label><input type="number" name="stunden" min="0" max="168" value="${Math.floor(prefs.lead_minutes / 60)}" inputmode="numeric" aria-label="Stunden"> Std.</label>
+        <label><input type="number" name="minuten" min="0" max="59" value="${prefs.lead_minutes % 60}" inputmode="numeric" aria-label="Minuten"> Min.</label>
+      </div>
+      <small class="muted">Aktuell: ${leadLabel(prefs.lead_minutes)} vorher, nur wenn Tipps fehlen.</small>
+    </fieldset>
+    <button type="submit" class="btn">Speichern</button>
+  </form>
+  <div class="push-box" data-push data-key="${vapid.publicKey}" hidden>
+    <p class="muted" data-push-status>${devices ? `${devices} ${devices === 1 ? 'Gerät' : 'Geräte'} für Push angemeldet.` : 'Noch kein Gerät für Push angemeldet.'}</p>
+    <button type="button" class="btn" data-push-on>Push auf diesem Gerät aktivieren</button>
+    <button type="button" class="btn btn-quiet" data-push-off hidden>Push auf diesem Gerät abschalten</button>
+    <input type="hidden" name="_csrf" value="${ctx.csrf}" data-push-csrf>
+  </div>
 </section>
 <section class="panel narrow">
   <h2>E-Mail-Adresse ändern</h2>

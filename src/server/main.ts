@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startSyncSchedule } from './abgleich.ts';
+import { startNotifySchedule } from './benachrichtigung.ts';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, migrate } from './db/index.ts';
@@ -22,7 +23,8 @@ if (config.autoMigrate) {
   if (applied.length) console.log(`Datenbank aktualisiert: ${applied.join(', ')}`);
 }
 
-const app = createApp({ db, config, mailer: createMailer(config), publicDir: join(root, 'public') });
+const mailer = createMailer(config);
+const app = createApp({ db, config, mailer, publicDir: join(root, 'public') });
 const server = createServer(app.listener);
 server.headersTimeout = 20_000;
 server.requestTimeout = 30_000;
@@ -35,6 +37,9 @@ server.listen(config.port, config.host, () => {
 
 // Champions und Spielerkader regelmäßig von Riot holen
 if (config.dataSync) startSyncSchedule(db, (m) => console.log(m));
+
+// Erinnerungen an fehlende Tipps (E-Mail, Push)
+startNotifySchedule(db, config, mailer, (m) => console.log(m));
 
 let stopping = false;
 function stop() {
