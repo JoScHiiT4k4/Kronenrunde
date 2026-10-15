@@ -9,6 +9,7 @@ import {
   hashPassword,
   LOGIN_TOKEN_MINUTES,
   loginWithPassword,
+  newToken,
   normalizeEmail,
   PASSWORD_MAX,
   PASSWORD_MIN,
@@ -329,11 +330,62 @@ export function registerAuthRoutes(router: Router<Ctx>) {
       return accountPage(ctx, 'Das bisherige Passwort stimmt nicht.');
     }
     const password = ctx.form.get('password') ?? '';
+    if (password !== (ctx.form.get('password2') ?? '')) return accountPage(ctx, 'Die beiden neuen Passwörter sind nicht gleich.');
     const problem = passwordProblem(password, ctx.user.email);
     if (problem) return accountPage(ctx, problem);
     await setPassword(db, ctx.user.id, password);
     // Alle Sitzungen sind beendet (auch auf anderen Geräten) – hier gleich wieder anmelden
     return signIn(ctx, ctx.user.id, '/konto?hinweis=passwort-gespeichert');
+  });
+
+  router.post('/konto/email', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { db, config, mailer } = ctx.deps;
+    const row = await db.one<{ password_hash: string | null }>('select password_hash from users where id = $1', [ctx.user.id]);
+    if (row?.password_hash && !(await verifyPassword(ctx.form.get('current') ?? '', row.password_hash))) {
+      return accountPage(ctx, 'Das Passwort stimmt nicht.');
+    }
+    const email = normalizeEmail(ctx.form.get('email') ?? '');
+    if (!email) return accountPage(ctx, 'Bitte gib eine gültige E-Mail-Adresse ein.');
+    if (email === ctx.user.email.toLowerCase()) return accountPage(ctx, 'Das ist schon deine E-Mail-Adresse.');
+    const recent = await db.one<{ n: number }>(`select count(*)::int as n from email_changes where user_id = $1 and created_at > now() - interval '1 hour'`, [ctx.user.id]);
+    if ((recent?.n ?? 0) >= 3) return accountPage(ctx, 'Zu viele Anfragen. Bitte versuche es in einer Stunde noch einmal.');
+    const taken = await db.one<{ x: number }>('select 1 as x from users where email = $1', [email]);
+    // Ob die Adresse schon vergeben ist, verraten wir nicht – es wird dann einfach keine Mail verschickt
+    if (!taken) {
+      const token = newToken();
+      await db.run(
+        `insert into email_changes (token_hash, user_id, new_email, expires_at) values ($1, $2, $3, now() + interval '60 minutes')`,
+        [hashToken(token), ctx.user.id, email],
+      );
+      const link = `${config.appUrl}/konto/email-bestaetigen?token=${token}`;
+      const text = `Hallo!\n\nMit diesem Link bestätigst du deine neue E-Mail-Adresse für ${config.appName}:\n\n${link}\n\nDer Link gilt 60 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail einfach.`;
+      const body = html`<p>Hallo!</p>
+<p>Mit diesem Link bestätigst du deine neue E-Mail-Adresse für ${config.appName}:</p>
+<p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#c8aa6e;color:#1c1407;text-decoration:none;font-weight:bold">E-Mail-Adresse bestätigen</a></p>
+<p style="color:#666">Der Link gilt 60 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail einfach.</p>`;
+      await mailer.send({ to: email, subject: `Neue E-Mail-Adresse bestätigen – ${config.appName}`, text, html: body.value });
+    }
+    return redirect('/konto?hinweis=email-gesendet');
+  });
+
+  router.get('/konto/email-bestaetigen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { db } = ctx.deps;
+    const token = ctx.query.get('token') ?? '';
+    if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.');
+    const row = await db.one<{ new_email: string }>(
+      `delete from email_changes where token_hash = $1 and user_id = $2 and expires_at > now() returning new_email`,
+      [hashToken(token), ctx.user.id],
+    );
+    if (!row) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.');
+    try {
+      await db.run('update users set email = $2 where id = $1', [ctx.user.id, row.new_email]);
+    } catch (e) {
+      if (e instanceof PgError && e.code === '23505') return accountPage(ctx, 'Diese E-Mail-Adresse ist inzwischen vergeben.');
+      throw e;
+    }
+    return redirect('/konto?hinweis=email-geaendert');
   });
 
   router.post('/konto/loeschen', async (ctx) => {
@@ -402,10 +454,19 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     </label>
     <button type="submit" class="btn">Name speichern</button>
   </form>
-  <form method="post" action="/abmelden" class="stack">
+</section>
+<section class="panel narrow">
+  <h2>E-Mail-Adresse ändern</h2>
+  <form method="post" action="/konto/email" class="stack">
     ${csrfField(ctx)}
-    <button type="submit" class="btn">Abmelden</button>
+    <label class="field">
+      <span>Neue E-Mail-Adresse</span>
+      <input type="email" name="email" required maxlength="254" autocomplete="email">
+    </label>
+    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
+    <button type="submit" class="btn">Bestätigungs-Mail senden</button>
   </form>
+  <p class="muted">Die neue Adresse gilt erst, wenn du den Link in der Mail anklickst.</p>
 </section>
 <section class="panel narrow">
   <h2>${hasPassword ? 'Passwort ändern' : 'Passwort festlegen'}</h2>
@@ -414,9 +475,21 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     <input type="email" name="email" value="${user.email}" autocomplete="username" hidden>
     ${hasPassword ? passwordInput('current', 'current-password', 'Bisheriges Passwort') : nothing}
     ${passwordInput('password', 'new-password', 'Neues Passwort', `(mindestens ${PASSWORD_MIN} Zeichen)`)}
+    ${passwordInput('password2', 'new-password', 'Neues Passwort wiederholen')}
     <button type="submit" class="btn">Passwort speichern</button>
   </form>
   <p class="muted">Danach bist du auf allen anderen Geräten abgemeldet.</p>
+</section>
+<section class="panel narrow" data-install-section hidden>
+  <h2>Aufs Handy oder den Desktop legen</h2>
+  <p class="muted">Dann startest du das Tippspiel wie eine App.</p>
+  <button type="button" class="btn" data-install>Zum Startbildschirm hinzufügen</button>
+</section>
+<section class="panel narrow">
+  <form method="post" action="/abmelden" class="stack">
+    ${csrfField(ctx)}
+    <button type="submit" class="btn">Abmelden</button>
+  </form>
 </section>
 <section class="panel narrow danger-zone">
   <h2>Konto löschen</h2>

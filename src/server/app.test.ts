@@ -252,12 +252,37 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
     assert.equal((await anna.get('/konto')).status, 303);
     // Passwort im Konto zurückändern (braucht das bisherige)
-    const wrongCurrent = await reset.post('/konto/passwort', { current: 'falsch', password: PASSWORT });
+    const wrongCurrent = await reset.post('/konto/passwort', { current: 'falsch', password: PASSWORT, password2: PASSWORT });
     assert.match(wrongCurrent.text, /bisherige Passwort stimmt nicht/);
-    const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT });
+    const mismatch = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT + 'x' });
+    assert.match(mismatch.text, /nicht gleich/);
+    const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT });
     assert.equal(changed.location, '/konto?hinweis=passwort-gespeichert');
     anna.cookies.clear();
     assert.equal((await anna.login('anna@example.de')).location, '/');
+
+    // E-Mail-Adresse ändern: erst nach Klick auf den Link in der Mail an die neue Adresse
+    const konto = await anna.get('/konto');
+    assert.match(konto.text, /E-Mail-Adresse ändern/);
+    assert.match(konto.text, /class="top-logout"/);
+    assert.match(konto.text, /name="password2"/);
+    assert.match((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: 'falsch' })).text, /Passwort stimmt nicht/);
+    assert.match((await anna.post('/konto/email', { email: 'kaputt', current: PASSWORT })).text, /gültige E-Mail/);
+    await db.run(`insert into users (email, display_name) values ('vergeben@example.de', 'Vergeben')`);
+    const sentBefore = mailer.sent!.length;
+    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    assert.equal(mailer.sent!.length, sentBefore, 'vergebene Adresse: keine Mail, aber auch kein Hinweis darauf');
+    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    const cm = [...mailer.sent!].reverse().find((m) => m.to === 'anna.neu@example.de')!;
+    const confirm = new URL(/https?:\/\/[^\s]+\/konto\/email-bestaetigen\?[^\s]+/.exec(cm.text)![0]);
+    assert.equal((await new Client().get(confirm.pathname + confirm.search)).status, 303, 'ohne Anmeldung nicht einlösbar');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?hinweis=email-geaendert');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).status, 400, 'Link gilt nur einmal');
+    assert.equal((await new Client().post('/anmelden', { email: 'anna.neu@example.de', password: PASSWORT })).status, 303);
+    assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
+    // zurück, damit die weiteren Tests mit der alten Adresse laufen
+    await db.run(`update users set email = 'anna@example.de' where email = 'anna.neu@example.de'`);
+    await db.run(`delete from users where email = 'vergeben@example.de'`);
 
     // Konto aus der Zeit der Anmelde-Links (ohne Passwort): Anmelden schickt einen Link zum Festlegen
     await db.run(`insert into users (email, display_name) values ('alt@example.de', 'Alt')`);

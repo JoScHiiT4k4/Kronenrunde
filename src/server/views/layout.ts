@@ -9,6 +9,8 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
+  'email-gesendet': { text: 'Wir haben dir eine Mail an die neue Adresse geschickt. Mit dem Link darin wird sie übernommen.', kind: 'ok' },
+  'email-geaendert': { text: 'Deine E-Mail-Adresse ist geändert.', kind: 'ok' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
   abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },
   beigetreten: { text: 'Willkommen in der Tipprunde!', kind: 'ok' },
@@ -66,7 +68,8 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
-    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
+    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>
+    <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn">Abmelden</button></form>` : html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
