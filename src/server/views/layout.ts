@@ -3,6 +3,7 @@
 import type { Ctx } from '../app.ts';
 import { formatDateTime, formatTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
+import { gotPercent } from '../../domain/possible.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
 
 /** Kurze Hinweise nach einer Aktion (?hinweis=…). Nur feste Texte – nichts aus der Adresse wird angezeigt. */
@@ -85,7 +86,7 @@ ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.t
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
 </main>
-${adBox('right')}
+${rankBox(ctx)}
 </div>
 <footer class="foot">
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
@@ -140,6 +141,43 @@ function tournamentBar(ctx: Ctx): Html {
 /** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
 function adBox(side: 'left' | 'right'): Html {
   return html`<aside class="ad ad-${side}" aria-label="Werbung"><div class="ad-box"><span class="ad-label">Anzeige</span></div></aside>`;
+}
+
+/** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
+export function scaleBar(points: number, possible: number): Html {
+  const got = gotPercent(points, possible);
+  const label = possible > 0 ? `${points} von ${possible} möglichen Punkten (${got} %)` : 'Noch keine Punkte vergeben';
+  return html`<svg class="scale" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="${label}">
+    <title>${label}</title>
+    ${possible > 0 ? html`<rect class="scale-got" x="0" y="0" width="${got}" height="8"/><rect class="scale-miss" x="${got}" y="0" width="${100 - got}" height="8"/>` : html`<rect class="scale-none" x="0" y="0" width="100" height="8"/>`}
+  </svg>`;
+}
+
+/** Rechts neben dem Inhalt (breite Bildschirme): die Rangliste der aktuellen Tipprunde, klickbar zur Seite "Rangliste". */
+function rankBox(ctx: Ctx): Html {
+  const s = ctx.sidebar;
+  if (!s) return adBox('right');
+  const top = s.rows.slice(0, 8);
+  const me = s.rows.find((r) => r.userId === ctx.user?.id);
+  const shown = me && !top.includes(me) ? [...top, me] : top;
+  return html`<aside class="ad ad-right rank-side" aria-label="Rangliste ${s.leagueName}">
+    <a class="rank-box" href="/r/${s.slug}/rangliste">
+      <span class="rank-title">Rangliste</span>
+      <span class="rank-league">${s.leagueName}</span>
+      <ol class="rank-list">
+        ${shown.map(
+          (r) => html`<li class="rank-row${r.userId === ctx.user?.id ? ' me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium-${r.rank}` : ''}">
+          <span class="rank-pos">${r.rank}</span>
+          <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null)}<span class="rank-n">${r.displayName}</span></span>
+          ${scaleBar(r.points, s.possible)}
+          <span class="rank-pts">${r.points}</span>
+        </li>`,
+        )}
+      </ol>
+      <span class="rank-foot">${s.possible > 0 ? `${s.possible} Punkte bisher möglich` : 'Noch keine Spiele gewertet'}</span>
+      <span class="rank-more">Zur ganzen Rangliste →</span>
+    </a>
+  </aside>`;
 }
 
 /** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite). */

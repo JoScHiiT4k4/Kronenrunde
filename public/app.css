@@ -900,3 +900,73 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 /* Anzahl der Tipps je Begegnung und Versions-Fußnote */
 .match-meta .tipped { color: var(--muted); }
 .foot .foot-version { max-width: none; margin: 14px 0 0; font-size: 0.75rem; color: var(--muted); text-align: left; opacity: 0.8; }
+
+/* Aufklappbare Tipps der Mitspieler bei Spielen, die schon begonnen haben */
+.tips-fold { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.tips-fold summary { display: list-item; margin-left: 18px; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
+.tips-fold summary:hover { color: var(--gold-bright); }
+.tips-fold[open] summary { margin-bottom: 8px; }
+
+/* Rangliste in der rechten Seitenleiste (ersetzt die Werbefläche rechts) */
+.ad-right.rank-side { width: 250px; }
+.rank-box {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 14px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--frame);
+  background-color: var(--surface);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+a.rank-box:hover { border-color: var(--gold); color: inherit; }
+a.rank-box:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: -2px; }
+.rank-title { font-family: var(--font-display); font-size: 1.1rem; letter-spacing: 0.06em; color: var(--gold-text); }
+.rank-league { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.rank-row { display: grid; grid-template-columns: 20px 1fr auto; grid-template-areas: "pos name pts" ". bar bar"; align-items: center; gap: 2px 8px; }
+.rank-pos { grid-area: pos; font-weight: 700; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.rank-name { grid-area: name; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.rank-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rank-pts { grid-area: pts; font-weight: 700; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+.rank-row .scale { grid-area: bar; }
+.rank-row.me .rank-n { color: var(--gold-bright); }
+.rank-row.podium-1 .rank-pos { color: var(--gold-bright); }
+.rank-foot { margin-top: 8px; font-size: 0.75rem; color: var(--muted); }
+.rank-more { font-size: 0.82rem; color: var(--gold-text); }
+a.rank-box:hover .rank-more { color: var(--gold-bright); }
+.rank-box .avatar { width: 22px; height: 22px; font-size: 0.7rem; }
+
+/* Grün/rote Skala: geholte Punkte im Verhältnis zu den möglichen */
+.scale { display: block; width: 100%; height: 7px; border-radius: 2px; overflow: hidden; }
+.scale-got { fill: #3ddc84; }
+.scale-miss { fill: #ff6b6b; opacity: 0.75; }
+.scale-none { fill: var(--line); }
+.scale-col { min-width: 110px; }
+.scale-col .scale { height: 9px; }
+
+/* Administrator: Server-Auslastung */
+.sys-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0; }
+.sys-card { padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); }
+.sys-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.sys-label { font-weight: 600; letter-spacing: 0.03em; }
+.sys-pct { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sys-bar { display: block; width: 100%; height: 12px; border-radius: 2px; }
+.sys-bar-thin { height: 8px; }
+.sys-track { fill: var(--line); }
+.sys-fill { fill: #3ddc84; }
+.sys-warm .sys-fill { fill: #f0b429; }
+.sys-hot .sys-fill { fill: #ff6b6b; }
+.sys-warm .sys-pct { color: #f0b429; }
+.sys-hot .sys-pct { color: #ff6b6b; }
+.sys-detail { margin-top: 8px; font-size: 0.92rem; }
+.sys-note { margin-top: 2px; font-size: 0.8rem; color: var(--muted); }
+.sys-facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 4px 0 8px; }
+.sys-facts div { display: flex; flex-direction: column; }
+.sys-facts strong { font-size: 1.1rem; }
+.sys-tables { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sys-tables li { display: grid; grid-template-columns: 170px 1fr 80px; gap: 12px; align-items: center; font-size: 0.9rem; }
+.sys-tables li > :last-child { text-align: right; }
