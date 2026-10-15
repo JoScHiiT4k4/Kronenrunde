@@ -64,7 +64,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
   ${tournamentBar(ctx)}
   <nav class="top-nav">
-    ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
+    ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
     ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
@@ -111,6 +111,19 @@ function tournamentBar(ctx: Ctx): Html {
     <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
     <a class="tbar-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>
   </div>`;
+}
+
+/** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite). */
+function roleSwitch(ctx: Ctx, league: LeagueNav | undefined): Html {
+  const admin = ctx.path.startsWith('/admin');
+  const leaderHref = league ? `/r/${league.slug}/verwalten` : '/';
+  return html`<details class="role-switch">
+    <summary>${admin ? 'Administrator' : 'Spielleiter'}</summary>
+    <div class="role-menu">
+      <a href="${leaderHref}"${!admin ? html` aria-current="true"` : nothing}>Spielleiter</a>
+      <a href="/admin"${admin ? html` aria-current="true"` : nothing}>Administrator</a>
+    </div>
+  </details>`;
 }
 
 function leagueNav(l: LeagueNav): Html {

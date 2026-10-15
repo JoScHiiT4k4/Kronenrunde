@@ -1053,7 +1053,7 @@ export function registerLeagueRoutes(router: Router<Ctx>) {
   const mayCreate = (fn: (ctx: Ctx) => Promise<Res>) => async (ctx: Ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     if (!(await canCreateLeague(ctx))) {
-      throw new HttpError(403, 'Neue Tipprunden kann im Moment nur der Admin anlegen. Du kannst einer Tipprunde über einen Einladungslink beitreten.');
+      throw new HttpError(403, 'Neue Tipprunden kann im Moment nur der Administrator anlegen. Du kannst einer Tipprunde über einen Einladungslink beitreten.');
     }
     return fn(ctx);
   };

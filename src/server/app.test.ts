@@ -501,7 +501,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 
-  test('Verwalten: nur Leitung; Einladungslink erneuern; Mitglied zur Mitleitung machen', async () => {
+  test('Verwalten: nur Spielleiter; Einladungslink erneuern; Mitglied zum Mit-Spielleiter machen', async () => {
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 403);
     const renew = await anna.post(`/r/${slug}/verwalten/einladung-neu`);
     assert.equal(renew.status, 303);
@@ -509,12 +509,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
     await anna.post(`/r/${slug}/verwalten/mitglied/${benId}`, { aktion: 'admin' });
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 200);
-    // Mitleitung darf keine Rollen ändern
+    // Mit-Spielleiter darf keine Rollen ändern
     const annaId = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
     assert.equal((await ben.post(`/r/${slug}/verwalten/mitglied/${annaId}`, { aktion: 'entfernen' })).status, 403);
   });
 
-  test('Konto löschen: Leitung geht an Mitleitung über, Daten sind weg', async () => {
+  test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {
     const r = await anna.post('/konto/loeschen', { bestaetigt: 'ja' });
     assert.equal(r.location, '/?hinweis=konto-geloescht');
     assert.equal(anna.cookies.size, 0);
@@ -762,6 +762,16 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(swissPage.text, /Die Paarungen für Swiss stehen noch nicht fest/);
     assert.match(swissPage.text, /Freitag, 23\. Oktober/);
     assert.doesNotMatch(swissPage.text, /class="match/);
+  });
+
+  test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
+    const adminPage = await admin.get('/admin');
+    assert.match(adminPage.text, /class="role-switch"/);
+    assert.match(adminPage.text, /<summary>Administrator<\/summary>/);
+    const normal = await admin.get(`/r/${slug}/rangliste`);
+    assert.match(normal.text, /<summary>Spielleiter<\/summary>/);
+    assert.match(normal.text, new RegExp(`href="/r/${slug}/verwalten"`));
+    assert.doesNotMatch((await new Client().get('/impressum')).text, /role-switch/);
   });
 
   test('Turnierbaum: Phasen, Begegnungen, ausgeschiedene Teams grau', async () => {
