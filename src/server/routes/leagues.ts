@@ -12,7 +12,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, layout, postButton, scaleBar } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, layout, postButton, scaleBar } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
@@ -754,7 +754,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
     const match = toDomainMatch(m);
     const result = resultLabel(m);
     const own = tips.get(m.id)!;
-    return html`<article class="match match-tips" id="tipps-${m.id}">
+    return html`<article class="match match-tips" id="tipps-${m.id}" data-item data-text="${`${m.team_a ? shortA(m) : ''} ${m.team_b ? shortB(m) : ''} ${m.team_a ?? ''} ${m.team_b ?? ''}`.toLowerCase()}">
   <div class="match-meta">
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : ''}</span>
     <span class="bo">Bo${m.best_of}</span>
@@ -790,12 +790,14 @@ ${phaseTabs}
 ${
   visible.length
     ? html`<p class="muted page-note">Alle Spiele, bei denen der Tippschluss vorbei ist – die neuesten oben.</p>
-  ${days.map(
-    (d) => html`<section class="day">
+  ${filterBar('tips-list', 'Team suchen …')}
+  <div id="tips-list">${days.map(
+    (d) => html`<section class="day" data-group>
     <header class="day-head"><h2>${d.start ? formatDayLong(d.start, tz) : 'Ohne Termin'}</h2></header>
     ${d.matches.map(card)}
   </section>`,
-  )}`
+  )}</div>
+  <p class="muted filter-empty" hidden>Keine Treffer.</p>`
     : emptyState('Noch sind keine Tipps zu sehen. Sobald bei einem Spiel der Tippschluss vorbei ist, stehen hier die Tipps aller Mitspieler.')
 }`;
   return htmlResponse(layout(ctx, { title: `Alle Tipps – ${league.name}`, body, league: leagueNav(access, 'alle-tipps') }));
@@ -815,7 +817,8 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const body = html`<section class="panel">
   <h1>Rangliste</h1>
   <p class="muted">${finished} ${finished === 1 ? 'Spiel' : 'Spiele'} gewertet. Richtiger Sieger ${league.points_winner} ${league.points_winner === 1 ? 'Punkt' : 'Punkte'}, exaktes Ergebnis ${league.points_exact} extra. Bei Gleichstand zählen die exakten Ergebnisse.</p>
-  <table class="table standings">
+  ${filterBar('rk-list', 'Spieler suchen …')}
+  <table class="table standings" id="rk-list">
     <thead><tr>
       <th class="num">Platz</th><th>Name</th>
       <th class="scale-col col-x" title="Grün: geholte Punkte, rot: liegen gelassen (von ${possible} bisher möglichen)">Ausbeute</th>
@@ -826,7 +829,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
     </tr></thead>
     <tbody>
     ${rows.map(
-      (r) => html`<tr class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
+      (r) => html`<tr data-item data-text="${r.displayName.toLowerCase()}" class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
         <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span>
           <span class="rk-sub">${scaleBar(r.points, possible)}<small>${r.correctWinners} Sieger · ${r.exactResults} exakt${hasBonus ? ` · ${r.bonusPoints} Sonder` : ''}</small></span></td>

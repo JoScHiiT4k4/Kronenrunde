@@ -10,10 +10,9 @@ const m = (x: StatTeam | null, y: StatTeam | null, wx: number | null, wy: number
   teamA: x, teamB: y, winsA: wx, winsB: wy, status, bestOf, time: n++,
 });
 
-test('Turnier in Zahlen: Maps, Sweeps und volle Distanz', () => {
+test('Turnier in Zahlen: Sweeps und volle Distanz', () => {
   const s = tournamentStat([m(a, b, 2, 0), m(a, c, 2, 1), m(b, c, 1, 0, 1), m(a, b, null, null), m(b, c, null, null, 3, 'live'), m(a, c, 0, 0, 3, 'cancelled')]);
-  assert.deepEqual(s, { total: 5, finished: 3, live: 1, open: 1, maps: 6, mapsPerSeries: 2, sweeps: 1, fullDistance: 1 });
-  assert.equal(tournamentStat([]).mapsPerSeries, null);
+  assert.deepEqual(s, { total: 5, finished: 3, live: 1, open: 1, sweeps: 1, fullDistance: 1 });
 });
 
 test('Teams: Bilanz, Maps, Quote, Serie; Teams ohne Spiel stehen mit dabei', () => {

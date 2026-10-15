@@ -35,11 +35,7 @@ export interface TournamentStat {
   finished: number;
   live: number;
   open: number;
-  /** Alle gespielten Maps (Summe der Siege beider Seiten) */
-  maps: number;
-  /** Maps pro Serie, eine Nachkommastelle; null ohne gespielte Serie */
-  mapsPerSeries: number | null;
-  /** Serien, bei denen der Verlierer keine Map geholt hat (nur Bo3/Bo5) */
+  /** Serien, bei denen der Verlierer kein Spiel gewonnen hat (nur Bo3/Bo5) */
   sweeps: number;
   /** Serien über die volle Distanz (z. B. 3:2 im Bo5) */
   fullDistance: number;
@@ -51,13 +47,11 @@ const decided = (m: StatMatch) =>
 export function tournamentStat(matches: StatMatch[]): TournamentStat {
   const live = matches.filter((m) => m.status !== 'cancelled');
   const done = live.filter(decided);
-  let maps = 0;
   let sweeps = 0;
   let fullDistance = 0;
   for (const m of done) {
     const hi = Math.max(m.winsA!, m.winsB!);
     const lo = Math.min(m.winsA!, m.winsB!);
-    maps += hi + lo;
     if (m.bestOf > 1 && lo === 0) sweeps++;
     if (m.bestOf > 1 && hi + lo === m.bestOf) fullDistance++;
   }
@@ -66,8 +60,6 @@ export function tournamentStat(matches: StatMatch[]): TournamentStat {
     finished: done.length,
     live: live.filter((m) => m.status === 'live').length,
     open: live.filter((m) => m.status === 'scheduled').length,
-    maps,
-    mapsPerSeries: done.length ? Math.round((maps / done.length) * 10) / 10 : null,
     sweeps,
     fullDistance,
   };

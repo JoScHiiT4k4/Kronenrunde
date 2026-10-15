@@ -1046,3 +1046,12 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
   .sw-match { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .sw-meta { grid-column: 1 / -1; text-align: center; }
 }
+
+/* Filter / Live-Suche */
+[hidden] { display: none !important; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 .75rem; }
+.filter-bar[hidden] { display: none !important; }
+.filter-bar .filter-q { flex: 1 1 12rem; min-width: 0; }
+.filter-bar .filter-region { flex: 0 1 12rem; min-width: 0; }
+/* Rollen-Auswahl: nur ein Pfeil (der globale Details-Pfeil entfällt) */
+.role-switch > summary::before, .role-switch[open] > summary::before { content: none; }

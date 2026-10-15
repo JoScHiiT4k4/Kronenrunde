@@ -238,6 +238,14 @@ export function postButton(
 </form>`;
 }
 
+/** Live-Suche (und optional Regionsfilter) für eine Liste; bleibt ohne JavaScript verborgen. Zeilen brauchen data-item, data-text, ggf. data-region. */
+export function filterBar(target: string, placeholder: string, regions: string[] = []): Html {
+  return html`<div class="filter-bar" data-filter="${target}" hidden>
+  <input type="search" class="filter-q" placeholder="${placeholder}" aria-label="${placeholder}" autocomplete="off">
+  ${regions.length ? html`<select class="filter-region" aria-label="Region"><option value="">Alle Regionen</option>${regions.map((r) => html`<option value="${r}">${r}</option>`)}</select>` : nothing}
+</div>`;
+}
+
 export function emptyState(text: string, action?: Html): Html {
   return html`<div class="empty"><p>${text}</p>${action ?? nothing}</div>`;
 }

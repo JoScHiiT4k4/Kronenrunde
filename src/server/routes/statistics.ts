@@ -6,7 +6,7 @@ import { regionCounts, type StatMatch, type StatTeam, teamStats, tournamentStat 
 import type { Ctx } from '../app.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, type Res, type Router } from '../http.ts';
-import { emptyState, layout } from '../views/layout.ts';
+import { emptyState, filterBar, layout } from '../views/layout.ts';
 import { isUuid, loginRedirect } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 
@@ -102,6 +102,13 @@ async function statisticsPage(ctx: Ctx): Promise<Res> {
   const t = tournamentStat(matches);
   const table = teamStats(matches, teams);
   const regions = regionCounts(table.map((r) => r.team));
+  const regionNames = [...new Set(table.map((r) => r.team.region?.trim()).filter((x): x is string => !!x))].sort((x, y) => x.localeCompare(y, 'de'));
+  const started = t.finished > 0;
+  // Gleiche Bilanz = gleicher Platz
+  const ranks = table.map((r, i) => {
+    const first = table.findIndex((o) => o.wins === r.wins && o.losses === r.losses);
+    return first + 1 || i + 1;
+  });
   const maxRegion = Math.max(1, ...regions.map((r) => r.count));
   const roleCount = new Map(roleRows.map((r) => [r.role ?? '', r.n]));
   const players = roleRows.reduce((s, r) => s + r.n, 0);
@@ -124,9 +131,7 @@ async function statisticsPage(ctx: Ctx): Promise<Res> {
   <div class="st-tiles">
     ${tile(t.finished, t.finished === 1 ? 'Serie gespielt' : 'Serien gespielt')}
     ${tile(t.live + t.open, 'noch offen')}
-    ${tile(t.maps, 'Maps gespielt')}
-    ${tile(t.mapsPerSeries === null ? '–' : String(t.mapsPerSeries).replace('.', ','), 'Maps pro Serie')}
-    ${tile(t.sweeps, 'Sweeps (Bo3/Bo5 ohne Map-Gewinn des Gegners)')}
+    ${tile(t.sweeps, 'Sweeps (Bo3/Bo5 ohne Sieg des Gegners)')}
     ${tile(t.fullDistance, 'Serien über die volle Distanz')}
   </div>
 </section>
@@ -135,22 +140,24 @@ async function statisticsPage(ctx: Ctx): Promise<Res> {
   <h2>Teams</h2>
   ${
     table.length
-      ? html`<table class="table compact st-table">
-    <thead><tr><th>Team</th><th>Region</th><th class="num">Serien</th><th class="num">Maps</th><th class="st-quote">Siegquote</th><th>Serie</th></tr></thead>
+      ? html`${filterBar('st-teams', 'Team suchen …', regionNames)}
+  <table class="table compact st-table" id="st-teams">
+    <thead><tr>${started ? html`<th class="num">#</th>` : nothing}<th>Team</th><th>Region</th><th class="num">Siege–Niederlagen</th><th class="st-quote">Siegquote</th><th>Serie</th></tr></thead>
     <tbody>
     ${table.map(
-      (r) => html`<tr>
+      (r, i) => html`<tr data-item data-region="${r.team.region ?? ''}" data-text="${`${r.team.name} ${r.team.short ?? ''}`.toLowerCase()}">
+      ${started ? html`<td class="num muted">${ranks[i]}</td>` : nothing}
       <td title="${r.team.name}"><strong>${r.team.short || r.team.name}</strong></td>
       <td class="muted">${r.team.region ?? ''}</td>
       <td class="num">${r.wins}–${r.losses}</td>
-      <td class="num">${r.mapsWon}–${r.mapsLost}</td>
       <td class="st-quote">${r.winRate === null ? html`<span class="muted">–</span>` : html`${bar(r.winRate)}<span class="st-pct">${r.winRate} %</span>`}</td>
       <td>${r.streak ? html`<span class="st-streak ${r.streak.win ? 'st-win' : 'st-loss'}">${r.streak.length}${r.streak.win ? 'S' : 'N'}</span>` : html`<span class="muted">–</span>`}</td>
     </tr>`,
     )}
     </tbody>
   </table>
-  <p class="muted st-hint">Serien = gewonnene–verlorene Begegnungen, Maps = gewonnene–verlorene Einzelspiele. Serie: S = Siege in Folge, N = Niederlagen in Folge.</p>`
+  <p class="muted st-empty" hidden>Keine Treffer.</p>
+  <p class="muted st-hint">${started ? 'Sortiert nach Siegen. ' : ''}Serie: S = Siege in Folge, N = Niederlagen in Folge.</p>`
       : html`<p class="muted">Noch keine Teams eingetragen.</p>`
   }
   ${
