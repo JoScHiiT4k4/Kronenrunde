@@ -86,7 +86,6 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${leagueSwitch(ctx)}
-    ${ctx.isAdmin && !ctx.sidebar?.isTest ? roleSwitch(ctx, o.league) : nothing}
     ${ctx.user ? html`<a href="/konto" class="top-user" title="Dein Konto">${ICON_USER}<span class="top-user-name">${ctx.user.display_name}</span></a>
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn" title="Abmelden" aria-label="Abmelden">${ICON_LOGOUT}</button></form>`: html`<a href="/anmelden">Anmelden</a>`}
   </nav>
@@ -103,6 +102,7 @@ ${rankBox(ctx)}
 </div>
 ${chatWidget(ctx)}
 <footer class="foot">
+  ${ctx.isAdmin && !ctx.sidebar?.isTest ? html`<div class="foot-role">${roleSwitch(ctx, o.league)}</div>` : nothing}
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
   <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></p>

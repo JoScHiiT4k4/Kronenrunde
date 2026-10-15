@@ -435,7 +435,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   line-height: 1.15;
   margin-bottom: 12px;
 }
-.teams.has-score { grid-template-columns: 1fr auto auto auto 1fr; gap: 8px; }
+.teams .mid { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .wins {
   min-width: 2rem; padding: 2px 6px; font: inherit; font-size: 1.15rem; line-height: 1.2; text-align: center;
   color: var(--text); background: transparent; border: 1px solid transparent; cursor: pointer;
@@ -923,6 +923,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .sub-tabs a[aria-current] { color: var(--gold-bright); border-color: var(--gold); background: rgb(200 170 110 / 10%); }
 
 /* Gewinnchance aus den Tipps */
+.pct-a { text-align: right; }
 .pct { font-family: var(--font-body); font-size: 0.85em; font-weight: 700; letter-spacing: 0; white-space: nowrap; }
 .pct-up { color: #3ddc84; }
 .pct-down { color: #ff6b6b; }
@@ -1204,3 +1205,13 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
 .progress-ok { color: var(--ok); background: rgb(63 199 165 / 12%); }
 .progress-bad { color: var(--red); background: rgb(236 91 82 / 12%); }
 td.bad { color: var(--red); }
+
+/* Rollen-Auswahl (Spielleiter/Administrator) am Seitenende: Menü klappt nach oben auf */
+.foot-role { margin: 0 0 14px; }
+.foot .foot-role .role-switch { position: relative; display: inline-block; }
+.foot .foot-role .role-menu { top: auto; bottom: calc(100% + 6px); left: 50%; right: auto; transform: translateX(-50%); text-align: left; }
+@media (max-width: 420px) {
+  .teams .mid { gap: 4px; }
+  .teams .pct { font-size: 0.72em; }
+  .wins { min-width: 1.5rem; padding: 2px 3px; }
+}

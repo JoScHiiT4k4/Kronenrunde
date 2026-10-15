@@ -467,9 +467,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /Vorbei/);
     assert.match(tips.text, /pts pts-hit pts-exact">\+2</);
     // Gewinnchance aus den Tipps: GEN–T1 je einer (50/50), G2–KC beide auf KC (100/0); offene Spiele zeigen nichts
-    assert.equal((tips.text.match(/class="pct pct-even"/g) ?? []).length, 2);
-    assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
-    assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
+    assert.equal((tips.text.match(/class="pct pct-[ab] pct-even"/g) ?? []).length, 2);
+    assert.match(tips.text, /class="pct pct-[ab] pct-up"[^>]*>100 %</);
+    assert.match(tips.text, /class="pct pct-[ab] pct-down"[^>]*>0 %</);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
     // Gewonnene Spiele je Team mit Spoilerschutz (GEN 3:1, G2–KC 1:2)
     assert.equal((tips.text.match(/<button type="button" class="wins wins-[ab]" data-spoiler/g) ?? []).length, 4);
@@ -662,7 +662,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const page = await anna.get(`/r/${slug}/tippen`);
     assert.match(page.text, new RegExp(`name="tipp_${match['T1-KC']}"`), 'T1–KC ist noch tippbar');
     assert.equal((page.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'Tipps der anderen bei den zwei begonnenen Spielen');
-    assert.match(page.text, /class="pct pct-up"/);
+    assert.match(page.text, /class="pct pct-[ab] pct-up"/);
     await db.run(`update matches set scheduled_at = $2 where id = $1`, [match['T1-KC'], saved!.scheduled_at]);
     await db.run('update leagues set lock_mode = $2 where slug = $1', [slug, mode!.lock_mode]);
   });
@@ -1125,7 +1125,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     rmSync(UPDATE_FILE, { force: true });
   });
 
-  test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
+  test('Seitenende: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
     const adminPage = await admin.get('/admin');
     assert.match(adminPage.text, /class="role-switch"/);
     assert.match(adminPage.text, /<summary>Administrator<\/summary>/);
@@ -1134,6 +1134,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(normal.text, new RegExp(`href="/r/${slug}/verwalten"`));
     assert.match(normal.text, /<a href="\/admin">Administrator<\/a>/);
     assert.match(normal.text, /<a href="\/r\/[a-z0-9-]+\/verwalten" aria-current="true">Spielleiter<\/a>/, 'gewählte Rolle ist markiert');
+    assert.match(normal.text, /<footer class="foot">\s*<div class="foot-role">\s*<details class="role-switch">/, 'Umschalter steht im Seitenende');
+    assert.doesNotMatch(normal.text.slice(0, normal.text.indexOf('</header>')), /role-switch/, 'nicht mehr in der Kopfzeile');
     assert.doesNotMatch((await new Client().get('/impressum')).text, /role-switch/);
   });
 
