@@ -107,18 +107,18 @@ function countdownText(ms: number): string {
   return d > 0 ? `${d} Tg ${two(h)}:${two(m)}:${two(sec)}` : `${two(h)}:${two(m)}:${two(sec)}`;
 }
 
-/** Mitte im Kopf: Countdown bis zum Turnierstart, danach Links zum Livestream (mit grünem „Live“, wenn gespielt wird). */
+/** Mitte im Kopf: Countdown bis zum Turnierstart (solange er läuft), dazu immer die Links zum Livestream – mit grünem „Live“, wenn gespielt wird. */
 function tournamentBar(ctx: Ctx): Html {
   const t = ctx.headerTournament;
   if (!t) return nothing;
-  if (!t.running) {
-    return html`<div class="tbar" aria-label="Countdown ${t.name}">
-    <span class="tbar-label">${t.name} in</span>
-    <time class="tbar-count" datetime="${t.startsAt.toISOString()}" data-countdown="${t.startsAt.toISOString()}">${countdownText(t.startsAt.getTime() - ctx.now.getTime())}</time>
-  </div>`;
-  }
   const { twitch, youtube } = ctx.deps.config.streams;
-  return html`<div class="tbar" aria-label="Livestream ${t.name}">
+  return html`<div class="tbar" aria-label="${t.name}">
+    ${
+      t.running
+        ? nothing
+        : html`<span class="tbar-label">${t.name} in</span>
+    <time class="tbar-count" datetime="${t.startsAt.toISOString()}" data-countdown="${t.startsAt.toISOString()}">${countdownText(t.startsAt.getTime() - ctx.now.getTime())}</time>`
+    }
     ${t.live ? html`<span class="tbar-live">Live</span>` : nothing}
     <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
     <a class="tbar-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>

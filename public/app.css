@@ -847,3 +847,10 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 .role-menu a { padding: 10px 14px; color: var(--text); text-decoration: none; max-width: none; }
 .role-menu a:hover { color: var(--gold-bright); background: rgb(200 170 110 / 10%); }
 .role-menu a[aria-current] { color: var(--gold-bright); }
+
+/* Sonderfragen: Auswahl und Einstellungen in einer Liste */
+.q-list { display: flex; flex-direction: column; }
+.q-row { padding: 8px 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.q-row .check { flex: 1 1 auto; }
+.q-row .question-edit { flex: 1 1 100%; margin: 4px 0 0 30px; }
+.q-points { font-size: 0.9rem; }

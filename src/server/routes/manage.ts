@@ -149,39 +149,38 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     return html`<h3>${t.name}</h3>
     <p class="muted">${
       started
-        ? 'Das Turnier hat begonnen: Die Auswahl ist gesperrt. Eine Frage lässt sich nur noch über ihre Einstellungen löschen.'
-        : 'Wähle, welche Fragen in deiner Tipprunde gestellt werden. Das geht bis zum Start des ersten Spiels, danach ist die Auswahl gesperrt.'
+        ? 'Das Turnier hat begonnen: Die Auswahl ist gesperrt. Punkte und richtige Antworten kannst du weiter ändern; eine Frage lässt sich nur noch über ihre Einstellungen löschen.'
+        : 'Hake an, welche Fragen in deiner Tipprunde gestellt werden (Abwählen löscht die Frage samt Antworten). Das geht bis zum Start des ersten Spiels, danach ist die Auswahl gesperrt.'
     }</p>
-    <form method="post" action="${base}/fragen-auswahl" class="stack"${attr(!started, 'data-confirm="Abgewählte Fragen werden mit allen Antworten gelöscht. Speichern?"')}>
+    <form method="post" action="${base}/fragen-auswahl" class="stack" data-confirm-uncheck="Abgewählte Fragen werden mit allen Antworten gelöscht. Wirklich speichern?">
       ${csrfField(ctx)}
       <input type="hidden" name="tournament_id" value="${t.id}">
-      <fieldset class="field"${attr(started, 'disabled')}>
-        <legend>Fragen für diese Tipprunde</legend>
-        ${QUESTION_CATALOG.map(
-          (c) => html`<label class="check"><input type="checkbox" name="frage" value="${c.key}"${attr(qs.some((q) => q.catalog_key === c.key), 'checked')}>
-          <span>${c.question} <span class="muted">(${c.points} P.)</span></span></label>`,
-        )}
-      </fieldset>
-      ${started ? nothing : html`<button type="submit" class="btn">Auswahl speichern</button>`}
-    </form>
-    ${
-      qs.length
-        ? html`<h4 class="small-title">Einstellungen der Fragen</h4>
-    ${qs.map(
-      (q) => html`<details class="question-edit">
-      <summary><span>${q.question}</span> <span class="muted">${q.points} P.${q.correct_answers.length ? ', aufgelöst' : ''}${q.answers ? `, ${q.answers} ${q.answers === 1 ? 'Antwort' : 'Antworten'}` : ''}</span></summary>
-      <form method="post" action="${base}/frage/${q.id}" class="stack">
-        ${csrfField(ctx)}
-        ${questionFields(q)}
-        <div class="row">
-          <button type="submit" name="aktion" value="speichern" class="btn btn-primary">Speichern</button>
-          <button type="submit" name="aktion" value="loeschen" class="btn btn-quiet" data-confirm="Frage „${q.question}“ mit allen Antworten wirklich löschen? Das lässt sich nicht rückgängig machen.">Frage löschen</button>
-        </div>
-      </form>
-    </details>`,
-    )}`
-        : nothing
-    }`;
+      <div class="q-list">
+      ${QUESTION_CATALOG.map((c) => {
+        const q = qs.find((x) => x.catalog_key === c.key);
+        return html`<div class="q-row">
+        <label class="check"><input type="checkbox" name="frage" value="${c.key}"${attr(!!q, 'checked data-was-checked="1"')}${attr(started, 'disabled')}>
+          <span>${c.question}</span></label>
+        ${
+          q
+            ? html`<details class="question-edit">
+          <summary><span class="muted">${q.points} P.${q.correct_answers.length ? ', aufgelöst' : ''}${q.answers ? `, ${q.answers} ${q.answers === 1 ? 'Antwort' : 'Antworten'}` : ''} – Einstellungen</span></summary>
+          <div class="stack">
+            <p class="muted">Antwort der Tipper: ${ANSWER_TYPE_LABELS[q.answer_type]}</p>
+            <label class="field small"><span>Punkte</span>
+              <input type="number" name="punkte_${c.key}" value="${q.points}" min="0" max="50" required inputmode="numeric"></label>
+            <label class="field"><span>Richtige Antwort(en) <small class="muted">(eine pro Zeile, z. B. bei Gleichstand; Groß-/Kleinschreibung und Satzzeichen sind egal)</small></span>
+              <textarea name="antworten_${c.key}" rows="2">${q.correct_answers.join('\n')}</textarea></label>
+            <button type="submit" formaction="${base}/frage/${q.id}" name="aktion" value="loeschen" formnovalidate class="btn btn-quiet" data-confirm="Frage „${q.question}“ mit allen Antworten wirklich löschen? Das lässt sich nicht rückgängig machen.">Frage löschen</button>
+          </div>
+        </details>`
+            : html`<span class="muted q-points">${c.points} P.</span>`
+        }
+      </div>`;
+      })}
+      </div>
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>`;
   })}
   <details class="question-edit new">
     <summary>Neue Frage vorschlagen</summary>
@@ -300,6 +299,15 @@ export function registerManageRoutes(router: Router<Ctx>) {
     const tid = ctx.form.get('tournament_id');
     if (!isUuid(tid)) return 'Bitte wähle ein Turnier aus.';
     const wanted = new Set(ctx.form.getAll('frage'));
+    // Punkte und richtige Antworten vorab prüfen
+    const settings = new Map<string, { points: number; answers: string[] }>();
+    for (const c of QUESTION_CATALOG) {
+      const raw = ctx.form.get(`punkte_${c.key}`);
+      if (raw === null) continue;
+      const points = intField(raw, 0, 50);
+      if (points === null) return 'Bitte gib Punkte von 0 bis 50 ein.';
+      settings.set(c.key, { points, answers: lines(ctx.form.get(`antworten_${c.key}`)) });
+    }
     await ctx.deps.db.tx(async (q) => {
       const t = await q.one<{ started: boolean }>(
         `select coalesce(tournament_start(lt.tournament_id) <= now(), false) as started
@@ -307,23 +315,36 @@ export function registerManageRoutes(router: Router<Ctx>) {
         [league.id, tid],
       );
       if (!t) throw new HttpError(400, 'Dieses Turnier gehört nicht zur Tipprunde.');
-      if (t.started) throw new HttpError(400, 'Das Turnier hat schon begonnen: Die Auswahl lässt sich nicht mehr ändern. Eine Frage kannst du noch über ihre Einstellungen löschen.');
       const existing = new Set(
         (await q.query<{ catalog_key: string }>('select catalog_key from bonus_questions where league_id = $1 and tournament_id = $2 and catalog_key is not null', [league.id, tid])).map((r) => r.catalog_key),
       );
-      for (const [i, c] of QUESTION_CATALOG.entries()) {
-        if (wanted.has(c.key) && !existing.has(c.key)) {
-          await q.run(
-            `insert into bonus_questions (league_id, tournament_id, position, question, points, answer_type, choices, catalog_key)
-             values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [league.id, tid, i + 1, c.question, c.points, c.type, c.choices, c.key],
-          );
-        } else if (!wanted.has(c.key) && existing.has(c.key)) {
-          await q.run('delete from bonus_questions where league_id = $1 and tournament_id = $2 and catalog_key = $3', [league.id, tid, c.key]);
+      // Nach Turnierstart ist die Auswahl gesperrt (abgewählte Haken werden vom Browser gar nicht mitgeschickt)
+      if (!t.started) {
+        for (const [i, c] of QUESTION_CATALOG.entries()) {
+          if (wanted.has(c.key) && !existing.has(c.key)) {
+            await q.run(
+              `insert into bonus_questions (league_id, tournament_id, position, question, points, answer_type, choices, catalog_key)
+               values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [league.id, tid, i + 1, c.question, c.points, c.type, c.choices, c.key],
+            );
+            existing.add(c.key);
+          } else if (!wanted.has(c.key) && existing.has(c.key)) {
+            await q.run('delete from bonus_questions where league_id = $1 and tournament_id = $2 and catalog_key = $3', [league.id, tid, c.key]);
+            existing.delete(c.key);
+          }
         }
+      } else if (wanted.size > 0 && (wanted.size !== existing.size || [...wanted].some((k) => !existing.has(k)))) {
+        throw new HttpError(400, 'Das Turnier hat schon begonnen: Die Auswahl lässt sich nicht mehr ändern. Eine Frage kannst du noch über ihre Einstellungen löschen.');
+      }
+      for (const [key, v] of settings) {
+        if (!existing.has(key)) continue;
+        await q.run(
+          'update bonus_questions set points = $4, correct_answers = $5 where league_id = $1 and tournament_id = $2 and catalog_key = $3',
+          [league.id, tid, key, v.points, v.answers],
+        );
       }
     });
-    return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
+    return redirect(`${areaHref(league.slug, 'fragen')}&hinweis=gespeichert`);
   });
 
   post('/frage/:qid', async (ctx, { league }) => {

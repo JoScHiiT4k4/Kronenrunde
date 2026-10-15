@@ -474,7 +474,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const restore = await postponeTournament(tournamentId);
     const before = await anna.get(`/r/${slug}/tippen`);
     assert.match(before.text, /data-countdown="/);
-    assert.doesNotMatch(before.text, /twitch\.tv/);
+    assert.match(before.text, /twitch\.tv/, 'Links gibt es schon vor dem Start');
     await restore();
     const after = await anna.get(`/r/${slug}/tippen`);
     assert.doesNotMatch(after.text, /data-countdown/);
@@ -520,7 +520,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const restore = await postponeTournament(tournamentId);
     const manage = await anna.get(`/r/${slug}/verwalten`);
     assert.match(manage.text, /name="frage" value="weltmeister"/);
-    assert.doesNotMatch(manage.text, /<fieldset class="field" disabled>/);
+    assert.doesNotMatch(manage.text, /name="frage"[^>]*disabled/);
     assert.doesNotMatch(manage.text, /name="answer_type"|name="choices"|name="hint"|bonus_deadline_at/, 'keine komplizierten Felder mehr');
     assert.doesNotMatch(manage.text, /Neue Sonderfrage|action="[^"]*\/verwalten\/frage"/, 'niemand legt selbst Fragen an');
     const all = new URLSearchParams([['tournament_id', tournamentId], ...['weltmeister', 'finals-mvp', 'meistgebannt', 'kuerzestes-spiel', 'pentakill-team', 'pentakill-spieler'].map((k) => ['frage', k])]);
@@ -562,7 +562,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();
     const locked = await anna.get(`/r/${slug}/verwalten`);
-    assert.match(locked.text, /<fieldset class="field" disabled>/);
+    assert.match(locked.text, /name="frage"[^>]*disabled/);
     assert.match(locked.text, /Die Auswahl ist gesperrt/);
     assert.match(locked.text, /Frage löschen/);
     const refused = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
