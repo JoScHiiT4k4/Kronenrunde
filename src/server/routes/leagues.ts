@@ -479,7 +479,7 @@ ${
   !tournaments.length
     ? emptyState(
         'Diese Tipprunde hat noch kein Turnier.',
-        access.canManage ? html`<a class="btn" href="/r/${league.slug}/verwalten#turniere">Turnier auswählen</a>` : undefined,
+        access.canManage ? html`<a class="btn" href="/r/${league.slug}/verwalten?bereich=turniere">Turnier auswählen</a>` : undefined,
       )
     : !matches.length
       ? emptyState('Für dieses Turnier sind noch keine Spiele eingetragen.')
@@ -894,7 +894,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
     const teamNames = teams.filter((x) => x.tournament_id === t.id).map((x) => x.name);
     if (!qs.length) {
       return html`<section class="panel"><h2>${t.name}</h2><p class="muted">Für dieses Turnier gibt es keine Sonderfragen.</p>
-      ${access.canManage ? html`<p><a href="/r/${league.slug}/verwalten#fragen">Sonderfragen anlegen</a></p>` : nothing}</section>`;
+      ${access.canManage ? html`<p><a href="/r/${league.slug}/verwalten?bereich=fragen">Sonderfragen anlegen</a></p>` : nothing}</section>`;
     }
 
     if (!closed) {

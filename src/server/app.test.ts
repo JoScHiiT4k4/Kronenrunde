@@ -515,10 +515,29 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await anna.get(`/avatar/${id}`)).status, 404);
   });
 
+  test('Verwalten: Untermenü und Übersicht "Noch nicht getippt" ohne Tipp-Inhalte', async () => {
+    const start = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(start.text, /class="sub-tabs"/);
+    assert.match(start.text, /Noch nicht getippt/);
+    assert.doesNotMatch(start.text, /id="turniere"|id="fragen"/, 'andere Bereiche stehen auf eigenen Seiten');
+    for (const area of ['einstellungen', 'turniere', 'fragen', 'mitglieder']) {
+      const r = await anna.get(`/r/${slug}/verwalten?bereich=${area}`);
+      assert.equal(r.status, 200, area);
+      assert.doesNotMatch(r.text, /Noch nicht getippt/);
+    }
+    assert.match((await anna.get(`/r/${slug}/verwalten?bereich=mitglieder`)).text, /Mitglieder \(\d+\)/);
+    // Mit offenem Spiel in der Zukunft taucht Ben ohne Tipp auf – nur mit Anzahl und Frist
+    const restore = await postponeTournament(tournamentId);
+    const open = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(open.text, /Nächster Tippschluss/);
+    assert.match(open.text, /Ben/);
+    await restore();
+  });
+
   test('Sonderfragen: auswählen, beantworten, Frist, Auflösung', async () => {
     // Frist = Start des ersten Spiels; hier noch in der Zukunft, damit die Auswahl offen ist
     const restore = await postponeTournament(tournamentId);
-    const manage = await anna.get(`/r/${slug}/verwalten`);
+    const manage = await anna.get(`/r/${slug}/verwalten?bereich=fragen`);
     assert.match(manage.text, /name="frage" value="weltmeister"/);
     assert.doesNotMatch(manage.text, /<fieldset class="field" disabled>/);
     assert.doesNotMatch(manage.text, /name="answer_type"|name="choices"|name="hint"|bonus_deadline_at/, 'keine komplizierten Felder mehr');
@@ -544,7 +563,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Vorschlag für neue Fragen geht per E-Mail an den Betreiber
     assert.equal((await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: '   ' })).status, 400);
     const sug = await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: 'Wer holt den ersten Baron?' });
-    assert.equal(sug.location, `/r/${slug}/verwalten?hinweis=vorschlag-gesendet#fragen`);
+    assert.equal(sug.location, `/r/${slug}/verwalten?bereich=fragen&hinweis=vorschlag-gesendet`);
     const mail = [...mailer.sent!].reverse().find((m) => m.to === 'vorschlaege@example.de')!;
     assert.match(mail.text, /Wer holt den ersten Baron\?/);
     assert.match(mail.text, /Anna/);
@@ -561,7 +580,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();
-    const locked = await anna.get(`/r/${slug}/verwalten`);
+    const locked = await anna.get(`/r/${slug}/verwalten?bereich=fragen`);
     assert.match(locked.text, /<fieldset class="field" disabled>/);
     assert.match(locked.text, /Die Auswahl ist gesperrt/);
     assert.match(locked.text, /Frage löschen/);
