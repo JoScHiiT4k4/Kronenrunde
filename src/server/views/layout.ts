@@ -78,9 +78,10 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
 </head>
 <body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
-  <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
+  <a class="brand" href="${ctx.user && ctx.sidebar ? `/r/${ctx.sidebar.slug}/tippen` : '/'}"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
   ${tournamentBar(ctx)}
   <nav class="top-nav">
+    ${leagueSwitch(ctx)}
     ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
     ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn">Abmelden</button></form>` : html`<a href="/anmelden">Anmelden</a>`}
@@ -210,6 +211,18 @@ function rankBox(ctx: Ctx): Html {
       <span class="rank-more">Zur ganzen Rangliste →</span>
     </div>
   </aside>`;
+}
+
+/** Dropdown zum Wechseln der Tipprunde – nur mit mehr als einer Tipprunde. */
+function leagueSwitch(ctx: Ctx): Html {
+  const sb = ctx.sidebar;
+  if (!ctx.user || !sb || sb.leagues.length < 2) return nothing;
+  return html`<details class="role-switch league-switch">
+    <summary>${sb.leagueName}</summary>
+    <div class="role-menu">
+      ${sb.leagues.map((l) => html`<a href="/r/${l.slug}/tippen"${l.slug === sb.slug ? html` aria-current="true"` : nothing}>${l.name}</a>`)}
+    </div>
+  </details>`;
 }
 
 /** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite).

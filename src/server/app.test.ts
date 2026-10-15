@@ -396,6 +396,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Tippen: speichern, Format prüfen, Tipps der anderen erst ab Tippschluss', async () => {
     const page = await anna.get(`/r/${slug}/tippen`);
     assert.match(page.text, /Tipps speichern/);
+    assert.match(page.text, new RegExp(`class="brand" href="/r/${slug}/tippen"`)); // Logo führt zu „Tippen“
+    assert.doesNotMatch(page.text, /league-switch/); // nur eine Tipprunde → kein Dropdown
     assert.match(page.text, new RegExp(`name="tipp_${match['GEN-T1']}" value="A-3-1"`));
     // Spiele ohne feststehende Teams werden nicht gezeigt, nur ein Hinweis
     assert.match(page.text, /Ein weiteres Spiel dieser Phase erscheint hier, sobald die Teams feststehen/);
