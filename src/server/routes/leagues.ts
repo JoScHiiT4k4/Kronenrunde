@@ -12,7 +12,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, filterBar, layout, postButton, scaleBar, tabMenu } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
@@ -929,9 +929,11 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
       ${access.canManage ? html`<p><a href="/r/${league.slug}/verwalten?bereich=fragen">Sonderfragen anlegen</a></p>` : nothing}</section>`;
     }
 
+    const done = qs.filter((q) => myAnswers.has(q.id)).length;
+    const status = progress(done, qs.length, 'Fragen abgegeben', true);
     if (!closed) {
       return html`<section class="panel">
-  <h2>${t.name}</h2>
+  <h2>${t.name} ${status}</h2>
   ${
     t.bonus_deadline_at
       ? html`<p><span class="lock">Antworten bis zum Start des ersten Spiels: ${formatDateTime(t.bonus_deadline_at, tz)} Uhr</span> <span class="muted">(${formatRemaining(t.bonus_deadline_at, ctx.now)})</span>. Danach sind sie fest und alle sehen die Antworten der anderen.</p>`
@@ -989,7 +991,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
     }
 
     return html`<section class="panel">
-  <h2>${t.name}</h2>
+  <h2>${t.name} ${status}</h2>
   <p class="muted">Geschlossen seit dem Start des ersten Spiels (${formatDateTime(t.bonus_deadline_at!, tz)} Uhr).</p>
   ${qs.map((q) => {
     const resolved = q.correct_answers.length > 0;
