@@ -471,6 +471,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
     assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
+    // Gewonnene Spiele je Team mit Spoilerschutz (GEN 3:1, G2–KC 1:2)
+    assert.equal((tips.text.match(/<button type="button" class="wins wins-[ab]" data-spoiler/g) ?? []).length, 4);
+    assert.match(tips.text, /class="wins wins-a" data-spoiler[^>]*>3<\/button>/);
     assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
@@ -499,7 +502,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch(after.text, /data-countdown/);
     assert.match(after.text, /class="tbar-label">[^<]+<\/span>/, 'läuft: nur der Turniername');
     assert.doesNotMatch(after.text, /class="tbar-label">[^<]* in<\/span>/);
-    assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
+    assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/riotgames"/);
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
   });
 

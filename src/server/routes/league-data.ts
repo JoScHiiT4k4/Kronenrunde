@@ -148,6 +148,7 @@ export function toDomainMatch(m: MatchRow): Match {
     winsB: m.wins_b,
     liveAt: m.live_at,
     previousFinishedAt: m.prev_finished_at,
+    finished: m.status === 'finished',
   };
 }
 

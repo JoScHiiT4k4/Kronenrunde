@@ -49,7 +49,7 @@ export function lockTime(
 /** Darf (noch) getippt werden? */
 export function isOpen(match: Match, mode: LockMode, now: Date): boolean {
   const lock = lockTime(match, mode);
-  return lock !== null && match.teamA !== null && match.teamB !== null && now.getTime() < lock.getTime();
+  return !match.finished && lock !== null && match.teamA !== null && match.teamB !== null && now.getTime() < lock.getTime();
 }
 
 /** Ab Tippschluss sind die Tipps aller Mitspieler für alle sichtbar. */

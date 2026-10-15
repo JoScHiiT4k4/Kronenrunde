@@ -435,6 +435,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   line-height: 1.15;
   margin-bottom: 12px;
 }
+.teams.has-score { grid-template-columns: 1fr auto auto auto 1fr; gap: 8px; }
+.wins {
+  min-width: 2rem; padding: 2px 6px; font: inherit; font-size: 1.15rem; line-height: 1.2; text-align: center;
+  color: var(--text); background: transparent; border: 1px solid transparent; cursor: pointer;
+}
+.wins-a { text-align: right; }
+.wins-b { text-align: left; }
+/* Spoilerschutz: Zahl verdeckt, bis man tippt */
+.teams:not(.revealed) .wins {
+  color: transparent; text-shadow: none; user-select: none;
+  border-color: var(--frame);
+  background: repeating-linear-gradient(135deg, rgb(200 170 110 / 18%) 0 4px, rgb(200 170 110 / 6%) 4px 8px);
+}
+.teams:not(.revealed) .wins:hover, .wins:focus-visible { border-color: var(--gold); outline: none; }
 .team-a { color: #8cc3ff; }
 .team-b { color: #ff9a92; text-align: right; }
 .team.tbd {
