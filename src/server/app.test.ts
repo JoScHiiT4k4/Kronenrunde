@@ -5,6 +5,7 @@
 // Ohne TEST_DATABASE_URL wird der Test übersprungen.
 
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createServer, type Server } from 'node:http';
@@ -73,7 +74,7 @@ class Client {
     if (!exists) {
       const form = await this.get(`/registrieren?weiter=${encodeURIComponent(next)}`);
       assert.equal(form.status, 200);
-      const r = await this.post('/registrieren', { display_name: name ?? email.split('@')[0], email, password: PASSWORT, weiter: next });
+      const r = await this.post('/registrieren', { display_name: name ?? email.split('@')[0], first_name: 'Test', email, password: PASSWORT, weiter: next });
       assert.equal(r.status, 303, r.text);
       await this.refresh();
       return r;
@@ -202,10 +203,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   });
 
   test('Anmeldung: Konto erstellen, Passwort, Fehlversuche, Passwort vergessen, alte Konten', async () => {
-    const bad = await anna.post('/registrieren', { display_name: 'Anna', email: 'kein-at-zeichen', password: PASSWORT });
+    const bad = await anna.post('/registrieren', { display_name: 'Anna', first_name: 'Anna', email: 'kein-at-zeichen', password: PASSWORT });
     assert.equal(bad.status, 400);
     assert.match(bad.text, /gültige E-Mail-Adresse/);
-    const short = await anna.post('/registrieren', { display_name: 'Anna', email: 'anna@example.de', password: 'kurz' });
+    const short = await anna.post('/registrieren', { display_name: 'Anna', first_name: 'Anna', email: 'anna@example.de', password: 'kurz' });
     assert.match(short.text, /mindestens 8 Zeichen/);
 
     const r = await anna.login('Anna@Example.de', 'Anna');
@@ -213,7 +214,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const home = await anna.get('/');
     assert.match(home.text, /Deine Tipprunden/);
     assert.match(home.text, />Anna</);
-    const dup = await new Client().post('/registrieren', { display_name: 'Anna 2', email: 'anna@example.de', password: PASSWORT });
+    const dup = await new Client().post('/registrieren', { display_name: 'Anna 2', first_name: 'Anna', email: 'anna@example.de', password: PASSWORT });
     assert.match(dup.text, /gibt es schon ein Konto/);
 
     // In der Datenbank steht nur ein Hash, nicht das Passwort
@@ -262,12 +263,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const mismatch = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT + 'x' });
     assert.match(mismatch.text, /nicht gleich/);
     const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT });
-    assert.equal(changed.location, '/konto?hinweis=passwort-gespeichert');
+    assert.equal(changed.location, '/konto?bereich=sicherheit&hinweis=passwort-gespeichert');
     anna.cookies.clear();
     assert.equal((await anna.login('anna@example.de')).location, '/');
 
     // E-Mail-Adresse ändern: erst nach Klick auf den Link in der Mail an die neue Adresse
-    const konto = await anna.get('/konto');
+    const konto = await anna.get('/konto?bereich=sicherheit');
     assert.match(konto.text, /E-Mail-Adresse ändern/);
     assert.match(konto.text, /class="top-logout"/);
     assert.match(konto.text, /name="password2"/);
@@ -275,13 +276,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match((await anna.post('/konto/email', { email: 'kaputt', current: PASSWORT })).text, /gültige E-Mail/);
     await db.run(`insert into users (email, display_name) values ('vergeben@example.de', 'Vergeben')`);
     const sentBefore = mailer.sent!.length;
-    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?bereich=sicherheit&hinweis=email-gesendet');
     assert.equal(mailer.sent!.length, sentBefore, 'vergebene Adresse: keine Mail, aber auch kein Hinweis darauf');
-    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?bereich=sicherheit&hinweis=email-gesendet');
     const cm = [...mailer.sent!].reverse().find((m) => m.to === 'anna.neu@example.de')!;
     const confirm = new URL(/https?:\/\/[^\s]+\/konto\/email-bestaetigen\?[^\s]+/.exec(cm.text)![0]);
     assert.equal((await new Client().get(confirm.pathname + confirm.search)).status, 303, 'ohne Anmeldung nicht einlösbar');
-    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?hinweis=email-geaendert');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?bereich=sicherheit&hinweis=email-geaendert');
     assert.equal((await anna.get(confirm.pathname + confirm.search)).status, 400, 'Link gilt nur einmal');
     assert.equal((await new Client().post('/anmelden', { email: 'anna.neu@example.de', password: PASSWORT })).status, 303);
     assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
@@ -456,7 +457,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(status, { status: 'finished', wins_a: 1, wins_b: 2 });
 
     const table = await anna.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
     const tips = await anna.get(`/r/${slug}/tippen`);
@@ -529,16 +530,16 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // kleines gültiges JPEG-Gerüst (Prüfung nur auf Kopf/Ende und Größe)
     const body = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 1), Buffer.from([0xff, 0xd9])]);
     const url = `data:image/jpeg;base64,${body.toString('base64')}`;
-    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/png;base64,AAAA' })).location, '/konto?hinweis=avatar-fehler');
-    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/jpeg;base64,' + Buffer.alloc(60_000, 7).toString('base64') })).location, '/konto?hinweis=avatar-fehler', 'zu groß / kein JPEG');
-    assert.equal((await anna.post('/konto/avatar', { avatar: url })).location, '/konto?hinweis=avatar-gespeichert');
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/png;base64,AAAA' })).location, '/konto?bereich=profil&hinweis=avatar-fehler');
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/jpeg;base64,' + Buffer.alloc(60_000, 7).toString('base64') })).location, '/konto?bereich=profil&hinweis=avatar-fehler', 'zu groß / kein JPEG');
+    assert.equal((await anna.post('/konto/avatar', { avatar: url })).location, '/konto?bereich=profil&hinweis=avatar-gespeichert');
     const id = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
     const img = await anna.get(`/avatar/${id}`);
     assert.equal(img.status, 200);
     assert.equal(img.headers.get('content-type'), 'image/jpeg');
     assert.equal((await new Client().get(`/avatar/${id}`)).status, 303, 'nicht ohne Anmeldung');
     assert.match((await anna.get(`/r/${slug}/rangliste`)).text, new RegExp(`src="/avatar/${id}\\?v=\\d+"`));
-    assert.equal((await anna.post('/konto/avatar/loeschen')).location, '/konto?hinweis=avatar-geloescht');
+    assert.equal((await anna.post('/konto/avatar/loeschen')).location, '/konto?bereich=profil&hinweis=avatar-geloescht');
     assert.equal((await anna.get(`/avatar/${id}`)).status, 404);
   });
 
@@ -640,7 +641,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 
@@ -658,7 +659,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   });
 
   test('Benachrichtigungen: Einstellung im Konto, Push-Gerät, Erinnerung nur bei fehlenden Tipps und nur einmal', async () => {
-    const page = await ben.get('/konto');
+    const page = await ben.get('/konto?bereich=benachrichtigungen');
     assert.match(page.text, /Benachrichtigungen/);
     assert.match(page.text, /name="stunden"/);
     assert.match(page.text, /data-push data-key="[A-Za-z0-9_-]{80,100}"/);
@@ -673,7 +674,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       `select p.* from notification_prefs p join users u on u.id = p.user_id where u.email = 'ben@example.de'`,
     );
     assert.deepEqual([prefs!.email_enabled, prefs!.push_enabled, prefs!.lead_minutes], [true, false, 10080]);
-    assert.match((await ben.get('/konto')).text, /Aktuell: 7 Std\. 0 Min|Aktuell: 168 Std\./);
+    assert.match((await ben.get('/konto?bereich=benachrichtigungen')).text, /Aktuell: 7 Std\. 0 Min|Aktuell: 168 Std\./);
 
     // Push-Gerät: nur gültige https-Adressen
     assert.equal((await ben.post('/konto/push', { endpoint: 'http://127.0.0.1/x', p256dh: 'a', auth: 'b' })).status, 400);
@@ -697,6 +698,37 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(mails[0].subject, /Tipp/);
     // Anna hat nichts aktiviert → keine Mail
     assert.equal(mailer.sent!.slice(before).filter((m) => m.to !== 'ben@example.de').length, 0);
+  });
+
+  test('Vorname, Konto-Reiter und Profil eines Mitspielers', async () => {
+    for (const bad of ['', 'Anna Lena', 'Anna2', 'An_na', '-Anna', 'Anna-', 'Anna--Lena', 'Anna!']) {
+      const r = await new Client().post('/registrieren', { display_name: 'Neu', first_name: bad, email: 'neu@example.de', password: PASSWORT });
+      assert.equal(r.status, 400, `"${bad}" muss abgelehnt werden`);
+    }
+    assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from users where email = 'neu@example.de'`))!.n, 0);
+    // Reiter im Konto
+    for (const [k, text] of [['profil', 'Profilbild'], ['benachrichtigungen', 'Benachrichtigungen'], ['sicherheit', 'Passwort ändern'], ['konto', 'Konto löschen']]) {
+      const r = await anna.get(`/konto?bereich=${k}`);
+      assert.match(r.text, new RegExp(text), k);
+      assert.match(r.text, new RegExp(`<a href="/konto\\?bereich=${k}" aria-current="page">`), k);
+    }
+    // Namen ändern
+    assert.equal((await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna Lena' })).status, 400);
+    assert.match((await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna-Lena' })).location ?? '', /bereich=profil/);
+    assert.match((await anna.get('/konto')).text, /name="first_name" value="Anna-Lena"/);
+
+    // Profil: nur über gemeinsame Tipprunde, mit Vorname und Zahlen
+    const annaId = (await db.one<{ id: string }>(`select id from users where email = 'anna.neu@example.de' or display_name = 'Anna' order by created_at limit 1`))!.id;
+    const rank = await ben.get(`/r/${slug}/rangliste`);
+    assert.match(rank.text, new RegExp(`href="/r/${slug}/spieler/${annaId}"`));
+    const prof = await ben.get(`/r/${slug}/spieler/${annaId}`);
+    assert.equal(prof.status, 200);
+    assert.match(prof.text, /Anna-Lena/);
+    assert.match(prof.text, /Platz in der Rangliste/);
+    assert.match(prof.text, /Sonderfragen/);
+    assert.equal((await stranger.get(`/r/${slug}/spieler/${annaId}`)).status, 404, 'Fremde ohne Mitgliedschaft');
+    assert.equal((await new Client().get(`/r/${slug}/spieler/${annaId}`)).status, 303, 'ohne Anmeldung');
+    assert.equal((await ben.get(`/r/${slug}/spieler/${randomUUID()}`)).status, 404);
   });
 
   test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {

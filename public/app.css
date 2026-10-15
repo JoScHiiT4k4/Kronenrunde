@@ -1063,3 +1063,15 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .lead-row input[type=number] { width: 5rem; }
 .push-box { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--line, rgba(200,170,110,.25)); display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
 .push-box[hidden] { display: none; }
+
+/* Konto: Profilbild und Knöpfe eng beieinander */
+.stack.tight { gap: 8px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-row form { margin: 0; }
+/* Profil eines Mitspielers */
+.profile-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.profile-head h1 { margin: 0 0 4px; }
+.profile-head p { margin: 0; }
+.profile-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; }
+.who-link { color: inherit; text-decoration: none; }
+.who-link:hover span { color: var(--gold-bright); text-decoration: underline; }
