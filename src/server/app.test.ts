@@ -1117,6 +1117,25 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch((await new Client().get('/impressum')).text, /role-switch/);
   });
 
+  test('Testspiel: Betreiber sieht dort nur die Teilnehmer-Ansicht, Dropdown nur mit zwei Tipprunden', async () => {
+    assert.doesNotMatch((await admin.get(`/r/${slug}/rangliste`)).text, /league-switch/);
+    assert.equal((await stranger.post('/admin/test/einblenden')).status, 404);
+    assert.match((await admin.post('/admin/test/einblenden')).location ?? '', /test-eingeblendet/);
+    const main = await admin.get(`/r/${slug}/rangliste`);
+    assert.match(main.text, /league-switch/);
+    assert.match(main.text, /href="\/r\/testspiel\/tippen"/);
+    assert.match(main.text, /<summary>Spielleiter<\/summary>/);
+    const test = await admin.get('/r/testspiel/tippen');
+    assert.equal(test.status, 200);
+    assert.doesNotMatch(test.text, /role-switch"|role-single|>Verwalten</);
+    assert.equal((await admin.get('/r/testspiel/verwalten')).status, 403);
+    // Adminseiten verweisen weiter aufs Hauptspiel
+    assert.match((await admin.get('/admin')).text, new RegExp(`/r/${slug}/verwalten`));
+    assert.match((await admin.post('/admin/test/abgleichen')).location ?? '', /test-abgeglichen/);
+    assert.match((await admin.post('/admin/test/ausblenden')).location ?? '', /test-ausgeblendet/);
+    assert.doesNotMatch((await admin.get(`/r/${slug}/rangliste`)).text, /league-switch/);
+  });
+
   test('Turnierbaum: Phasen, Begegnungen, ausgeschiedene Teams grau', async () => {
     const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
     const matchId = async (key: string) => (await db.one<{ id: string }>(`select id from matches where tournament_id = $1 and external_id = $2`, [tid, key]))!.id;

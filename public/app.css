@@ -847,7 +847,10 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 /* Abmelden oben rechts */
 .top-nav { align-items: center; }
 .top-logout { margin: 0; }
-.top-logout-btn { background: none; border: 1px solid var(--frame); color: var(--muted); padding: 4px 10px; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.top-logout-btn { display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--frame); color: var(--muted); width: 34px; height: 34px; padding: 0; cursor: pointer; }
+.top-nav a.top-user { display: inline-flex; align-items: center; gap: 6px; }
+.top-user .ico { flex: none; }
+.top-user-name { overflow: hidden; text-overflow: ellipsis; }
 .top-logout-btn:hover { color: var(--gold-bright); border-color: var(--gold); }
 [hidden] { display: none !important; }
 /* Rechtliches */
@@ -867,10 +870,17 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .avatar-edit > .stack { flex: 1 1 220px; }
 /* Umschalter Spielleiter / Administrator (nur Betreiber) */
 .role-switch { position: relative; }
-.role-switch summary { cursor: pointer; list-style: none; font-weight: 600; color: var(--gold-text); white-space: nowrap; }
+.role-switch summary {
+  cursor: pointer; list-style: none; font-weight: 600; color: var(--gold-text); white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px;
+  min-height: 34px; padding: 3px 10px; max-width: 100%;
+  background: var(--surface-2); border: 1px solid var(--frame); border-radius: 2px;
+}
+.role-switch summary:hover, .role-switch[open] summary { border-color: var(--gold); }
+.league-switch summary { overflow: hidden; text-overflow: ellipsis; max-width: 16rem; }
 .role-switch summary::-webkit-details-marker { display: none; }
 .role-switch summary::before { content: none; }
-.role-switch summary::after { content: " ▾"; font-size: 0.8em; }
+.role-switch summary::after { content: "▾"; font-size: 0.8em; }
 .role-single { font-weight: 600; color: var(--gold-text); white-space: nowrap; text-decoration: none; }
 .role-single:hover { color: var(--gold-bright); }
 .role-switch[open] summary, .role-switch summary:hover { color: var(--gold-bright); }
@@ -1166,10 +1176,11 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
   .top-nav > .top-logout { order: 2; flex: none; }
   .tbar { order: 3; flex-basis: 100%; }
   .top-nav > .role-switch, .top-nav > .role-single {
-    order: 4; flex: 1 1 auto; position: relative;
-    padding-top: 8px; border-top: 1px solid var(--line);
+    order: 4; flex: 0 1 auto; position: relative;
+    margin-top: 0;
   }
   .top-nav > .role-single { display: block; }
-  .top-nav > .role-switch > summary { justify-content: flex-start; padding: 0; }
+  .top-nav > .league-switch { margin-right: 8px; }
+  .top-nav > .role-switch > summary { justify-content: flex-start; }
   .top-nav .role-menu { right: auto; left: 0; top: calc(100% + 2px); }
 }

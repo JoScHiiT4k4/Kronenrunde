@@ -29,6 +29,8 @@ export interface League {
   points_winner: number;
   points_exact: number;
   lock_mode: LockMode;
+  /** Testspiel des Betreibers: nur Teilnehmer-Ansicht */
+  is_test: boolean;
   /** Rolle des aktuellen Nutzers oder null (z. B. Admin ohne Mitgliedschaft). */
   role: 'owner' | 'admin' | 'member' | null;
 }
@@ -43,7 +45,7 @@ export interface LeagueAccess {
 /** Tipprunde laden. Nicht-Mitglieder sehen nichts (404), außer Admins mit allowAdmin. */
 export async function loadLeague(ctx: Ctx, slug: string, o: { allowAdmin?: boolean } = {}): Promise<LeagueAccess> {
   const league = await ctx.deps.db.one<League>(
-    `select l.id, l.name, l.slug, l.owner_id, l.invite_code, l.points_winner, l.points_exact, l.lock_mode, m.role
+    `select l.id, l.name, l.slug, l.owner_id, l.invite_code, l.points_winner, l.points_exact, l.lock_mode, l.is_test, m.role
        from leagues l
        left join league_members m on m.league_id = l.id and m.user_id = $2
       where l.slug = $1`,
@@ -56,8 +58,8 @@ export async function loadLeague(ctx: Ctx, slug: string, o: { allowAdmin?: boole
   return {
     league,
     isMember,
-    canManage: league.role === 'owner' || league.role === 'admin' || ctx.isAdmin,
-    isOwner: league.role === 'owner' || ctx.isAdmin,
+    canManage: !league.is_test && (league.role === 'owner' || league.role === 'admin' || ctx.isAdmin),
+    isOwner: !league.is_test && (league.role === 'owner' || ctx.isAdmin),
   };
 }
 
