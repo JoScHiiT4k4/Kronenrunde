@@ -16,7 +16,7 @@ import type { Ctx } from '../app.ts';
 import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, type Res, type Router } from '../http.ts';
-import { emptyState, layout } from '../views/layout.ts';
+import { emptyState, filterBar, layout } from '../views/layout.ts';
 import { isUuid, loginRedirect, slugify } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 
@@ -157,19 +157,20 @@ function swissRounds(slug: string, phase: Phase, tz: string): Html {
     const score = o ? html`<span class="sw-score">${m.winsA}<i>:</i>${m.winsB}</span>` : html`<span class="sw-score sw-vs">vs</span>`;
     const meta = html`<span class="sw-meta">${m.status === 'live' ? html`<span class="live">läuft</span> ` : nothing}${m.scheduledAt ? formatDateTime(m.scheduledAt, tz) : 'Termin offen'} · Bo${m.bestOf}</span>`;
     const inner = html`${side(m.teamA, 'a')}${score}${side(m.teamB, 'b')}${meta}`;
+    const text = `${m.teamA?.name ?? ''} ${m.teamA?.short ?? ''} ${m.teamB?.name ?? ''} ${m.teamB?.short ?? ''}`.toLowerCase();
     return m.teamA && m.teamB
-      ? html`<a class="sw-match${m.status === 'live' ? ' sw-live' : ''}" href="/r/${slug}/spiel/${m.id}" aria-label="${m.teamA.name} gegen ${m.teamB.name}">${inner}</a>`
-      : html`<div class="sw-match sw-open">${inner}</div>`;
+      ? html`<a data-item data-text="${text}" class="sw-match${m.status === 'live' ? ' sw-live' : ''}" href="/r/${slug}/spiel/${m.id}" aria-label="${m.teamA.name} gegen ${m.teamB.name}">${inner}</a>`
+      : html`<div data-item data-text="${text}" class="sw-match sw-open">${inner}</div>`;
   };
-  return html`<div class="swiss-rounds" aria-label="Spiele ${phase.name}">
+  return html`${filterBar('sw-list-all', 'Team suchen …')}<div class="swiss-rounds" id="sw-list-all" aria-label="Spiele ${phase.name}">
   ${phase.rounds.map((r) => {
     const done = r.matches.filter((m) => outcome(m)).length;
-    return html`<details class="sw-round"${r === target ? html` open` : nothing}>
+    return html`<details class="sw-round" data-group${r === target ? html` open` : nothing}>
     <summary><span class="sw-title">${r.name}</span><span class="sw-count">${done}/${r.matches.length} gespielt</span></summary>
     <div class="sw-list">${r.matches.map(line)}</div>
   </details>`;
   })}
-</div>`;
+</div><p class="muted filter-empty" hidden>Keine Treffer.</p>`;
 }
 
 function rounds(slug: string, phase: Phase, tz: string): Html {

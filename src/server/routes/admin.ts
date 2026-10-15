@@ -13,7 +13,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatTime, isLocalInput, toLocalInput } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, layout, postButton } from '../views/layout.ts';
+import { csrfField, filterBar, layout, postButton } from '../views/layout.ts';
 import { cleanName, isUuid, loginRedirect } from './common.ts';
 import { LEGAL_FIELDS, type LegalKey, loadLegal } from './legal.ts';
 import { leagueCreation, type MatchRow, oneMatch, shortA, shortB, tournamentMatches } from './league-data.ts';
@@ -223,12 +223,14 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
     );
     content = html`<section class="panel">
   <h2>Nutzer (${users.length})</h2>
-  <table class="table compact">
+  ${filterBar('user-list', 'Name oder E-Mail suchen …')}
+  <table class="table compact" id="user-list">
     <thead><tr><th>Name</th><th>E-Mail</th><th class="num">Runden</th><th>Seit</th></tr></thead>
     <tbody>
-    ${users.map((u) => html`<tr><td>${u.display_name}</td><td>${u.email}</td><td class="num">${u.leagues}</td><td>${formatDateTime(u.created_at, tz)}</td></tr>`)}
+    ${users.map((u) => html`<tr data-item data-text="${`${u.display_name} ${u.email}`.toLowerCase()}"><td>${u.display_name}</td><td>${u.email}</td><td class="num">${u.leagues}</td><td>${formatDateTime(u.created_at, tz)}</td></tr>`)}
     </tbody>
   </table>
+  <p class="muted filter-empty" hidden>Keine Treffer.</p>
 </section>`;
   } else if (area === 'system') {
     content = await systemPanel(ctx);

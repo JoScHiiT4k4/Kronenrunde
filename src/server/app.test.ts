@@ -992,6 +992,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const stats = await admin.get(`/r/${slug}/statistiken?turnier=${tid}`);
     assert.equal(stats.status, 200);
     assert.match(stats.text, /<a href="\/r\/[a-z0-9-]+\/statistiken" aria-current="page">Statistiken<\/a>/);
+    assert.doesNotMatch(stats.text, /Maps gespielt|Maps pro Serie/);
+    assert.match(stats.text, /class="filter-bar" data-filter="st-teams"/);
     assert.match(stats.text, /<h1 class="bk-title">Statistiken – Worlds 2026<\/h1>/);
     assert.match(stats.text, /Das Turnier in Zahlen/);
     assert.match(stats.text, /<strong>MVK<\/strong>/, 'Teams mit Kürzel in der Tabelle');

@@ -230,3 +230,31 @@ document.addEventListener('submit', (e) => {
   const removed = [...form.querySelectorAll('input[data-was-checked]')].some((i) => !i.checked && !i.disabled);
   if (removed && !window.confirm(text)) e.preventDefault();
 });
+
+// Live-Suche / Filter: Listen mit data-item-Zeilen, Leiste bleibt ohne JavaScript verborgen
+document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
+  const list = document.getElementById(bar.dataset.filter);
+  if (!list) return;
+  const q = bar.querySelector('.filter-q');
+  const region = bar.querySelector('.filter-region');
+  const empty = list.parentElement.querySelector('.st-empty, .filter-empty');
+  const apply = () => {
+    const text = q.value.trim().toLowerCase();
+    const reg = region ? region.value : '';
+    let shown = 0;
+    list.querySelectorAll('[data-item]').forEach((row) => {
+      const ok = (!text || (row.dataset.text || '').includes(text)) && (!reg || row.dataset.region === reg);
+      row.hidden = !ok;
+      if (ok) shown++;
+    });
+    list.querySelectorAll('[data-group]').forEach((g) => {
+      const has = !!g.querySelector('[data-item]:not([hidden])');
+      g.hidden = !has;
+      if (has && text && g.tagName === 'DETAILS') g.open = true;
+    });
+    if (empty) empty.hidden = shown > 0;
+  };
+  q.addEventListener('input', apply);
+  if (region) region.addEventListener('change', apply);
+  bar.hidden = false;
+});
