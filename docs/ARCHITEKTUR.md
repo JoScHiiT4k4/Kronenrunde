@@ -27,6 +27,7 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 | Hosting | **Raspberry Pi 4 zu Hause** (Raspberry Pi OS 64-bit), öffentlich über **Tailscale Funnel** (`https://lol-tippspiel.….ts.net`). Einrichtung per `deploy/install.sh` | Kostenlos, keine offenen Ports am Router, HTTPS automatisch. Dasselbe Skript läuft auf jedem Debian/Ubuntu (z. B. gemieteter Server) – Umzug = installieren + Sicherung einspielen |
 | Betrieb | systemd-Dienst mit Schutz-Einstellungen, App lauscht nur auf 127.0.0.1; nächtliche Sicherung (14 Stück); automatische Sicherheits-Updates; `tippspiel update` sichert vorher und geht bei Startproblemen automatisch zurück | Wenig Pflege, nichts Wichtiges geht verloren |
 | E-Mail | Ohne eigene Domain: **Gmail per SMTP** mit App-Passwort (`MAIL_MODE=smtp`, bis 500 Empfänger/Tag). Mit eigener Domain später: Brevo oder Resend | Brevo schreibt Gmail-Absender auf `@brevosend.com` um, das landet eher im Spam. Eigener SMTP-Client ohne Zusatzpakete (`src/server/smtp.ts`), Passwort nur verschlüsselt |
+| Turnierbaum | Reiter „Turnierbaum“ (`routes/bracket.ts`, Logik in `src/domain/bracket.ts`): Phasen und Runden ergeben sich aus den Abschnittsnamen (`Play-In: oberes Halbfinale` → Phase „Play-In“; Viertelfinale/Halbfinale/Finale → „K.-o.-Phase“). Wer ausgeschieden ist, wird **aus den Ergebnissen berechnet**, nicht gespeichert: Swiss 3 Siege = weiter / 3 Niederlagen = raus, Play-In doppeltes K.o. (2 Niederlagen oder Finale verloren = raus), K.-o.-Phase jede Niederlage. Andere Phasen: keine Markierung | Keine zusätzliche Pflege und kein neues Datenbankfeld; stimmt automatisch, sobald der Abgleich Ergebnisse einträgt. Die Datenbank kennt nicht, welches Spiel in welches weiterführt – deshalb zeichnet der Baum Spalten ohne Verbindungslinien. Andere Turnierformate brauchen eine Regel in `phaseKind()` |
 | Geld verdienen | Vorbereitet: Werbeflächen, Cookie-Banner (zertifiziert, IAB TCF), Premium (`users.premium_until`) | Später ohne Umbau einschaltbar |
 
 ## Hinweise für später
@@ -60,7 +61,7 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 db/migrations/      Datenbank-Aufbau (wird beim Start automatisch eingespielt)
 db/tests/           Tests für die Datenbank-Regeln
 db/seed/            Beispieldaten (Worlds 2026)
-src/domain/         Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste
+src/domain/         Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste, Turnierbaum (bracket.ts)
 deploy/             install.sh (Einrichtung/Update auf Debian/Raspberry Pi OS), tippspiel (Verwaltungsbefehl), ANLEITUNG.md
 src/server/         Web-Server
   main.ts           Start

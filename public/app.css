@@ -675,3 +675,103 @@ details > summary > span:first-of-type { flex: 1; }
   .install-sheet { animation: install-in 260ms ease-out; }
   @keyframes install-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 }
+
+/* ---------- Turnierbaum ---------- */
+.main-wide { max-width: 1100px; }
+.bk-title { margin: 0 0 10px; font-size: 1.4rem; }
+.bk-note { margin: 0 0 10px; color: var(--muted); font-size: 0.92rem; }
+.bk-hint { margin: 4px 0 0; font-size: 0.88rem; }
+.bk-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 14px; font-size: 0.85rem; color: var(--muted); }
+.bk-key { display: inline-flex; align-items: center; gap: 7px; }
+.bk-key::before { content: ""; width: 9px; height: 9px; background: var(--gold); transform: rotate(45deg); }
+.bk-key-out::before { background: var(--muted); opacity: 0.5; }
+
+/* Teams der Phase als kleine Schilder */
+.bk-teams { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.bk-chip {
+  padding: 4px 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--surface);
+  border: 1px solid var(--frame);
+}
+.bk-chip.bk-through { color: var(--gold-bright); border-color: var(--gold); }
+
+/* Swiss-Tabelle */
+.bk-table { margin-bottom: 18px; }
+.bk-table tr.bk-through td { color: var(--gold-bright); }
+
+/* Der Baum selbst: Runden als Spalten, seitlich scrollbar */
+.bracket {
+  display: flex;
+  gap: 14px;
+  margin: 0 -16px 14px;
+  padding: 2px 16px 14px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--frame) transparent;
+}
+.bracket:focus-visible { outline-offset: -2px; }
+.bk-round { flex: 0 0 216px; display: flex; flex-direction: column; scroll-snap-align: start; }
+.bk-round-title {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  color: var(--gold-text);
+  border-bottom: 1px solid var(--frame);
+}
+/* K.-o.-Bäume: Spiele mittig zwischen den Spielen der Runde davor; Swiss und Listen: von oben nach unten */
+.bk-round-list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.bracket.is-flow .bk-round-list { justify-content: flex-start; }
+
+.bk-match {
+  display: block;
+  padding-top: 6px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+a.bk-match:hover { border-color: var(--gold); color: inherit; }
+a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold-bright); }
+.bk-match.bk-live { border-color: var(--red); }
+.bk-meta { display: flex; justify-content: space-between; gap: 8px; padding: 0 10px 5px; font-size: 0.78rem; color: var(--muted); }
+.bk-meta .bo { font-weight: 700; color: var(--gold-text); }
+
+/* Eine Zeile je Team: blauer Streifen für Seite A, roter für Seite B */
+.bk-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--line);
+  border-left: 3px solid var(--blue);
+}
+.bk-team.bk-b { border-left-color: var(--red); }
+.bk-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: 0.02em; }
+.bk-tbd { font-weight: 400; font-style: italic; color: var(--muted); }
+.bk-score { min-width: 1.2em; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.bk-won .bk-name, .bk-won .bk-score { font-weight: 700; color: var(--gold-bright); }
+.bk-lost .bk-name, .bk-lost .bk-score { font-weight: 600; color: var(--muted); }
+.bk-tag {
+  padding: 0 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-gold);
+  background: var(--gold);
+}
+.bk-through .bk-name { color: var(--gold-bright); }
+
+/* Ausgeschieden: grau, blass und schraffiert (nicht nur eine Farbe, damit es auch ohne Farbsehen auffällt) */
+.bk-out {
+  opacity: 0.5;
+  filter: grayscale(1);
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgb(255 255 255 / 4%) 6px 12px);
+}
+.bk-out .bk-name, .bk-out .bk-score { color: var(--muted); font-weight: 600; }

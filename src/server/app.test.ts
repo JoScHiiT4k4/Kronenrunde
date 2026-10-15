@@ -727,4 +727,55 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(swissPage.text, /Freitag, 23\. Oktober/);
     assert.doesNotMatch(swissPage.text, /class="match/);
   });
+
+  test('Turnierbaum: Phasen, Begegnungen, ausgeschiedene Teams grau', async () => {
+    const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
+    const matchId = async (key: string) => (await db.one<{ id: string }>(`select id from matches where tournament_id = $1 and external_id = $2`, [tid, key]))!.id;
+    const path = `/r/${slug}/turnierbaum`;
+
+    // Nur Mitglieder; Reiter neben "Alle Tipps"
+    assert.equal((await stranger.get(path)).status, 404);
+    assert.equal((await new Client().get(path)).status, 303);
+    const first = await admin.get(path);
+    assert.equal(first.status, 200);
+    assert.match(first.text, /<a href="\/r\/[a-z0-9-]+\/alle-tipps">Alle Tipps<\/a>\s*<a href="\/r\/[a-z0-9-]+\/turnierbaum" aria-current="page">Turnierbaum<\/a>/);
+    // Zwei Turniere in der Tipprunde: Auswahl oben; fremde Turnier-Nummern werden ignoriert
+    assert.match(first.text, /<nav class="phase-tabs" aria-label="Turniere">/);
+    assert.equal((await admin.get(`${path}?turnier=${tid}x`)).status, 200);
+
+    const play = await admin.get(`${path}?turnier=${tid}&phase=play-in`);
+    assert.equal(play.status, 200);
+    assert.match(play.text, /<h1 class="bk-title">Worlds 2026<\/h1>/);
+    assert.match(play.text, /<nav class="phase-tabs" aria-label="Phasen">/);
+    assert.match(play.text, /phase=swiss"/);
+    assert.match(play.text, /phase=k-o-phase"/);
+    for (const round of ['Oberes Halbfinale', 'Unteres Halbfinale', 'Oberes Finale', 'Unteres Finale', 'Finale']) {
+      assert.match(play.text, new RegExp(`<h3 class="bk-round-title">${round}</h3>`));
+    }
+    assert.match(play.text, /Doppeltes K\.o\./);
+    assert.match(play.text, new RegExp(`href="/r/${slug}/spiel/${await matchId('pi-oh-1')}"`));
+    // Noch ist niemand ausgeschieden (alle haben höchstens eine Niederlage)
+    assert.doesNotMatch(play.text, /bk-out/);
+    // Offene Paarungen ohne Link
+    assert.match(play.text, /class="bk-match bk-open"/);
+
+    // Unteres Halbfinale C9 – MVK endet 3:0: MVK hat zwei Niederlagen und ist ausgeschieden
+    await db.run(`update matches set wins_a = 3, wins_b = 0, status = 'finished' where id = $1`, [await matchId('pi-uh')]);
+    const after = await admin.get(`${path}?turnier=${tid}&phase=play-in`);
+    assert.match(after.text, /bk-team bk-b bk-lost bk-out"[^]*?title="MVK Esports">MVK<\/span>[^]*?\(ausgeschieden\)/);
+    assert.match(after.text, /<li class="bk-chip bk-out" title="MVK Esports">MVK/);
+    assert.doesNotMatch(after.text, /<li class="bk-chip bk-out" title="Cloud9[^"]*">/, 'C9 hat erst eine Niederlage');
+    assert.match(after.text, /bk-legend/);
+
+    // Swiss: Runden stehen schon, die Paarungen sind noch offen
+    const swiss = await admin.get(`${path}?turnier=${tid}&phase=swiss`);
+    assert.match(swiss.text, /Schweizer System/);
+    assert.match(swiss.text, /<h3 class="bk-round-title">Runde 5<\/h3>/);
+    assert.doesNotMatch(swiss.text, /bk-table/);
+    // K.-o.-Phase: Viertelfinale, Halbfinale, Finale als Spalten
+    const ko = await admin.get(`${path}?turnier=${tid}&phase=k-o-phase`);
+    for (const round of ['Viertelfinale', 'Halbfinale', 'Finale']) assert.match(ko.text, new RegExp(`<h3 class="bk-round-title">${round}</h3>`));
+    // Unbekannte Phase → die aktuelle wird gezeigt
+    assert.equal((await admin.get(`${path}?turnier=${tid}&phase=gibt-es-nicht`)).status, 200);
+  });
 });

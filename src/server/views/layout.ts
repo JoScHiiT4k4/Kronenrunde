@@ -29,13 +29,15 @@ export interface LeagueNav {
   slug: string;
   name: string;
   canManage: boolean;
-  active: 'tippen' | 'alle-tipps' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
+  active: 'tippen' | 'alle-tipps' | 'turnierbaum' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
 }
 
 export interface PageOptions {
   title: string;
   body: Html;
   league?: LeagueNav;
+  /** Breitere Seite (z. B. für den Turnierbaum, der seitlich scrollt). */
+  wide?: boolean;
   /** Zusätzliche Fehlermeldung über dem Inhalt. */
   error?: string;
 }
@@ -66,7 +68,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
-<main class="main">
+<main class="main${o.wide ? ' main-wide' : ''}">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
@@ -87,6 +89,7 @@ function leagueNav(l: LeagueNav): Html {
   <div class="tabs">
     ${tab('tippen', 'Tippen')}
     ${tab('alle-tipps', 'Alle Tipps')}
+    ${tab('turnierbaum', 'Turnierbaum')}
     ${tab('rangliste', 'Rangliste')}
     ${tab('sonderfragen', 'Sonderfragen')}
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
