@@ -70,11 +70,9 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
   ${tournamentBar(ctx)}
   <nav class="top-nav">
-    ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
+    ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
     ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn">Abmelden</button></form>` : html`<a href="/anmelden">Anmelden</a>`}
-    ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
-    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
@@ -130,6 +128,8 @@ function tournamentBar(ctx: Ctx): Html {
 /** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
 function adBox(side: 'left' | 'right'): Html {
   return html`<aside class="ad ad-${side}" aria-label="Werbung"><div class="ad-box"><span class="ad-label">Anzeige</span></div></aside>`;
+}
+
 /** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite). */
 function roleSwitch(ctx: Ctx, league: LeagueNav | undefined): Html {
   const admin = ctx.path.startsWith('/admin');

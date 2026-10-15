@@ -480,6 +480,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch(after.text, /data-countdown/);
     assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+  });
+
   test('Rechtliches: Impressum/Datenschutz öffentlich, Angaben nur vom Admin', async () => {
     const pub = await new Client().get('/impressum');
     assert.equal(pub.status, 200);
@@ -513,15 +515,6 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await anna.get(`/avatar/${id}`)).status, 404);
   });
 
-  test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
-    const add = await anna.post(`/r/${slug}/verwalten/typische-fragen`, { tournament_id: tournamentId });
-    assert.equal(add.status, 303);
-    const qs = await db.query<{ id: string; question: string; answer_type: string }>('select id, question, answer_type from bonus_questions order by position');
-    assert.equal(qs.length, 6);
-    const champ = qs.find((q) => q.question.includes('Weltmeister'))!;
-    const mvp = qs.find((q) => q.question.includes('MVP'))!;
-
-    // Frist = Start des ersten Spiels; hier noch in der Zukunft
   test('Sonderfragen: auswählen, beantworten, Frist, Auflösung', async () => {
     // Frist = Start des ersten Spiels; hier noch in der Zukunft, damit die Auswahl offen ist
     const restore = await postponeTournament(tournamentId);
@@ -863,6 +856,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
     assert.equal((pub.text.match(/class="ad ad-(left|right)"/g) ?? []).length, 2);
+  });
+
   test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
     const adminPage = await admin.get('/admin');
     assert.match(adminPage.text, /class="role-switch"/);
