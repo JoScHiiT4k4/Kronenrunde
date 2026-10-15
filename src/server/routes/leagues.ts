@@ -3,6 +3,7 @@
 import { isBonusCorrect } from '../../domain/bonus.ts';
 import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
+import { type Shares, winShares } from '../../domain/shares.ts';
 import { isValidResult, matchResult, resultOptions, type ResultOption } from '../../domain/results.ts';
 import { computeStandings, scorePrediction } from '../../domain/scoring.ts';
 import type { Ctx } from '../app.ts';
@@ -313,7 +314,7 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
   return [...days.values()];
 }
 
-function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean): Html {
+function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null): Html {
   const tz = ctx.deps.config.timeZone;
   const match = toDomainMatch(m);
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
@@ -326,10 +327,15 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
+  // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind
+  const pct = (mine: number | undefined, other: number | undefined) =>
+    shares && mine !== undefined && other !== undefined
+      ? html` <span class="pct ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">(${mine} %)</span>`
+      : nothing;
   const teams = html`<div class="teams">
-    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ?? 'Steht noch nicht fest'}</span>
+    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ?? 'Steht noch nicht fest'}${pct(shares?.a, shares?.b)}</span>
     <span class="vs">VS</span>
-    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ?? 'Steht noch nicht fest'}</span>
+    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ?? 'Steht noch nicht fest'}${pct(shares?.b, shares?.a)}</span>
   </div>`;
 
   if (open && teamsKnown) {
@@ -375,15 +381,26 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const { league } = access;
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
-  const [matches, preds, tournaments] = await Promise.all([
+  const [matches, preds, tournaments, votes] = await Promise.all([
     leagueMatches(db, league.id),
     db.query<PredictionRow>(
       `select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1 and user_id = $2`,
       [league.id, ctx.user.id],
     ),
     leagueTournaments(db, league.id),
+    db.query<{ match_id: string; a: number; b: number }>(
+      `select match_id, count(*) filter (where winner = 'A')::int as a, count(*) filter (where winner = 'B')::int as b
+         from predictions where league_id = $1 group by match_id`,
+      [league.id],
+    ),
   ]);
   const own = new Map(preds.map((p) => [p.match_id, p]));
+  // Nur für Spiele, deren Tipps schon öffentlich sind (nach Tippschluss) – vorher bleibt alles geheim
+  const sharesOf = (m: MatchRow): Shares | null => {
+    if (!(m.team_a_id && m.team_b_id) || !arePredictionsPublic(toDomainMatch(m), league.lock_mode, ctx.now)) return null;
+    const v = votes.find((x) => x.match_id === m.id);
+    return v ? winShares(v.a, v.b) : null;
+  };
   const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -501,7 +518,7 @@ ${
   ${unscheduled.map(
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m)))}
   </section>`,
   )}
   ${hiddenNote}
@@ -519,7 +536,7 @@ ${
   ${closedDays.map(
     (d, i) => html`<details class="day day-closed"${attr(i === 0, 'open')}>
     <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span>${dayPoints(d)}</summary>
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m)))}
   </details>`,
   )}`
     : nothing

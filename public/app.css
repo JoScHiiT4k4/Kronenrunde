@@ -859,3 +859,9 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 .sub-tabs a { padding: 7px 14px; color: var(--muted); text-decoration: none; border: 1px solid var(--frame); font-weight: 600; }
 .sub-tabs a:hover { color: var(--gold-bright); }
 .sub-tabs a[aria-current] { color: var(--gold-bright); border-color: var(--gold); background: rgb(200 170 110 / 10%); }
+
+/* Gewinnchance aus den Tipps */
+.pct { font-family: var(--font-body); font-size: 0.85em; font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+.pct-up { color: #3ddc84; }
+.pct-down { color: #ff6b6b; }
+.pct-even { color: var(--muted); }
