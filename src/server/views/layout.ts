@@ -18,6 +18,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'keine-aenderung': { text: 'Keine Änderungen.', kind: 'ok' },
   'antworten-gespeichert': { text: 'Deine Antworten sind gespeichert.', kind: 'ok' },
   'antworten-zu-spaet': { text: 'Die Sonderfragen sind schon geschlossen.', kind: 'warn' },
+  'vorschlag-gesendet': { text: 'Danke! Dein Vorschlag ist per E-Mail unterwegs.', kind: 'ok' },
   'link-erneuert': { text: 'Neuer Einladungslink erstellt. Der alte funktioniert nicht mehr.', kind: 'ok' },
   verlassen: { text: 'Du hast die Tipprunde verlassen.', kind: 'ok' },
   'runde-geloescht': { text: 'Die Tipprunde ist gelöscht.', kind: 'ok' },

@@ -1,7 +1,7 @@
 // Verwaltung einer Tipprunde: Einladen, Einstellungen, Turniere, Sonderfragen, Mitglieder.
 
 import type { Ctx } from '../app.ts';
-import { PgError } from '../db/index.ts';
+import { ANSWER_TYPE_LABELS, type AnswerType, QUESTION_CATALOG } from '../../domain/questions.ts';
 import { formatDateTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
@@ -22,30 +22,11 @@ interface QuestionRow {
   position: number;
   question: string;
   points: number;
-  answer_type: 'text' | 'team' | 'choice' | 'champion' | 'player';
-  choices: string[];
-  hint: string | null;
+  answer_type: AnswerType;
+  catalog_key: string | null;
   correct_answers: string[];
   answers: number;
 }
-
-const ANSWER_TYPES: Record<QuestionRow['answer_type'], string> = {
-  team: 'Team aus dem Turnier auswählen',
-  player: 'Spieler aus den Turnier-Teams auswählen',
-  champion: 'Champion auswählen',
-  choice: 'Aus eigener Liste auswählen',
-  text: 'Freitext',
-};
-
-/** Die Fragen, die in der bisherigen Tipprunde jedes Jahr dabei waren. Punkte sind änderbar. */
-const TYPICAL_QUESTIONS: { question: string; points: number; type: QuestionRow['answer_type']; choices?: string[]; hint?: string }[] = [
-  { question: 'Wer wird Weltmeister?', points: 5, type: 'team' },
-  { question: 'Wer wird Finals-MVP?', points: 3, type: 'player' },
-  { question: 'Welcher Champion wird am häufigsten gebannt?', points: 3, type: 'champion' },
-  { question: 'Welches Team verliert das kürzeste Spiel?', points: 3, type: 'team' },
-  { question: 'Welches Team holt den ersten Pentakill?', points: 3, type: 'team', choices: ['Kein Pentakill'] },
-  { question: 'Welcher Spieler holt den ersten Pentakill?', points: 3, type: 'player', choices: ['Kein Pentakill'] },
-];
 
 function lines(value: string | null, maxItems = 50, maxLen = 200): string[] {
   return [
@@ -58,37 +39,14 @@ function lines(value: string | null, maxItems = 50, maxLen = 200): string[] {
   ].slice(0, maxItems);
 }
 
-function questionFields(q: Partial<QuestionRow>, tournaments: { id: string; name: string }[] | null): Html {
+/** Einstellungen einer Frage: nur Punkte und richtige Antwort(en) – Frage und Antwortart sind fest. */
+function questionFields(q: QuestionRow): Html {
   return html`
-    ${
-      tournaments && tournaments.length > 1
-        ? html`<label class="field"><span>Turnier</span><select name="tournament_id">
-          ${tournaments.map((t) => html`<option value="${t.id}"${attr(t.id === q.tournament_id, 'selected')}>${t.name}</option>`)}
-        </select></label>`
-        : tournaments
-          ? html`<input type="hidden" name="tournament_id" value="${tournaments[0]?.id ?? ''}">`
-          : nothing
-    }
-    <label class="field"><span>Frage</span>
-      <input type="text" name="question" value="${q.question ?? ''}" required maxlength="300"></label>
-    <div class="row">
-      <label class="field small"><span>Punkte</span>
-        <input type="number" name="points" value="${q.points ?? 3}" min="0" max="50" required inputmode="numeric"></label>
-      <label class="field small"><span>Reihenfolge</span>
-        <input type="number" name="position" value="${q.position ?? 0}" min="0" max="999" inputmode="numeric"></label>
-    </div>
-    <label class="field"><span>Antwort</span>
-      <select name="answer_type">
-        ${(Object.keys(ANSWER_TYPES) as QuestionRow['answer_type'][]).map(
-          (k) => html`<option value="${k}"${attr((q.answer_type ?? 'team') === k, 'selected')}>${ANSWER_TYPES[k]}</option>`,
-        )}
-      </select></label>
-    <label class="field"><span>Auswahl-Möglichkeiten <small class="muted">(eine pro Zeile; bei Team, Spieler oder Champion zusätzlich zur Liste, z. B. „Kein Pentakill“)</small></span>
-      <textarea name="choices" rows="2">${(q.choices ?? []).join('\n')}</textarea></label>
-    <label class="field"><span>Hinweis für die Tipper <small class="muted">(optional)</small></span>
-      <input type="text" name="hint" value="${q.hint ?? ''}" maxlength="200"></label>
+    <p class="muted">Antwort der Tipper: ${ANSWER_TYPE_LABELS[q.answer_type]}</p>
+    <label class="field small"><span>Punkte</span>
+      <input type="number" name="points" value="${q.points}" min="0" max="50" required inputmode="numeric"></label>
     <label class="field"><span>Richtige Antwort(en) <small class="muted">(eine pro Zeile, z. B. bei Gleichstand; Groß-/Kleinschreibung und Satzzeichen sind egal)</small></span>
-      <textarea name="correct_answers" rows="2">${(q.correct_answers ?? []).join('\n')}</textarea></label>`;
+      <textarea name="correct_answers" rows="2">${q.correct_answers.join('\n')}</textarea></label>`;
 }
 
 async function managePage(ctx: Ctx, error?: string): Promise<Res> {
@@ -101,7 +59,7 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     leagueTournaments(db, league.id),
     db.query<{ id: string; name: string }>('select id, name from tournaments order by starts_on desc nulls last, name'),
     db.query<QuestionRow>(
-      `select q.id, q.tournament_id, q.position, q.question, q.points, q.answer_type, q.choices, q.hint, q.correct_answers,
+      `select q.id, q.tournament_id, q.position, q.question, q.points, q.answer_type, q.catalog_key, q.correct_answers,
               (select count(*)::int from bonus_answers a where a.question_id = q.id) as answers
          from bonus_questions q where q.league_id = $1 order by q.position, q.created_at`,
       [league.id],
@@ -187,30 +145,52 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
       : html`
   ${tournaments.map((t) => {
     const qs = questions.filter((q) => q.tournament_id === t.id);
+    const started = !!t.bonus_deadline_at && ctx.now >= t.bonus_deadline_at;
     return html`<h3>${t.name}</h3>
-    ${!qs.length ? html`<p class="muted">Noch keine Sonderfragen.</p>
-      ${postButton(ctx, `${base}/typische-fragen`, 'Typische Fragen einfügen', { cls: 'btn', fields: { tournament_id: t.id } })}
-      <p class="muted">Weltmeister, Finals-MVP, meistgebannter Champion, Verlierer des kürzesten Spiels und erster Pentakill (Team und Spieler). Danach kannst du alles anpassen.</p>` : nothing}
+    <p class="muted">${
+      started
+        ? 'Das Turnier hat begonnen: Die Auswahl ist gesperrt. Eine Frage lässt sich nur noch über ihre Einstellungen löschen.'
+        : 'Wähle, welche Fragen in deiner Tipprunde gestellt werden. Das geht bis zum Start des ersten Spiels, danach ist die Auswahl gesperrt.'
+    }</p>
+    <form method="post" action="${base}/fragen-auswahl" class="stack"${attr(!started, 'data-confirm="Abgewählte Fragen werden mit allen Antworten gelöscht. Speichern?"')}>
+      ${csrfField(ctx)}
+      <input type="hidden" name="tournament_id" value="${t.id}">
+      <fieldset class="field"${attr(started, 'disabled')}>
+        <legend>Fragen für diese Tipprunde</legend>
+        ${QUESTION_CATALOG.map(
+          (c) => html`<label class="check"><input type="checkbox" name="frage" value="${c.key}"${attr(qs.some((q) => q.catalog_key === c.key), 'checked')}>
+          <span>${c.question} <span class="muted">(${c.points} P.)</span></span></label>`,
+        )}
+      </fieldset>
+      ${started ? nothing : html`<button type="submit" class="btn">Auswahl speichern</button>`}
+    </form>
+    ${
+      qs.length
+        ? html`<h4 class="small-title">Einstellungen der Fragen</h4>
     ${qs.map(
       (q) => html`<details class="question-edit">
       <summary><span>${q.question}</span> <span class="muted">${q.points} P.${q.correct_answers.length ? ', aufgelöst' : ''}${q.answers ? `, ${q.answers} ${q.answers === 1 ? 'Antwort' : 'Antworten'}` : ''}</span></summary>
       <form method="post" action="${base}/frage/${q.id}" class="stack">
         ${csrfField(ctx)}
-        ${questionFields(q, null)}
+        ${questionFields(q)}
         <div class="row">
           <button type="submit" name="aktion" value="speichern" class="btn btn-primary">Speichern</button>
-          <button type="submit" name="aktion" value="loeschen" class="btn btn-quiet" data-confirm="Frage mit allen Antworten löschen?">Löschen</button>
+          <button type="submit" name="aktion" value="loeschen" class="btn btn-quiet" data-confirm="Frage „${q.question}“ mit allen Antworten wirklich löschen? Das lässt sich nicht rückgängig machen.">Frage löschen</button>
         </div>
       </form>
     </details>`,
-    )}`;
+    )}`
+        : nothing
+    }`;
   })}
   <details class="question-edit new">
-    <summary>Neue Sonderfrage</summary>
-    <form method="post" action="${base}/frage" class="stack">
+    <summary>Neue Frage vorschlagen</summary>
+    <form method="post" action="${base}/frage-vorschlag" class="stack">
       ${csrfField(ctx)}
-      ${questionFields({ tournament_id: tournaments[0].id, position: questions.length + 1 }, tournaments)}
-      <button type="submit" class="btn btn-primary">Frage anlegen</button>
+      <p class="muted">Neue Fragen nimmt der Betreiber der Seite in die Auswahl auf. Dein Vorschlag geht per E-Mail an ihn.</p>
+      <label class="field"><span>Dein Vorschlag</span>
+        <input type="text" name="vorschlag" required maxlength="300" autocomplete="off"></label>
+      <button type="submit" class="btn btn-primary">Vorschlag senden</button>
     </form>
   </details>`
   }
@@ -267,22 +247,6 @@ ${
   );
 }
 
-type Q = { question: string; points: number; position: number; answer_type: string; choices: string[]; hint: string | null; correct_answers: string[] };
-
-function readQuestion(f: URLSearchParams): Q | string {
-  const question = cleanName(f.get('question'), 300);
-  const points = intField(f.get('points'), 0, 50);
-  const position = intField(f.get('position') || '0', 0, 999);
-  const answer_type = f.get('answer_type') ?? '';
-  if (!question) return 'Bitte gib eine Frage ein.';
-  if (points === null) return 'Bitte gib Punkte von 0 bis 50 ein.';
-  if (position === null) return 'Die Reihenfolge muss eine Zahl von 0 bis 999 sein.';
-  if (!(answer_type in ANSWER_TYPES)) return 'Bitte wähle aus, wie geantwortet wird.';
-  const choices = lines(f.get('choices'));
-  if (answer_type === 'choice' && !choices.length) return 'Bitte gib bei „Aus eigener Liste“ mindestens eine Möglichkeit an.';
-  return { question, points, position, answer_type, choices, hint: cleanName(f.get('hint'), 200), correct_answers: lines(f.get('correct_answers')) };
-}
-
 export function registerManageRoutes(router: Router<Ctx>) {
   router.get('/r/:slug/verwalten', (ctx) => managePage(ctx));
 
@@ -332,38 +296,33 @@ export function registerManageRoutes(router: Router<Ctx>) {
     }
   });
 
-  post('/typische-fragen', async (ctx, { league }) => {
+  post('/fragen-auswahl', async (ctx, { league }) => {
     const tid = ctx.form.get('tournament_id');
     if (!isUuid(tid)) return 'Bitte wähle ein Turnier aus.';
+    const wanted = new Set(ctx.form.getAll('frage'));
     await ctx.deps.db.tx(async (q) => {
-      const ok = await q.one('select 1 from league_tournaments where league_id = $1 and tournament_id = $2', [league.id, tid]);
-      if (!ok) throw new HttpError(400, 'Dieses Turnier gehört nicht zur Tipprunde.');
-      for (const [i, t] of TYPICAL_QUESTIONS.entries()) {
-        await q.run(
-          `insert into bonus_questions (league_id, tournament_id, position, question, points, answer_type, choices, hint)
-           values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [league.id, tid, i + 1, t.question, t.points, t.type, t.choices ?? [], t.hint ?? null],
-        );
+      const t = await q.one<{ started: boolean }>(
+        `select coalesce(tournament_start(lt.tournament_id) <= now(), false) as started
+           from league_tournaments lt where lt.league_id = $1 and lt.tournament_id = $2`,
+        [league.id, tid],
+      );
+      if (!t) throw new HttpError(400, 'Dieses Turnier gehört nicht zur Tipprunde.');
+      if (t.started) throw new HttpError(400, 'Das Turnier hat schon begonnen: Die Auswahl lässt sich nicht mehr ändern. Eine Frage kannst du noch über ihre Einstellungen löschen.');
+      const existing = new Set(
+        (await q.query<{ catalog_key: string }>('select catalog_key from bonus_questions where league_id = $1 and tournament_id = $2 and catalog_key is not null', [league.id, tid])).map((r) => r.catalog_key),
+      );
+      for (const [i, c] of QUESTION_CATALOG.entries()) {
+        if (wanted.has(c.key) && !existing.has(c.key)) {
+          await q.run(
+            `insert into bonus_questions (league_id, tournament_id, position, question, points, answer_type, choices, catalog_key)
+             values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [league.id, tid, i + 1, c.question, c.points, c.type, c.choices, c.key],
+          );
+        } else if (!wanted.has(c.key) && existing.has(c.key)) {
+          await q.run('delete from bonus_questions where league_id = $1 and tournament_id = $2 and catalog_key = $3', [league.id, tid, c.key]);
+        }
       }
     });
-    return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
-  });
-
-  post('/frage', async (ctx, { league }) => {
-    const q = readQuestion(ctx.form);
-    if (typeof q === 'string') return q;
-    const tid = ctx.form.get('tournament_id');
-    if (!isUuid(tid)) return 'Bitte wähle ein Turnier aus.';
-    try {
-      await ctx.deps.db.run(
-        `insert into bonus_questions (league_id, tournament_id, position, question, points, answer_type, choices, hint, correct_answers)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [league.id, tid, q.position, q.question, q.points, q.answer_type, q.choices, q.hint, q.correct_answers],
-      );
-    } catch (e) {
-      if (e instanceof PgError && e.code === '23503') return 'Dieses Turnier gehört nicht zur Tipprunde.';
-      throw e;
-    }
     return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
   });
 
@@ -373,15 +332,29 @@ export function registerManageRoutes(router: Router<Ctx>) {
     if (ctx.form.get('aktion') === 'loeschen') {
       await ctx.deps.db.run('delete from bonus_questions where id = $1 and league_id = $2', [qid, league.id]);
     } else {
-      const q = readQuestion(ctx.form);
-      if (typeof q === 'string') return q;
-      await ctx.deps.db.run(
-        `update bonus_questions set question = $3, points = $4, position = $5, answer_type = $6, choices = $7, hint = $8, correct_answers = $9
-          where id = $1 and league_id = $2`,
-        [qid, league.id, q.question, q.points, q.position, q.answer_type, q.choices, q.hint, q.correct_answers],
-      );
+      const points = intField(ctx.form.get('points'), 0, 50);
+      if (points === null) return 'Bitte gib Punkte von 0 bis 50 ein.';
+      await ctx.deps.db.run('update bonus_questions set points = $3, correct_answers = $4 where id = $1 and league_id = $2', [
+        qid,
+        league.id,
+        points,
+        lines(ctx.form.get('correct_answers')),
+      ]);
     }
     return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
+  });
+
+  post('/frage-vorschlag', async (ctx, { league }) => {
+    const { config, mailer } = ctx.deps;
+    const text = cleanName(ctx.form.get('vorschlag'), 300);
+    if (!text) return 'Bitte schreib deinen Vorschlag auf (bis 300 Zeichen).';
+    if (!config.suggestionsTo) return 'Vorschläge sind gerade nicht möglich: Es ist keine Empfänger-Adresse eingestellt.';
+    const user = ctx.user!;
+    const body = `Neuer Vorschlag für eine Sonderfrage:\n\n${text}\n\nVon: ${user.display_name} <${user.email}>\nTipprunde: ${league.name}`;
+    const page = html`<p>Neuer Vorschlag für eine Sonderfrage:</p><blockquote>${text}</blockquote>
+<p>Von: ${user.display_name} &lt;${user.email}&gt;<br>Tipprunde: ${league.name}</p>`;
+    await mailer.send({ to: config.suggestionsTo, subject: `Sonderfragen-Vorschlag aus „${league.name}“`, text: body, html: page.value });
+    return redirect(`/r/${league.slug}/verwalten?hinweis=vorschlag-gesendet#fragen`);
   });
 
   post('/mitglied/:uid', async (ctx, access) => {
