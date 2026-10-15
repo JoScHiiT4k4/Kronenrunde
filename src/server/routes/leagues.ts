@@ -316,7 +316,7 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
   return [...days.values()];
 }
 
-function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null): Html {
+function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null, tipped?: string): Html {
   const tz = ctx.deps.config.timeZone;
   const match = toDomainMatch(m);
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
@@ -326,6 +326,7 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : 'Termin offen'}</span>
     <span class="bo">Bo${m.best_of}</span>
     ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
+    ${tipped ? html`<span class="tipped">(${tipped})</span>` : nothing}
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
@@ -383,18 +384,19 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const { league } = access;
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
-  const [matches, preds, tournaments, votes] = await Promise.all([
+  const [matches, preds, tournaments, votes, memberCount] = await Promise.all([
     leagueMatches(db, league.id),
     db.query<PredictionRow>(
       `select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1 and user_id = $2`,
       [league.id, ctx.user.id],
     ),
     leagueTournaments(db, league.id),
-    db.query<{ match_id: string; a: number; b: number }>(
-      `select match_id, count(*) filter (where winner = 'A')::int as a, count(*) filter (where winner = 'B')::int as b
+    db.query<{ match_id: string; a: number; b: number; n: number }>(
+      `select match_id, count(*) filter (where winner = 'A')::int as a, count(*) filter (where winner = 'B')::int as b, count(*)::int as n
          from predictions where league_id = $1 group by match_id`,
       [league.id],
     ),
+    db.one<{ n: number }>('select count(*)::int as n from league_members where league_id = $1', [league.id]),
   ]);
   const own = new Map(preds.map((p) => [p.match_id, p]));
   // Nur für Spiele, deren Tipps schon öffentlich sind (nach Tippschluss) – vorher bleibt alles geheim
@@ -403,6 +405,9 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     const v = votes.find((x) => x.match_id === m.id);
     return v ? winShares(v.a, v.b) : null;
   };
+  // Wie viele schon getippt haben (nur die Anzahl – die Tipps selbst bleiben bis Tippschluss geheim)
+  const tippedOf = (m: MatchRow): string | undefined =>
+    m.team_a_id && m.team_b_id ? `${votes.find((x) => x.match_id === m.id)?.n ?? 0}/${memberCount?.n ?? 0} Spieler getippt` : undefined;
   const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -514,13 +519,13 @@ ${
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
     ${tournamentNames ? html`<p class="muted">${tournamentNames.get(d.matches[0].tournament_id)}</p>` : nothing}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), null, tippedOf(m)))}
   </section>`,
   )}
   ${unscheduled.map(
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m)))}
   </section>`,
   )}
   ${hiddenNote}
@@ -538,7 +543,7 @@ ${
   ${closedDays.map(
     (d, i) => html`<details class="day day-closed"${attr(i === 0, 'open')}>
     <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span>${dayPoints(d)}</summary>
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m)))}
   </details>`,
   )}`
     : nothing

@@ -894,3 +894,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .pct-up { color: #3ddc84; }
 .pct-down { color: #ff6b6b; }
 .pct-even { color: var(--muted); }
+
+/* Anzahl der Tipps je Begegnung und Versions-Fußnote */
+.match-meta .tipped { color: var(--muted); }
+.foot .foot-version { max-width: none; margin: 14px 0 0; font-size: 0.75rem; color: var(--muted); text-align: left; opacity: 0.8; }

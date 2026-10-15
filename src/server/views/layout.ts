@@ -1,7 +1,9 @@
 // Seitenrahmen und kleine wiederkehrende Bausteine der Oberfläche.
 
 import type { Ctx } from '../app.ts';
+import { formatDateTime, formatTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
+import { buildInfo, lastUpdateCheck } from '../version.ts';
 
 /** Kurze Hinweise nach einer Aktion (?hinweis=…). Nur feste Texte – nichts aus der Adresse wird angezeigt. */
 const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
@@ -89,9 +91,19 @@ ${adBox('right')}
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
   <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></p>
+  ${versionNote(ctx)}
 </footer>
 </body>
 </html>`;
+}
+
+/** Fußnote unten links: laufende Version und Zeitpunkt der letzten Update-Prüfung des Pi. */
+function versionNote(ctx: Ctx): Html {
+  const tz = ctx.deps.config.timeZone;
+  const b = buildInfo();
+  const check = lastUpdateCheck();
+  const built = b.committedAt ? ` · Stand ${formatDateTime(b.committedAt, tz)} Uhr` : '';
+  return html`<p class="foot-version">Version ${b.version}${b.commit ? html` (${b.commit})` : nothing}${built}${check ? html` · Update zuletzt geprüft: ${formatTime(check, tz)} Uhr` : nothing}</p>`;
 }
 
 const TWITCH_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 2.5 7v13H7v3h3l3-3h4l5-5V3H4Zm15 11-3 3h-4l-3 3v-3H6V5h13v9Zm-3-6h-2v5h2V8Zm-5 0H9v5h2V8Z"/></svg>`;
