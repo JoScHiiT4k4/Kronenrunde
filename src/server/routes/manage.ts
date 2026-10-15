@@ -56,6 +56,7 @@ const AREAS = [
   ['turniere', 'Turniere'],
   ['fragen', 'Sonderfragen'],
   ['mitglieder', 'Mitglieder'],
+  ['anfragen', 'Anfragen'],
 ] as const;
 type Area = (typeof AREAS)[number][0];
 const isArea = (v: string | null | undefined): v is Area => AREAS.some(([k]) => k === v);
@@ -67,6 +68,7 @@ function areaOfPath(path: string): Area {
   if (rest.startsWith('/turnier')) return 'turniere';
   if (rest.startsWith('/frage')) return 'fragen';
   if (rest.startsWith('/mitglied')) return 'mitglieder';
+  if (rest.startsWith('/anfrage')) return 'anfragen';
   return 'uebersicht';
 }
 
@@ -96,6 +98,14 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
       [league.id],
     ),
   ]);
+  // Offene Anfragen zur Änderung von Namen (Mitglieder dieser Tipprunde)
+  const requests = await db.query<{ id: string; user_id: string; display_name: string; first_name: string | null; new_display_name: string; new_first_name: string; created_at: Date }>(
+    `select r.id, r.user_id, u.display_name, u.first_name, r.new_display_name, r.new_first_name, r.created_at
+       from name_requests r join users u on u.id = r.user_id
+       join league_members lm on lm.user_id = r.user_id and lm.league_id = $1
+      where r.status = 'pending' order by r.created_at`,
+    [league.id],
+  );
   const inviteLink = `${config.appUrl}/beitreten/${league.invite_code}`;
   const base = `/r/${league.slug}/verwalten`;
   const available = allTournaments.filter((t) => !tournaments.some((x) => x.id === t.id));
@@ -121,7 +131,7 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
   const body = html`
 <h1 class="small-title">Verwalten</h1>
 <nav class="sub-tabs" aria-label="Bereiche">
-  ${AREAS.map(([key, label]) => html`<a href="${areaHref(league.slug, key)}"${area === key ? html` aria-current="page"` : nothing}>${label}</a>`)}
+  ${AREAS.map(([key, label]) => html`<a href="${areaHref(league.slug, key)}"${area === key ? html` aria-current="page"` : nothing}>${label}${key === 'anfragen' && requests.length ? html` <span class="tab-badge" aria-label="${requests.length} offen">${requests.length}</span>` : nothing}</a>`)}
 </nav>
 
 ${area === 'uebersicht' ? html`
@@ -291,6 +301,31 @@ ${area === 'mitglieder' ? html`
   </table>
 </section>` : nothing}
 
+${area === 'anfragen' ? html`
+<section class="panel">
+  <h2>Anfragen</h2>
+  ${
+    requests.length
+      ? html`<p class="muted">Mitglieder möchten ihren Namen ändern. Erst nach deiner Bestätigung wird er geändert.</p>
+  <ul class="req-list">
+    ${requests.map(
+      (r) => html`<li class="req">
+      <div class="req-text">
+        <strong>${r.display_name}</strong><small class="muted"> · ${formatDateTime(r.created_at, tz)} Uhr</small><br>
+        Anzeigename: ${r.display_name === r.new_display_name ? html`<span class="muted">unverändert</span>` : html`${r.display_name} → <strong>${r.new_display_name}</strong>`}<br>
+        Vorname: ${(r.first_name ?? '') === r.new_first_name ? html`<span class="muted">unverändert</span>` : html`${r.first_name ?? '–'} → <strong>${r.new_first_name}</strong>`}
+      </div>
+      <div class="btn-row">
+        ${postButton(ctx, `${base}/anfrage/${r.id}/bestaetigen`, 'Bestätigen', { cls: 'btn btn-primary' })}
+        ${postButton(ctx, `${base}/anfrage/${r.id}/ablehnen`, 'Ablehnen', { cls: 'btn btn-quiet' })}
+      </div>
+    </li>`,
+    )}
+  </ul>`
+      : html`<p class="muted">Keine offenen Anfragen.</p>`
+  }
+</section>` : nothing}
+
 ${
   area === 'einstellungen' && access.isOwner
     ? html`<section class="panel danger-zone">
@@ -340,6 +375,25 @@ export function registerManageRoutes(router: Router<Ctx>) {
       [league.id, name, pw, pe, parseLockMode(f.get('lock_mode'))],
     );
   });
+
+  const decide = (approve: boolean) => async (ctx: Ctx, { league }: LeagueAccess) => {
+    const id = ctx.params.id;
+    if (!isUuid(id)) throw new HttpError(404, 'Diese Seite gibt es nicht.');
+    await ctx.deps.db.tx(async (q) => {
+      // nur offene Anfragen von Mitgliedern dieser Tipprunde
+      const r = await q.one<{ user_id: string; new_display_name: string; new_first_name: string }>(
+        `select r.user_id, r.new_display_name, r.new_first_name from name_requests r
+           join league_members lm on lm.user_id = r.user_id and lm.league_id = $2
+          where r.id = $1 and r.status = 'pending' for update of r`,
+        [id, league.id],
+      );
+      if (!r) return;
+      if (approve) await q.run('update users set display_name = $2, first_name = $3 where id = $1', [r.user_id, r.new_display_name, r.new_first_name]);
+      await q.run(`update name_requests set status = $2, decided_at = now(), decided_by = $3 where id = $1`, [id, approve ? 'approved' : 'rejected', ctx.user!.id]);
+    });
+  };
+  post('/anfrage/:id/bestaetigen', decide(true));
+  post('/anfrage/:id/ablehnen', decide(false));
 
   post('/einladung-neu', async (ctx, { league }) => {
     await ctx.deps.db.run(`update leagues set invite_code = encode(gen_random_bytes(6), 'hex') where id = $1`, [league.id]);
