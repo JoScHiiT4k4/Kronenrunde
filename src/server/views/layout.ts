@@ -29,7 +29,7 @@ export interface LeagueNav {
   slug: string;
   name: string;
   canManage: boolean;
-  active: 'tippen' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
+  active: 'tippen' | 'alle-tipps' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
 }
 
 export interface PageOptions {
@@ -86,6 +86,7 @@ function leagueNav(l: LeagueNav): Html {
   <div class="league-name">${l.name}</div>
   <div class="tabs">
     ${tab('tippen', 'Tippen')}
+    ${tab('alle-tipps', 'Alle Tipps')}
     ${tab('rangliste', 'Rangliste')}
     ${tab('sonderfragen', 'Sonderfragen')}
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}

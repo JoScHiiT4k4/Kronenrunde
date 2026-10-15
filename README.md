@@ -18,6 +18,7 @@ Was die App kann:
 - **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
   Team A steht links auf der blauen Seite, Team B rechts auf der roten.
 - **Tippschluss automatisch** (Standard): jedes Spiel einzeln zum Anstoß – oder früher, sobald das Spiel davor vorbei ist; alternativ ganzer Spieltag oder jedes Spiel zur angesetzten Zeit. Von der Datenbank erzwungen; ab Tippschluss sieht jeder die Tipps der anderen.
+- **Alle Tipps**: alle Spiele mit abgelaufenem Tippschluss und was jeder getippt hat (nach Phase, neueste zuerst); einzelne Spiele auch über „Tipps zu diesem Spiel“.
 - **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
 - **Sonderfragen** mit Frist (Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.

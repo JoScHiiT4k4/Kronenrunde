@@ -358,6 +358,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const hidden = await anna.get(`/r/${slug}/spiel/${match['GEN-T1']}`);
     assert.match(hidden.text, /ab Tippschluss/);
     assert.doesNotMatch(hidden.text, /Ben/);
+    // Reiter "Alle Tipps": vor dem Tippschluss noch leer
+    const all = await anna.get(`/r/${slug}/alle-tipps`);
+    assert.equal(all.status, 200);
+    assert.match(all.text, /Noch sind keine Tipps zu sehen/);
+    assert.match(all.text, /aria-current="page">Alle Tipps</);
+    assert.doesNotMatch(all.text, /Ben/);
+    assert.equal((await stranger.get(`/r/${slug}/alle-tipps`)).status, 404);
   });
 
   test('Nach Tippschluss: keine Änderung mehr, alle Tipps sichtbar, Ergebnis zählt', async () => {
@@ -395,6 +402,17 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const tips = await anna.get(`/r/${slug}/tippen`);
     assert.match(tips.text, /Vorbei/);
     assert.match(tips.text, /pts pts-hit pts-exact">\+2</);
+    assert.match(tips.text, new RegExp(`href="/r/${slug}/spiel/${match['GEN-T1']}">Tipps zu diesem Spiel</a>`));
+
+    // Reiter "Alle Tipps": beide geschlossenen Spiele mit allen Tipps und Punkten – offene Spiele nicht
+    const all = await ben.get(`/r/${slug}/alle-tipps`);
+    assert.equal(all.status, 200);
+    for (const id of [match['GEN-T1'], match['G2-KC']]) assert.match(all.text, new RegExp(`id="tipps-${id}"`));
+    assert.doesNotMatch(all.text, new RegExp(match['T1-KC']));
+    const block = (id: string) => all.text.slice(all.text.indexOf(`id="tipps-${id}"`)).split('</article>')[0];
+    const rowsOf = (id: string) => [...block(id).matchAll(/<tr( class="me")?>\s*<td>([^<]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td class="num( hit)?">(\d*)<\/td>/g)].map((r) => [r[2], r[3], r[5], !!r[1]]);
+    assert.deepEqual(rowsOf(match['GEN-T1']), [['Anna', 'GEN 3:1', '2', false], ['Ben', 'T1 3:2', '0', true]]);
+    assert.deepEqual(rowsOf(match['G2-KC']), [['Anna', 'KC 2:0', '1', false], ['Ben', 'KC 2:1', '2', true]]);
   });
 
   test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {

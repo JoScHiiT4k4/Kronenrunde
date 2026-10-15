@@ -63,7 +63,7 @@ function pointsBadge(points: number | null, exact = false): Html {
   return html`<span class="pts${points > 0 ? ' pts-hit' : ''}${exact ? ' pts-exact' : ''}">+${points}</span>`;
 }
 
-function leagueNav(access: { league: League; canManage: boolean }, active: 'tippen' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel') {
+function leagueNav(access: { league: League; canManage: boolean }, active: 'tippen' | 'alle-tipps' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel') {
   return { slug: access.league.slug, name: access.league.name, canManage: access.canManage, active };
 }
 
@@ -360,7 +360,7 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     ${teamsKnown || !open ? html`<span>Dein Tipp: <strong>${own ? predictionLabel(m, own) : '–'}</strong></span>` : nothing}
     ${result ? html`<span>Ergebnis: <strong>${result}</strong></span>` : nothing}
     ${score ? pointsBadge(score.points, score.exact) : nothing}
-    ${isPublic && teamsKnown ? html`<a href="/r/${league.slug}/spiel/${m.id}">Alle Tipps</a>` : nothing}
+    ${isPublic && teamsKnown ? html`<a href="/r/${league.slug}/spiel/${m.id}">Tipps zu diesem Spiel</a>` : nothing}
   </div>
 </article>`;
 }
@@ -646,6 +646,103 @@ ${
   ${content}
 </section>`;
   return htmlResponse(layout(ctx, { title: `${m.team_a ?? '?'} vs ${m.team_b ?? '?'}`, body, league: leagueNav(access, 'spiel') }));
+}
+
+// ---------------------------------------------------------------------
+// Alle Tipps: jedes Spiel, dessen Tippschluss vorbei ist, mit den Tipps aller Mitglieder
+// ---------------------------------------------------------------------
+
+async function allTipsPage(ctx: Ctx): Promise<Res> {
+  if (!ctx.user) return loginRedirect(ctx);
+  const access = await loadLeague(ctx, ctx.params.slug);
+  const { league } = access;
+  const { db, config } = ctx.deps;
+  const tz = config.timeZone;
+  const [matches, members, preds] = await Promise.all([
+    leagueMatches(db, league.id),
+    db.query<{ user_id: string; display_name: string }>(
+      `select u.id as user_id, u.display_name from league_members lm join users u on u.id = lm.user_id
+        where lm.league_id = $1 order by u.display_name, u.id`,
+      [league.id],
+    ),
+    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1`, [league.id]),
+  ]);
+  const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? 0;
+  // Nur Spiele, deren Tippschluss vorbei ist – alles andere bleibt verborgen, damit niemand abschreibt
+  const visible = matches
+    .filter((m) => m.team_a_id && m.team_b_id && arePredictionsPublic(toDomainMatch(m), league.lock_mode, ctx.now))
+    .sort((a, b) => time(a) - time(b));
+  const tips = new Map<string, Map<string, PredictionRow>>();
+  for (const m of visible) tips.set(m.id, new Map());
+  for (const p of preds) tips.get(p.match_id)?.set(p.user_id, p);
+
+  // Phasen wie beim Tippen; ohne Auswahl die Phase des zuletzt geschlossenen Spiels
+  const phases: { slug: string; name: string; matches: MatchRow[] }[] = [];
+  for (const m of visible) {
+    const name = phaseName(m);
+    let p = phases.find((x) => x.name === name);
+    if (!p) phases.push((p = { slug: phaseSlug(name), name, matches: [] }));
+    p.matches.push(m);
+  }
+  const latest = visible.at(-1);
+  const current = phases.find((p) => p.slug === ctx.query.get('phase')) ?? phases.find((p) => latest && p.name === phaseName(latest));
+  const phaseTabs = phases.length > 1
+    ? html`<nav class="phase-tabs" aria-label="Phasen">
+    ${phases.map((p) => html`<a href="/r/${league.slug}/alle-tipps?phase=${p.slug}"${p === current ? html` aria-current="page"` : nothing}>${p.name}</a>`)}
+  </nav>`
+    : nothing;
+  // Neueste Spieltage zuerst
+  const days = groupMatchdays(current?.matches ?? [], tz).reverse();
+
+  const card = (m: MatchRow) => {
+    const match = toDomainMatch(m);
+    const result = resultLabel(m);
+    const own = tips.get(m.id)!;
+    return html`<article class="match match-tips" id="tipps-${m.id}">
+  <div class="match-meta">
+    <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : ''}</span>
+    <span class="bo">Bo${m.best_of}</span>
+    ${m.stage ? html`<span>${m.stage}</span>` : nothing}
+    ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
+  </div>
+  <div class="teams">
+    <span class="team team-a">${m.team_a}</span>
+    <span class="vs">VS</span>
+    <span class="team team-b">${m.team_b}</span>
+  </div>
+  <p class="tips-result">${result ? html`Ergebnis: <strong>${result}</strong>` : html`<span class="muted">Noch kein Ergebnis</span>`}</p>
+  <table class="table compact tips-table">
+    <thead><tr><th>Name</th><th>Tipp</th><th class="num">Punkte</th></tr></thead>
+    <tbody>
+    ${members.map((u) => {
+      const p = own.get(u.user_id);
+      const score = p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)) : null;
+      const points = score?.points ?? null;
+      return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
+        <td>${u.display_name}</td>
+        <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
+        <td class="num${points ? ' hit' : ''}">${points ?? ''}</td>
+      </tr>`;
+    })}
+    </tbody>
+  </table>
+</article>`;
+  };
+
+  const body = html`
+${phaseTabs}
+${
+  visible.length
+    ? html`<p class="muted page-note">Alle Spiele, bei denen der Tippschluss vorbei ist – die neuesten oben.</p>
+  ${days.map(
+    (d) => html`<section class="day">
+    <header class="day-head"><h2>${d.start ? formatDayLong(d.start, tz) : 'Ohne Termin'}</h2></header>
+    ${d.matches.map(card)}
+  </section>`,
+  )}`
+    : emptyState('Noch sind keine Tipps zu sehen. Sobald bei einem Spiel der Tippschluss vorbei ist, stehen hier die Tipps aller Mitspieler.')
+}`;
+  return htmlResponse(layout(ctx, { title: `Alle Tipps – ${league.name}`, body, league: leagueNav(access, 'alle-tipps') }));
 }
 
 // ---------------------------------------------------------------------
@@ -958,6 +1055,7 @@ export function registerLeagueRoutes(router: Router<Ctx>) {
   router.get('/r/:slug/tippen', tipsPage);
   router.post('/r/:slug/tippen', saveTips);
   router.get('/r/:slug/spiel/:id', matchPage);
+  router.get('/r/:slug/alle-tipps', allTipsPage);
   router.get('/r/:slug/rangliste', standingsPage);
   router.get('/r/:slug/sonderfragen', bonusPage);
   router.post('/r/:slug/sonderfragen', saveBonus);
