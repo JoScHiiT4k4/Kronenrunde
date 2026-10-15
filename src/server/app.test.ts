@@ -274,6 +274,17 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       const r = await admin.post('/admin/team', { name, short_name: short, region: 'X' });
       assert.equal(r.status, 303, r.text);
     }
+    // Neue Tipprunden: anfangs nur Admins – für andere ist „Tipprunde erstellen“ ausgeblendet und gesperrt
+    assert.doesNotMatch((await anna.get('/')).text, /href="\/neu"/);
+    assert.equal((await anna.get('/neu')).status, 403);
+    assert.equal((await anna.post('/neu', { name: 'Heimlich' })).status, 403);
+    assert.match((await admin.get('/')).text, /href="\/neu"/);
+    assert.match((await admin.get('/admin')).text, /name="league_creation" value="admins" checked/);
+    assert.equal((await anna.post('/admin/einstellungen', { league_creation: 'alle' })).status, 404);
+    assert.equal((await admin.post('/admin/einstellungen', { league_creation: 'alle' })).location, '/admin?hinweis=gespeichert');
+    assert.match((await anna.get('/')).text, /href="\/neu"/);
+    assert.equal((await anna.get('/neu')).status, 200);
+
     const dup = await admin.post('/admin/team', { name: 'T1' });
     assert.equal(dup.status, 400);
     for (const t of await db.query<{ id: string; short_name: string }>('select id, short_name from teams')) team[t.short_name] = t.id;

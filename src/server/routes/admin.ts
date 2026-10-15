@@ -11,7 +11,7 @@ import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { csrfField, layout, postButton } from '../views/layout.ts';
 import { cleanName, isUuid, loginRedirect } from './common.ts';
-import { type MatchRow, oneMatch, shortA, shortB, tournamentMatches } from './league-data.ts';
+import { leagueCreation, type MatchRow, oneMatch, shortA, shortB, tournamentMatches } from './league-data.ts';
 
 function requireAdmin(ctx: Ctx) {
   if (!ctx.isAdmin) throw new HttpError(404, 'Diese Seite gibt es nicht.');
@@ -81,7 +81,7 @@ function resultSelect(m: MatchRow, name = 'ergebnis'): Html {
 
 async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   const { db } = ctx.deps;
-  const [tournaments, teamList, syncRows, counts] = await Promise.all([
+  const [tournaments, teamList, syncRows, counts, creation] = await Promise.all([
     db.query<{ id: string; name: string; starts_on: string | null; ends_on: string | null; matches: number; open_results: number }>(
       `select t.id, t.name, t.starts_on, t.ends_on,
               (select count(*)::int from matches m where m.tournament_id = t.id) as matches,
@@ -94,6 +94,7 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
     db.one<{ champions: number; players: number }>(
       'select (select count(*)::int from champions) as champions, (select count(*)::int from players where active) as players',
     ),
+    leagueCreation(db),
   ]);
   const tz = ctx.deps.config.timeZone;
   const body = html`<section class="panel">
@@ -121,6 +122,21 @@ Viertelfinale
 Halbfinale
 Finale</textarea></label>
     <button type="submit" class="btn btn-primary">Turnier anlegen</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Neue Tipprunden</h2>
+  <form method="post" action="/admin/einstellungen" class="stack">
+    ${csrfField(ctx)}
+    <fieldset class="field">
+      <legend>Wer darf neue Tipprunden anlegen?</legend>
+      <label class="check"><input type="radio" name="league_creation" value="admins"${attr(creation === 'admins', 'checked')}>
+        <span>Nur Admins <span class="muted">– für alle anderen ist „Tipprunde erstellen“ ausgeblendet; sie treten über deinen Einladungslink bei</span></span></label>
+      <label class="check"><input type="radio" name="league_creation" value="alle"${attr(creation === 'alle', 'checked')}>
+        <span>Jeder mit Konto</span></label>
+    </fieldset>
+    <button type="submit" class="btn">Speichern</button>
   </form>
 </section>
 
@@ -376,6 +392,16 @@ export function registerAdminRoutes(router: Router<Ctx>) {
   const post = (path: string, fn: (ctx: Ctx) => Promise<Res>) => router.post(path, guard(fn));
 
   get('/admin', (ctx) => adminHome(ctx));
+
+  post('/admin/einstellungen', async (ctx) => {
+    const value = ctx.form.get('league_creation') === 'alle' ? 'alle' : 'admins';
+    await ctx.deps.db.run(
+      `insert into app_settings (key, value) values ('league_creation', $1)
+       on conflict (key) do update set value = excluded.value, updated_at = now()`,
+      [value],
+    );
+    return redirect('/admin?hinweis=gespeichert');
+  });
   get('/admin/turnier/:id', (ctx) => tournamentPage(ctx));
   get('/admin/spiel/:id', (ctx) => matchPage(ctx));
 

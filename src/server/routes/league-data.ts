@@ -5,6 +5,21 @@ import type { Queryable } from '../db/index.ts';
 import type { BestOf, LockMode, Match } from '../../domain/types.ts';
 import { HttpError } from '../http.ts';
 
+/** Wer neue Tipprunden anlegen darf (Admin-Bereich): 'admins' oder 'alle' */
+export type LeagueCreation = 'admins' | 'alle';
+
+export async function leagueCreation(db: Queryable): Promise<LeagueCreation> {
+  const row = await db.one<{ value: string }>(`select value from app_settings where key = 'league_creation'`);
+  return row?.value === 'alle' ? 'alle' : 'admins';
+}
+
+/** Darf diese Person eine neue Tipprunde anlegen? Admins immer; ohne eingetragene Admins jeder (sonst könnte es niemand freigeben). */
+export async function canCreateLeague(ctx: Ctx): Promise<boolean> {
+  if (!ctx.user) return false;
+  if (ctx.isAdmin || !ctx.deps.config.adminEmails.size) return true;
+  return (await leagueCreation(ctx.deps.db)) === 'alle';
+}
+
 export interface League {
   id: string;
   name: string;

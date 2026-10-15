@@ -13,6 +13,7 @@ import { HttpError, htmlResponse, redirect, type Res, type Router } from '../htt
 import { csrfField, emptyState, layout, postButton } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
+  canCreateLeague,
   type League,
   leagueMatches,
   leagueTournaments,
@@ -100,6 +101,7 @@ async function homePage(ctx: Ctx): Promise<Res> {
     [ctx.user.id],
   );
 
+  const canCreate = await canCreateLeague(ctx);
   const body = html`<section class="panel">
   <h1>Deine Tipprunden</h1>
   ${
@@ -110,10 +112,10 @@ async function homePage(ctx: Ctx): Promise<Res> {
       <span class="muted">${l.members} ${l.members === 1 ? 'Mitglied' : 'Mitglieder'}${l.role === 'owner' ? ', von dir geleitet' : ''}</span></a></li>`,
     )}
   </ul>`
-      : html`<p>Du bist noch in keiner Tipprunde. Tritt mit einem Einladungscode bei oder lege eine eigene an.</p>`
+      : html`<p>Du bist noch in keiner Tipprunde. ${canCreate ? 'Tritt mit einem Einladungscode bei oder lege eine eigene an.' : 'Öffne den Einladungslink, den du bekommen hast, oder gib den Code unten ein.'}</p>`
   }
 </section>
-<section class="panel two-col">
+<section class="panel${canCreate ? ' two-col' : ''}">
   <form method="post" action="/beitreten" class="stack">
     ${csrfField(ctx)}
     <h2>Tipprunde beitreten</h2>
@@ -123,11 +125,15 @@ async function homePage(ctx: Ctx): Promise<Res> {
     </label>
     <button type="submit" class="btn">Beitreten</button>
   </form>
-  <div class="stack">
+  ${
+    canCreate
+      ? html`<div class="stack">
     <h2>Eigene Tipprunde</h2>
     <p class="muted">Für deine Freunde, deine Community oder dein Team.</p>
     <a class="btn" href="/neu">Tipprunde erstellen</a>
-  </div>
+  </div>`
+      : nothing
+  }
 </section>`;
   return htmlResponse(layout(ctx, { title: 'Deine Tipprunden', body }));
 }
@@ -1042,8 +1048,16 @@ async function leave(ctx: Ctx): Promise<Res> {
 
 export function registerLeagueRoutes(router: Router<Ctx>) {
   router.get('/', homePage);
-  router.get('/neu', async (ctx) => (ctx.user ? createPage(ctx, new URLSearchParams()) : loginRedirect(ctx)));
-  router.post('/neu', async (ctx) => (ctx.user ? createLeague(ctx) : loginRedirect(ctx)));
+  // Neue Tipprunden nur, wenn der Admin es erlaubt (Admin-Bereich → „Neue Tipprunden“)
+  const mayCreate = (fn: (ctx: Ctx) => Promise<Res>) => async (ctx: Ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    if (!(await canCreateLeague(ctx))) {
+      throw new HttpError(403, 'Neue Tipprunden kann im Moment nur der Admin anlegen. Du kannst einer Tipprunde über einen Einladungslink beitreten.');
+    }
+    return fn(ctx);
+  };
+  router.get('/neu', mayCreate((ctx) => createPage(ctx, new URLSearchParams())));
+  router.post('/neu', mayCreate(createLeague));
   router.post('/beitreten', async (ctx) => {
     const code = extractCode(ctx.form.get('code') ?? '');
     if (!/^[a-z0-9]{4,40}$/.test(code)) throw new HttpError(400, 'Dieser Einladungscode ist ungültig.');

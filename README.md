@@ -15,6 +15,7 @@ Was die App kann:
 
 - **Anmelden mit E-Mail und Passwort**; „Passwort vergessen“ schickt einen Link per Mail. Beim Konto-Erstellen wählt man seinen Namen für die Rangliste.
 - **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person.
+  Wer neue Tipprunden anlegen darf, stellt der Admin ein (Standard: nur Admins – für alle anderen ist der Knopf ausgeblendet).
 - **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
   Team A steht links auf der blauen Seite, Team B rechts auf der roten.
 - **Tippschluss automatisch** (Standard): jedes Spiel einzeln zum Anstoß – oder früher, sobald das Spiel davor vorbei ist; alternativ ganzer Spieltag oder jedes Spiel zur angesetzten Zeit. Von der Datenbank erzwungen; ab Tippschluss sieht jeder die Tipps der anderen.
@@ -23,7 +24,7 @@ Was die App kann:
 - **Sonderfragen** mit Frist (Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
-- **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen.
+- **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
 - **Automatischer Abgleich mit Riot**: Paarungen, Ergebnisse und Anstoßzeiten alle 10 Minuten, an Spieltagen alle 2 (lolesports.com), Champion-Liste und Spielerkader alle 6 Stunden – Stand im Admin-Bereich, `tippspiel abgleich` von Hand.
 - **Auto-Update** auf dem Pi alle 15 Minuten, nur auf GitHub geprüfte Versionen (Zweig `stabil`).
