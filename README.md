@@ -28,7 +28,7 @@ Was die App kann:
 - **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin unter `/admin/rechtliches`.
 - **Profilbild:** unter „Dein Konto“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
-- **Verwalten** (Spielleiter der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
+- **Verwalten** (Spielleiter der Tipprunde) mit Untermenü: Übersicht (Einladungslink, wer noch nicht getippt hat – ohne Tipp-Inhalte), Einstellungen, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
 - **Automatischer Abgleich mit Riot**: Paarungen, Ergebnisse und Anstoßzeiten alle 10 Minuten, an Spieltagen alle 2 (lolesports.com), Champion-Liste und Spielerkader alle 6 Stunden – Stand im Admin-Bereich, `tippspiel abgleich` von Hand.
