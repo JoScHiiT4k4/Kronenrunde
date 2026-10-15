@@ -140,6 +140,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       PORT: '0',
       APP_URL: 'http://127.0.0.1',
       ADMIN_EMAILS: 'admin@example.de',
+      SUGGESTIONS_TO: 'vorschlaege@example.de',
       MAIL_MODE: 'memory',
       APP_SECRET: 'test-geheimnis',
     });
@@ -251,12 +252,37 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
     assert.equal((await anna.get('/konto')).status, 303);
     // Passwort im Konto zurückändern (braucht das bisherige)
-    const wrongCurrent = await reset.post('/konto/passwort', { current: 'falsch', password: PASSWORT });
+    const wrongCurrent = await reset.post('/konto/passwort', { current: 'falsch', password: PASSWORT, password2: PASSWORT });
     assert.match(wrongCurrent.text, /bisherige Passwort stimmt nicht/);
-    const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT });
+    const mismatch = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT + 'x' });
+    assert.match(mismatch.text, /nicht gleich/);
+    const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT });
     assert.equal(changed.location, '/konto?hinweis=passwort-gespeichert');
     anna.cookies.clear();
     assert.equal((await anna.login('anna@example.de')).location, '/');
+
+    // E-Mail-Adresse ändern: erst nach Klick auf den Link in der Mail an die neue Adresse
+    const konto = await anna.get('/konto');
+    assert.match(konto.text, /E-Mail-Adresse ändern/);
+    assert.match(konto.text, /class="top-logout"/);
+    assert.match(konto.text, /name="password2"/);
+    assert.match((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: 'falsch' })).text, /Passwort stimmt nicht/);
+    assert.match((await anna.post('/konto/email', { email: 'kaputt', current: PASSWORT })).text, /gültige E-Mail/);
+    await db.run(`insert into users (email, display_name) values ('vergeben@example.de', 'Vergeben')`);
+    const sentBefore = mailer.sent!.length;
+    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    assert.equal(mailer.sent!.length, sentBefore, 'vergebene Adresse: keine Mail, aber auch kein Hinweis darauf');
+    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?hinweis=email-gesendet');
+    const cm = [...mailer.sent!].reverse().find((m) => m.to === 'anna.neu@example.de')!;
+    const confirm = new URL(/https?:\/\/[^\s]+\/konto\/email-bestaetigen\?[^\s]+/.exec(cm.text)![0]);
+    assert.equal((await new Client().get(confirm.pathname + confirm.search)).status, 303, 'ohne Anmeldung nicht einlösbar');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?hinweis=email-geaendert');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).status, 400, 'Link gilt nur einmal');
+    assert.equal((await new Client().post('/anmelden', { email: 'anna.neu@example.de', password: PASSWORT })).status, 303);
+    assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
+    // zurück, damit die weiteren Tests mit der alten Adresse laufen
+    await db.run(`update users set email = 'anna@example.de' where email = 'anna.neu@example.de'`);
+    await db.run(`delete from users where email = 'vergeben@example.de'`);
 
     // Konto aus der Zeit der Anmelde-Links (ohne Passwort): Anmelden schickt einen Link zum Festlegen
     await db.run(`insert into users (email, display_name) values ('alt@example.de', 'Alt')`);
@@ -425,7 +451,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(status, { status: 'finished', wins_a: 1, wins_b: 2 });
 
     const table = await anna.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
     const tips = await anna.get(`/r/${slug}/tippen`);
@@ -456,19 +482,74 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
   });
 
-  test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
-    const add = await anna.post(`/r/${slug}/verwalten/typische-fragen`, { tournament_id: tournamentId });
-    assert.equal(add.status, 303);
-    const qs = await db.query<{ id: string; question: string; answer_type: string }>('select id, question, answer_type from bonus_questions order by position');
-    assert.equal(qs.length, 6);
-    const champ = qs.find((q) => q.question.includes('Weltmeister'))!;
-    const mvp = qs.find((q) => q.question.includes('MVP'))!;
+  test('Rechtliches: Impressum/Datenschutz öffentlich, Angaben nur vom Admin', async () => {
+    const pub = await new Client().get('/impressum');
+    assert.equal(pub.status, 200);
+    assert.match(pub.text, /Name fehlt noch/);
+    assert.match(pub.text, /href="\/datenschutz"/, 'Footer-Links');
+    assert.equal((await new Client().get('/datenschutz')).status, 200);
+    assert.equal((await anna.get('/admin/rechtliches')).status, 404, 'normale Nutzer: nicht vorhanden');
+    assert.equal((await anna.post('/admin/rechtliches', { name: 'X' })).status, 404);
+    const adm = await admin.post('/admin/rechtliches', { name: 'Max <b>Muster', email: 'kontakt@example.de', street: 'Weg 1', city: '12345 Stadt', country: 'Deutschland', hosting: 'Eigener Server' });
+    assert.equal(adm.location, '/admin/rechtliches?hinweis=gespeichert');
+    const after = (await new Client().get('/impressum')).text;
+    assert.match(after, /Max &lt;b&gt;Muster/);
+    assert.doesNotMatch(after, /Name fehlt noch/);
+    await db.run(`delete from app_settings where key like 'legal\\_%'`);
+  });
 
-    // Frist = Start des ersten Spiels; hier noch in der Zukunft
+  test('Avatare: Upload, Rangliste, Abruf nur angemeldet', async () => {
+    // kleines gültiges JPEG-Gerüst (Prüfung nur auf Kopf/Ende und Größe)
+    const body = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 1), Buffer.from([0xff, 0xd9])]);
+    const url = `data:image/jpeg;base64,${body.toString('base64')}`;
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/png;base64,AAAA' })).location, '/konto?hinweis=avatar-fehler');
+    assert.equal((await anna.post('/konto/avatar', { avatar: 'data:image/jpeg;base64,' + Buffer.alloc(60_000, 7).toString('base64') })).location, '/konto?hinweis=avatar-fehler', 'zu groß / kein JPEG');
+    assert.equal((await anna.post('/konto/avatar', { avatar: url })).location, '/konto?hinweis=avatar-gespeichert');
+    const id = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
+    const img = await anna.get(`/avatar/${id}`);
+    assert.equal(img.status, 200);
+    assert.equal(img.headers.get('content-type'), 'image/jpeg');
+    assert.equal((await new Client().get(`/avatar/${id}`)).status, 303, 'nicht ohne Anmeldung');
+    assert.match((await anna.get(`/r/${slug}/rangliste`)).text, new RegExp(`src="/avatar/${id}\\?v=\\d+"`));
+    assert.equal((await anna.post('/konto/avatar/loeschen')).location, '/konto?hinweis=avatar-geloescht');
+    assert.equal((await anna.get(`/avatar/${id}`)).status, 404);
+  });
+
+  test('Sonderfragen: auswählen, beantworten, Frist, Auflösung', async () => {
+    // Frist = Start des ersten Spiels; hier noch in der Zukunft, damit die Auswahl offen ist
     const restore = await postponeTournament(tournamentId);
+    const manage = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(manage.text, /name="frage" value="weltmeister"/);
+    assert.doesNotMatch(manage.text, /<fieldset class="field" disabled>/);
+    assert.doesNotMatch(manage.text, /name="answer_type"|name="choices"|name="hint"|bonus_deadline_at/, 'keine komplizierten Felder mehr');
+    assert.doesNotMatch(manage.text, /Neue Sonderfrage|action="[^"]*\/verwalten\/frage"/, 'niemand legt selbst Fragen an');
+    const all = new URLSearchParams([['tournament_id', tournamentId], ...['weltmeister', 'finals-mvp', 'meistgebannt', 'kuerzestes-spiel', 'pentakill-team', 'pentakill-spieler'].map((k) => ['frage', k])]);
+    const add = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, all);
+    assert.equal(add.status, 303);
+    const qs = await db.query<{ id: string; question: string; answer_type: string; catalog_key: string }>('select id, question, answer_type, catalog_key from bonus_questions order by position');
+    assert.equal(qs.length, 6);
+    assert.deepEqual(qs.map((q) => q.answer_type), ['team', 'player', 'champion', 'team', 'team', 'player']);
+    const champ = qs.find((q) => q.catalog_key === 'weltmeister')!;
+    const mvp = qs.find((q) => q.catalog_key === 'finals-mvp')!;
+    // Abwählen löscht die Frage, Wiederholen ändert nichts
+    const less = new URLSearchParams(all);
+    less.delete('frage', 'pentakill-spieler');
+    await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
+    await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, all);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 6);
+    // Nur die Leitung darf wählen
+    assert.equal((await ben.post(`/r/${slug}/verwalten/fragen-auswahl`, all)).status, 403);
+
+    // Vorschlag für neue Fragen geht per E-Mail an den Betreiber
+    assert.equal((await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: '   ' })).status, 400);
+    const sug = await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: 'Wer holt den ersten Baron?' });
+    assert.equal(sug.location, `/r/${slug}/verwalten?hinweis=vorschlag-gesendet#fragen`);
+    const mail = [...mailer.sent!].reverse().find((m) => m.to === 'vorschlaege@example.de')!;
+    assert.match(mail.text, /Wer holt den ersten Baron\?/);
+    assert.match(mail.text, /Anna/);
     const form = await ben.get(`/r/${slug}/sonderfragen`);
     assert.match(form.text, /Antworten bis zum Start des ersten Spiels/);
-    assert.doesNotMatch((await anna.get(`/r/${slug}/verwalten`)).text, /bonus_deadline_at/, 'keine Frist mehr zum Einstellen');
     assert.match(form.text, /Antworten speichern/);
     assert.match(form.text, /<option value="Gen.G">Gen.G<\/option>/);
     const saved = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'Gen.G', [`antwort_${mvp.id}`]: '  chovy ' });
@@ -480,6 +561,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();
+    const locked = await anna.get(`/r/${slug}/verwalten`);
+    assert.match(locked.text, /<fieldset class="field" disabled>/);
+    assert.match(locked.text, /Die Auswahl ist gesperrt/);
+    assert.match(locked.text, /Frage löschen/);
+    const refused = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
+    assert.equal(refused.status, 400);
+    assert.match(refused.text, /schon begonnen/);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 6);
     const late = await ben.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'T1' });
     assert.equal(late.location, `/r/${slug}/sonderfragen?hinweis=antworten-zu-spaet`);
     const closed = await ben.get(`/r/${slug}/sonderfragen`);
@@ -489,19 +578,19 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     // Auflösen: Weltmeister Gen.G (5 Punkte), MVP "Chovy" – Schreibweise egal (3 Punkte)
     const q = (id: string) => db.one<Record<string, unknown>>('select * from bonus_questions where id = $1', [id]);
-    const c = (await q(champ.id))!;
-    await anna.post(`/r/${slug}/verwalten/frage/${champ.id}`, {
-      aktion: 'speichern', question: String(c.question), points: '5', position: '1', answer_type: 'team', choices: '', hint: '', correct_answers: 'Gen.G',
-    });
-    await anna.post(`/r/${slug}/verwalten/frage/${mvp.id}`, {
-      aktion: 'speichern', question: 'Wer wird Finals-MVP?', points: '3', position: '2', answer_type: 'text', choices: '', hint: '', correct_answers: 'Chovy',
-    });
+    await anna.post(`/r/${slug}/verwalten/frage/${champ.id}`, { aktion: 'speichern', points: '5', correct_answers: 'Gen.G' });
+    await anna.post(`/r/${slug}/verwalten/frage/${mvp.id}`, { aktion: 'speichern', points: '3', correct_answers: 'Chovy' });
+    assert.equal((await q(champ.id))!.question, 'Wer wird Weltmeister?', 'Frage und Antwortart bleiben fest');
+    // Nach dem Start lässt sich eine Frage nur noch über ihre Einstellungen löschen
+    const weg = qs.find((x) => x.catalog_key === 'kuerzestes-spiel')!;
+    await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td>([^<]+)<\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 
-  test('Verwalten: nur Leitung; Einladungslink erneuern; Mitglied zur Mitleitung machen', async () => {
+  test('Verwalten: nur Spielleiter; Einladungslink erneuern; Mitglied zum Mit-Spielleiter machen', async () => {
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 403);
     const renew = await anna.post(`/r/${slug}/verwalten/einladung-neu`);
     assert.equal(renew.status, 303);
@@ -509,12 +598,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
     await anna.post(`/r/${slug}/verwalten/mitglied/${benId}`, { aktion: 'admin' });
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 200);
-    // Mitleitung darf keine Rollen ändern
+    // Mit-Spielleiter darf keine Rollen ändern
     const annaId = (await db.one<{ id: string }>(`select id from users where email = 'anna@example.de'`))!.id;
     assert.equal((await ben.post(`/r/${slug}/verwalten/mitglied/${annaId}`, { aktion: 'entfernen' })).status, 403);
   });
 
-  test('Konto löschen: Leitung geht an Mitleitung über, Daten sind weg', async () => {
+  test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {
     const r = await anna.post('/konto/loeschen', { bestaetigt: 'ja' });
     assert.equal(r.location, '/?hinweis=konto-geloescht');
     assert.equal(anna.cookies.size, 0);
@@ -767,6 +856,16 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
     assert.equal((pub.text.match(/class="ad ad-(left|right)"/g) ?? []).length, 2);
+  });
+
+  test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
+    const adminPage = await admin.get('/admin');
+    assert.match(adminPage.text, /class="role-switch"/);
+    assert.match(adminPage.text, /<summary>Administrator<\/summary>/);
+    const normal = await admin.get(`/r/${slug}/rangliste`);
+    assert.match(normal.text, /<summary>Spielleiter<\/summary>/);
+    assert.match(normal.text, new RegExp(`href="/r/${slug}/verwalten"`));
+    assert.doesNotMatch((await new Client().get('/impressum')).text, /role-switch/);
   });
 
   test('Turnierbaum: Phasen, Begegnungen, ausgeschiedene Teams grau', async () => {

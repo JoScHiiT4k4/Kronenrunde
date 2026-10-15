@@ -9,6 +9,11 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
+  'email-gesendet': { text: 'Wir haben dir eine Mail an die neue Adresse geschickt. Mit dem Link darin wird sie übernommen.', kind: 'ok' },
+  'email-geaendert': { text: 'Deine E-Mail-Adresse ist geändert.', kind: 'ok' },
+  'avatar-gespeichert': { text: 'Dein Profilbild ist gespeichert.', kind: 'ok' },
+  'avatar-geloescht': { text: 'Dein Profilbild ist entfernt.', kind: 'ok' },
+  'avatar-fehler': { text: 'Das Bild konnte nicht gespeichert werden. Bitte wähle ein anderes Bild (JPG, PNG oder WebP).', kind: 'warn' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
   abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },
   beigetreten: { text: 'Willkommen in der Tipprunde!', kind: 'ok' },
@@ -18,6 +23,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'keine-aenderung': { text: 'Keine Änderungen.', kind: 'ok' },
   'antworten-gespeichert': { text: 'Deine Antworten sind gespeichert.', kind: 'ok' },
   'antworten-zu-spaet': { text: 'Die Sonderfragen sind schon geschlossen.', kind: 'warn' },
+  'vorschlag-gesendet': { text: 'Danke! Dein Vorschlag ist per E-Mail unterwegs.', kind: 'ok' },
   'link-erneuert': { text: 'Neuer Einladungslink erstellt. Der alte funktioniert nicht mehr.', kind: 'ok' },
   verlassen: { text: 'Du hast die Tipprunde verlassen.', kind: 'ok' },
   'runde-geloescht': { text: 'Die Tipprunde ist gelöscht.', kind: 'ok' },
@@ -64,8 +70,9 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
   <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
   ${tournamentBar(ctx)}
   <nav class="top-nav">
-    ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
-    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
+    ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
+    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>
+    <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn">Abmelden</button></form>` : html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
@@ -81,6 +88,7 @@ ${adBox('right')}
 <footer class="foot">
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
+  <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></p>
 </footer>
 </body>
 </html>`;
@@ -122,6 +130,19 @@ function adBox(side: 'left' | 'right'): Html {
   return html`<aside class="ad ad-${side}" aria-label="Werbung"><div class="ad-box"><span class="ad-label">Anzeige</span></div></aside>`;
 }
 
+/** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite). */
+function roleSwitch(ctx: Ctx, league: LeagueNav | undefined): Html {
+  const admin = ctx.path.startsWith('/admin');
+  const leaderHref = league ? `/r/${league.slug}/verwalten` : '/';
+  return html`<details class="role-switch">
+    <summary>${admin ? 'Administrator' : 'Spielleiter'}</summary>
+    <div class="role-menu">
+      <a href="${leaderHref}"${!admin ? html` aria-current="true"` : nothing}>Spielleiter</a>
+      <a href="/admin"${admin ? html` aria-current="true"` : nothing}>Administrator</a>
+    </div>
+  </details>`;
+}
+
 function leagueNav(l: LeagueNav): Html {
   const tab = (key: LeagueNav['active'], label: string) =>
     html`<a href="/r/${l.slug}/${key}"${l.active === key ? html` aria-current="page"` : nothing}>${label}</a>`;
@@ -136,6 +157,13 @@ function leagueNav(l: LeagueNav): Html {
     ${l.canManage ? tab('verwalten', 'Verwalten') : nothing}
   </div>
 </nav>`;
+}
+
+/** Kleines rundes Profilbild; ohne Bild der Anfangsbuchstabe. */
+export function avatar(userId: string, name: string, version: Date | null, size: 'sm' | 'lg' = 'sm'): Html {
+  return version
+    ? html`<img class="avatar avatar-${size}" src="/avatar/${userId}?v=${String(version.getTime())}" alt="" width="${size === 'lg' ? 96 : 28}" height="${size === 'lg' ? 96 : 28}" loading="lazy">`
+    : html`<span class="avatar avatar-${size} avatar-ph" aria-hidden="true">${[...name][0]?.toUpperCase() ?? '?'}</span>`;
 }
 
 export function csrfField(ctx: Ctx): Html {

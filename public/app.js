@@ -67,11 +67,11 @@ if ('serviceWorker' in navigator) {
   let deferred = null;
   let sheet = null;
 
-  // Nach "Später" vier Wochen Ruhe
+  // Einmal beantwortet (Hinzufügen, Später, Verstanden): pro Gerät nie wieder fragen, solange der Browser-Speicher nicht geleert wird.
+  // Über die Kontoseite lässt sich der Hinweis jederzeit selbst öffnen.
   const quiet = () => {
     try {
-      const t = Number(localStorage.getItem(KEY));
-      return t > 0 && Date.now() - t < 28 * 864e5;
+      return Number(localStorage.getItem(KEY)) > 0;
     } catch {
       return false;
     }
@@ -94,8 +94,8 @@ if ('serviceWorker' in navigator) {
     return e;
   };
 
-  function show(kind) {
-    if (sheet || standalone || !loggedIn || quiet()) return;
+  function show(kind, force) {
+    if (sheet || standalone || !loggedIn || (!force && quiet())) return;
     sheet = el('div', 'install-sheet');
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-labelledby', 'install-title');
@@ -129,6 +129,11 @@ if ('serviceWorker' in navigator) {
         close();
       });
       actions.append(later, add);
+    } else if (kind === 'other') {
+      sheet.append(
+        el('p', null, 'Öffne das Menü deines Browsers (⋮ oder ⋯) und wähle „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. In Chrome und Edge steht das Symbol dafür auch rechts in der Adressleiste.'),
+      );
+      actions.append(later);
     } else {
       // iPhone/iPad: Apple lässt Webseiten das nicht selbst erledigen – also kurz zeigen, wie es geht
       const steps = el('ol', 'install-steps');
@@ -153,6 +158,13 @@ if ('serviceWorker' in navigator) {
     close();
   });
   if (isIOS) setTimeout(() => show('ios'), 1500);
+
+  // Knopf auf der Kontoseite
+  const section = document.querySelector('[data-install-section]');
+  if (section && !standalone) {
+    section.hidden = false;
+    section.querySelector('[data-install]').addEventListener('click', () => show(deferred ? 'android' : isIOS ? 'ios' : 'other', true));
+  }
 })();
 
 // Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann erscheinen die Livestream-Links)
@@ -173,4 +185,39 @@ if ('serviceWorker' in navigator) {
   };
   const timer = setInterval(tick, 1000);
   tick();
+})();
+
+// Profilbild: im Browser auf 128x128 zuschneiden und verkleinern (JPEG), dann als Text mitschicken
+(() => {
+  const form = document.querySelector('[data-avatar-form]');
+  if (!form) return;
+  const file = form.querySelector('[data-avatar-file]');
+  const hidden = form.querySelector('input[name="avatar"]');
+  const submit = form.querySelector('[data-avatar-submit]');
+  file.addEventListener('change', () => {
+    submit.disabled = true;
+    hidden.value = '';
+    const f = file.files && file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!side) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+        hidden.value = canvas.toDataURL('image/jpeg', 0.85);
+        submit.disabled = false;
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  });
 })();

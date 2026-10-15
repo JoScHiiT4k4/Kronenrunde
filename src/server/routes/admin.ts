@@ -98,8 +98,9 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   ]);
   const tz = ctx.deps.config.timeZone;
   const body = html`<section class="panel">
-  <h1>Admin</h1>
+  <h1>Administrator</h1>
   <p class="muted">Turniere, Teams, Spiele und Ergebnisse gelten für alle Tipprunden.</p>
+  <p><a href="/admin/rechtliches">Rechtliche Angaben (Impressum, Datenschutz)</a></p>
   <h2>Turniere</h2>
   <ul class="league-list">
     ${tournaments.map(
@@ -132,7 +133,7 @@ Finale</textarea></label>
     <fieldset class="field">
       <legend>Wer darf neue Tipprunden anlegen?</legend>
       <label class="check"><input type="radio" name="league_creation" value="admins"${attr(creation === 'admins', 'checked')}>
-        <span>Nur Admins <span class="muted">– für alle anderen ist „Tipprunde erstellen“ ausgeblendet; sie treten über deinen Einladungslink bei</span></span></label>
+        <span>Nur Administratoren <span class="muted">– für alle anderen ist „Tipprunde erstellen“ ausgeblendet; sie treten über deinen Einladungslink bei</span></span></label>
       <label class="check"><input type="radio" name="league_creation" value="alle"${attr(creation === 'alle', 'checked')}>
         <span>Jeder mit Konto</span></label>
     </fieldset>
@@ -186,7 +187,7 @@ Finale</textarea></label>
   </form>
   <p class="muted">Teamnamen nachträglich ändern ist unproblematisch: Tipps hängen am Team, nicht am Namen.</p>
 </section>`;
-  return page(ctx, 'Admin', body, error);
+  return page(ctx, 'Administrator', body, error);
 }
 
 // ---------------------------------------------------------------------
@@ -221,7 +222,7 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
 
   const base = `/admin/turnier/${t.id}`;
   const body = html`<section class="panel">
-  <p><a href="/admin">Zurück zum Admin-Bereich</a></p>
+  <p><a href="/admin">Zurück zum Administrator-Bereich</a></p>
   <h1>${t.name}</h1>
   <form method="post" action="${base}" class="stack">
     ${csrfField(ctx)}
@@ -294,7 +295,7 @@ async function tournamentPage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="submit" class="btn btn-primary">Spiel anlegen</button>
   </form>
 </section>`;
-  return page(ctx, `${t.name} – Admin`, body, error);
+  return page(ctx, `${t.name} – Administrator`, body, error);
 }
 
 function matchFields(ctx: Ctx, m: MatchRow | null, stages: { id: string; name: string }[], teamList: Team[]): Html {
@@ -378,7 +379,7 @@ async function matchPage(ctx: Ctx, error?: string): Promise<Res> {
   })}
   <p class="muted">Anstoß: ${m.scheduled_at ? `${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : 'offen'}</p>
 </section>`;
-  return page(ctx, 'Spiel bearbeiten – Admin', body, error);
+  return page(ctx, 'Spiel bearbeiten – Administrator', body, error);
 }
 
 export function registerAdminRoutes(router: Router<Ctx>) {
