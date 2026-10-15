@@ -20,6 +20,7 @@ Was die App kann:
   Team A steht links auf der blauen Seite, Team B rechts auf der roten.
 - **Tippschluss automatisch** (Standard): jedes Spiel einzeln zum Anstoß – oder früher, sobald das Spiel davor vorbei ist; alternativ ganzer Spieltag oder jedes Spiel zur angesetzten Zeit. Von der Datenbank erzwungen; ab Tippschluss sieht jeder die Tipps der anderen.
 - **Alle Tipps**: alle Spiele mit abgelaufenem Tippschluss und was jeder getippt hat (nach Phase, neueste zuerst); einzelne Spiele auch über „Tipps zu diesem Spiel“.
+- **Turnierbaum** (Reiter neben „Alle Tipps“): alle Phasen des Turniers (Play-In, Swiss, K.-o.-Phase …) mit Teams, Begegnungen und Ergebnissen; Swiss mit Bilanz-Tabelle. Ausgeschiedene Teams sind grau, Teams, die weiter sind, golden markiert – berechnet aus den eingetragenen Ergebnissen.
 - **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
 - **Sonderfragen** mit Frist (Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
@@ -79,7 +80,7 @@ TEST_DATABASE_URL=postgres://… npm run test:app      # ganze App im Ablauf (nu
 
 ```
 deploy/           Installation auf dem Raspberry Pi (install.sh), Verwaltungsbefehl "tippspiel", Anleitung
-src/domain/       Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste (reine Logik)
+src/domain/       Punkte, Tippschluss, Ergebnisse, Sonderfragen, Rangliste, Turnierbaum (reine Logik)
 src/server/       Web-Server: Anmeldung, Seiten, Datenbank-Anschluss
   routes/         Seiten: Tipprunden & Tippen, Verwalten, Admin, Anmeldung
   db/             PostgreSQL-Anschluss und Migrationen

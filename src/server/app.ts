@@ -25,6 +25,7 @@ import {
 import type { Mailer } from './mail.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
+import { registerBracketRoutes } from './routes/bracket.ts';
 import { registerLeagueRoutes } from './routes/leagues.ts';
 import { registerManageRoutes } from './routes/manage.ts';
 import { layout } from './views/layout.ts';
@@ -114,6 +115,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
   const router = new Router<Ctx>();
   registerAuthRoutes(router);
   registerLeagueRoutes(router);
+  registerBracketRoutes(router);
   registerManageRoutes(router);
   registerAdminRoutes(router);
 
