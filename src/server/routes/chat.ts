@@ -3,6 +3,8 @@
 import type { Ctx } from '../app.ts';
 import type { Db } from '../db/index.ts';
 import { HttpError, type Res, type Router } from '../http.ts';
+import { vapidSubject } from '../benachrichtigung.ts';
+import { loadVapid, sendPush } from '../webpush.ts';
 import { loginRedirect } from './common.ts';
 import { loadLeague } from './league-data.ts';
 
@@ -40,6 +42,26 @@ export function startChatCleanup(db: Db, log: (m: string) => void): () => void {
   return () => (clearTimeout(first), clearInterval(every));
 }
 
+/** Push an alle anderen Mitglieder, die den Chat nicht stummgeschaltet haben. */
+async function pushToMembers(ctx: Ctx, league: { id: string; slug: string; name: string }, senderId: string, senderName: string, text: string): Promise<void> {
+  const { db, config } = ctx.deps;
+  const subs = await db.query<{ id: string; endpoint: string; p256dh: string; auth: string }>(
+    `select s.id, s.endpoint, s.p256dh, s.auth
+       from league_members lm
+       join notification_prefs p on p.user_id = lm.user_id and p.chat_push
+       join push_subscriptions s on s.user_id = lm.user_id
+      where lm.league_id = $1 and lm.user_id <> $2`,
+    [league.id, senderId],
+  );
+  if (!subs.length) return;
+  const vapid = await loadVapid(db);
+  const message = { title: `${senderName} im Chat · ${league.name}`, body: text.length > 120 ? `${text.slice(0, 117)}…` : text, url: `/r/${league.slug}/rangliste`, tag: `chat-${league.slug}` };
+  for (const s of subs) {
+    const r = await sendPush(vapid, s, message, vapidSubject(config));
+    if (r === 'gone') await db.run('delete from push_subscriptions where id = $1', [s.id]);
+  }
+}
+
 export function registerChatRoutes(router: Router<Ctx>) {
   // Neueste 50 Nachrichten (ohne "nach") oder alle neueren als die Nummer in "nach"
   router.get('/r/:slug/chat/nachrichten', async (ctx) => {
@@ -68,6 +90,7 @@ export function registerChatRoutes(router: Router<Ctx>) {
        select ins.id::text, ins.user_id, u.display_name as name, ins.created_at, ins.body from ins join users u on u.id = ins.user_id`,
       [league.id, ctx.user.id, text],
     );
+    pushToMembers(ctx, league, ctx.user.id, ctx.user.display_name, text).catch(() => {});
     return json({ message: view(row!) }, 201);
   });
 }

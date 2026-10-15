@@ -345,9 +345,9 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const minutes = h === null || m === null ? null : h * 60 + m;
     if (minutes === null || minutes < 5 || minutes > 10080) return accountPage(ctx, 'Bitte wähle eine Vorlaufzeit zwischen 5 Minuten und 7 Tagen.', 'benachrichtigungen');
     await ctx.deps.db.run(
-      `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes) values ($1, $2, $3, $4)
-       on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, updated_at = now()`,
-      [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes],
+      `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes, chat_push) values ($1, $2, $3, $4, $5)
+       on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, chat_push = $5, updated_at = now()`,
+      [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes, ctx.form.get('chat') === 'an'],
     );
     return redirect('/konto?bereich=benachrichtigungen&hinweis=benachrichtigung-gespeichert');
   });
@@ -371,6 +371,23 @@ export function registerAuthRoutes(router: Router<Ctx>) {
       [ctx.user.id],
     );
     return { status: 204, headers: {}, body: '' };
+  });
+
+  // Chat laut/stumm (Lautsprecher im Chat); gleicht sich mit der Einstellung unter Benachrichtigungen ab
+  router.post('/konto/chat-stumm', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const loud = ctx.form.get('stumm') === '0';
+    await ctx.deps.db.run(
+      `insert into notification_prefs (user_id, chat_push) values ($1, $2) on conflict (user_id) do update set chat_push = $2, updated_at = now()`,
+      [ctx.user.id, loud],
+    );
+    return { status: 204, headers: {}, body: '' };
+  });
+
+  router.get('/konto/push-schluessel', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { publicKey } = await loadVapid(ctx.deps.db);
+    return { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify({ key: publicKey }) };
   });
 
   router.post('/konto/push/entfernen', async (ctx) => {
@@ -517,7 +534,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
 
   if (area === 'profil') {
     const row = await db.one<{ avatar_updated_at: Date | null; first_name: string | null }>('select avatar_updated_at, first_name from users where id = $1', [user.id]);
-    content = html`<section class="panel narrow">
+    content = html`<section class="panel">
   <h2>Profilbild</h2>
   <div class="avatar-edit">
     ${avatar(user.id, user.display_name, row?.avatar_updated_at ?? null, 'lg')}
@@ -535,7 +552,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     </div>
   </div>
 </section>
-<section class="panel narrow">
+<section class="panel">
   <h2>Namen</h2>
   <form method="post" action="/konto/name" class="stack">
     ${csrfField(ctx)}
@@ -551,13 +568,13 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
   </form>
 </section>`;
   } else if (area === 'benachrichtigungen') {
-    const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
-      'select email_enabled, push_enabled, lead_minutes from notification_prefs where user_id = $1',
+    const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number; chat_push: boolean }>(
+      'select email_enabled, push_enabled, lead_minutes, chat_push from notification_prefs where user_id = $1',
       [user.id],
-    )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120 };
+    )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120, chat_push: false };
     const devices = (await db.one<{ n: number }>('select count(*)::int as n from push_subscriptions where user_id = $1', [user.id]))?.n ?? 0;
     const vapid = await loadVapid(db);
-    content = html`<section class="panel narrow" id="benachrichtigungen">
+    content = html`<section class="panel" id="benachrichtigungen">
   <h2>Benachrichtigungen</h2>
   <form method="post" action="/konto/benachrichtigung" class="stack">
     ${csrfField(ctx)}
@@ -572,6 +589,12 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
       </div>
       <small class="muted">Aktuell: ${leadLabel(prefs.lead_minutes)} vorher, nur wenn Tipps fehlen.</small>
     </fieldset>
+    <fieldset class="field lead-field">
+      <legend>Chat-Nachrichten</legend>
+      <label class="check"><input type="radio" name="chat" value="aus"${prefs.chat_push ? nothing : html` checked`}> Stummgeschaltet <small class="muted">(Standard)</small></label>
+      <label class="check"><input type="radio" name="chat" value="an"${prefs.chat_push ? html` checked` : nothing}> Bei neuen Nachrichten per Push informieren (Handy oder PC)</label>
+      <small class="muted">Dafür muss Push auf dem jeweiligen Gerät aktiviert sein. Im Chat selbst schaltest du mit dem Lautsprecher um.</small>
+    </fieldset>
     <button type="submit" class="btn">Speichern</button>
   </form>
   <div class="push-box" data-push data-key="${vapid.publicKey}" hidden>
@@ -583,7 +606,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
 </section>`;
   } else if (area === 'sicherheit') {
     const hasPassword = !!(await db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
-    content = html`<section class="panel narrow">
+    content = html`<section class="panel">
   <h2>E-Mail-Adresse ändern</h2>
   <p class="muted">Aktuell: ${user.email}</p>
   <form method="post" action="/konto/email" class="stack">
@@ -597,7 +620,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
   </form>
   <p class="muted">Die neue Adresse gilt erst, wenn du den Link in der Mail anklickst.</p>
 </section>
-<section class="panel narrow">
+<section class="panel">
   <h2>${hasPassword ? 'Passwort ändern' : 'Passwort festlegen'}</h2>
   <form method="post" action="/konto/passwort" class="stack">
     ${csrfField(ctx)}
@@ -610,12 +633,12 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
   <p class="muted">Danach bist du auf allen anderen Geräten abgemeldet.</p>
 </section>`;
   } else {
-    content = html`<section class="panel narrow" data-install-section hidden>
+    content = html`<section class="panel" data-install-section hidden>
   <h2>Aufs Handy oder den Desktop legen</h2>
   <p class="muted">Dann startest du das Tippspiel wie eine App.</p>
   <button type="button" class="btn" data-install>Zum Startbildschirm hinzufügen</button>
 </section>
-<section class="panel narrow">
+<section class="panel">
   <h2>Abmelden</h2>
   <p class="muted">Angemeldet als ${user.email}</p>
   <form method="post" action="/abmelden" class="stack">
@@ -623,7 +646,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     <button type="submit" class="btn">Abmelden</button>
   </form>
 </section>
-<section class="panel narrow danger-zone">
+<section class="panel danger-zone">
   <h2>Konto löschen</h2>
   <p>Löscht dein Konto mit allen Tipps und Antworten. Das lässt sich nicht rückgängig machen. Tipprunden, die du leitest, gehen an ein anderes Mitglied über.</p>
   <form method="post" action="/konto/loeschen" class="stack">

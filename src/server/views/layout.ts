@@ -105,12 +105,17 @@ ${chatWidget(ctx)}
 
 const CHAT_ICON = html`<svg class="chat-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>`;
 
+const SPEAKER_ON = html`<svg class="spk spk-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3Zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Zm-2.500-8.800v2.100a7 7 0 0 1 0 13.400v2.100a9 9 0 0 0 0-17.600Z"/></svg>`;
+const SPEAKER_OFF = html`<svg class="spk spk-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3Zm17.600 3 2.400-2.400-1.400-1.400-2.400 2.400-2.400-2.400-1.400 1.400 2.400 2.400-2.400 2.400 1.400 1.400 2.400-2.400 2.400 2.400 1.400-1.400-2.400-2.400Z"/></svg>`;
+
 /** Chat der aktuellen Tipprunde: Sprechblase unten rechts, klappt auf und zu. Ohne JavaScript bleibt er verborgen. */
 function chatWidget(ctx: Ctx): Html {
   if (!ctx.user || !ctx.sidebar) return nothing;
-  return html`<div class="chat" data-chat data-slug="${ctx.sidebar.slug}" data-csrf="${ctx.csrf}" hidden>
+  return html`<div class="chat" data-chat data-slug="${ctx.sidebar.slug}" data-csrf="${ctx.csrf}" data-muted="${ctx.sidebar.chatMuted ? '1' : '0'}" hidden>
   <section class="chat-panel" id="chat-panel" aria-label="Chat" hidden>
-    <header class="chat-head"><strong>Chat</strong><span class="muted">${ctx.sidebar.leagueName}</span><button type="button" class="chat-close" data-chat-close aria-label="Chat schließen">×</button></header>
+    <header class="chat-head"><strong>Chat</strong><span class="muted">${ctx.sidebar.leagueName}</span>
+      <button type="button" class="chat-mute" data-chat-mute aria-pressed="${ctx.sidebar.chatMuted ? 'true' : 'false'}" title="${ctx.sidebar.chatMuted ? 'Stumm – Benachrichtigungen einschalten' : 'Laut – stummschalten'}" aria-label="${ctx.sidebar.chatMuted ? 'Chat ist stumm, Benachrichtigungen einschalten' : 'Chat-Benachrichtigungen an, stummschalten'}">${SPEAKER_ON}${SPEAKER_OFF}</button>
+      <button type="button" class="chat-close" data-chat-close aria-label="Chat schließen">×</button></header>
     <div class="chat-log" data-chat-log role="log" aria-live="polite"><p class="muted chat-empty">Noch keine Nachrichten.</p></div>
     <form class="chat-form" data-chat-form autocomplete="off">
       <input type="text" name="text" maxlength="500" placeholder="Nachricht schreiben …" aria-label="Nachricht" required>
@@ -184,14 +189,14 @@ function rankBox(ctx: Ctx): Html {
   const me = s.rows.find((r) => r.userId === ctx.user?.id);
   const shown = me && !top.includes(me) ? [...top, me] : top;
   return html`<aside class="ad ad-right rank-side" aria-label="Rangliste ${s.leagueName}">
-    <a class="rank-box" href="/r/${s.slug}/rangliste">
-      <span class="rank-title">Rangliste</span>
+    <div class="rank-box">
+      <a class="rank-stretch rank-title" href="/r/${s.slug}/rangliste">Rangliste</a>
       <span class="rank-league">${s.leagueName}</span>
       <ol class="rank-list">
         ${shown.map(
           (r) => html`<li class="rank-row${r.userId === ctx.user?.id ? ' me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium-${r.rank}` : ''}">
           <span class="rank-pos">${r.rank}</span>
-          <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null)}<span class="rank-n">${r.displayName}</span></span>
+          <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null)}<a class="rank-n" href="/r/${s.slug}/spieler/${r.userId}">${r.displayName}</a></span>
           ${scaleBar(r.points, s.possible)}
           <span class="rank-pts">${r.points}</span>
         </li>`,
@@ -199,7 +204,7 @@ function rankBox(ctx: Ctx): Html {
       </ol>
       <span class="rank-foot">${s.possible > 0 ? `${s.possible} Punkte bisher möglich` : 'Noch keine Spiele gewertet'}</span>
       <span class="rank-more">Zur ganzen Rangliste →</span>
-    </a>
+    </div>
   </aside>`;
 }
 

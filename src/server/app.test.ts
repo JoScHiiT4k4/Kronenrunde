@@ -474,7 +474,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
     assert.match(tips.text, /<summary>Tipps der Mitspieler<\/summary>[^]*?<td>Ben<\/td>/);
     // Rangliste in der Seitenleiste, klickbar zur Rangliste
-    assert.match(tips.text, new RegExp(`<a class="rank-box" href="/r/${slug}/rangliste">`));
+    assert.match(tips.text, new RegExp(`<a class="rank-stretch rank-title" href="/r/${slug}/rangliste">`));
 
     // Reiter "Alle Tipps": beide geschlossenen Spiele mit allen Tipps und Punkten – offene Spiele nicht
     const all = await ben.get(`/r/${slug}/alle-tipps`);
@@ -737,6 +737,22 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(page.text, /data-chat data-slug=/);
     assert.match(page.text, /chat\.js/);
     assert.match(page.text, /Nachrichten werden nach 7 Tagen gelöscht/);
+
+    // Lautsprecher: standardmäßig stumm, Umschalten gleicht sich mit dem Konto ab
+    assert.match(page.text, /data-muted="1"/);
+    assert.match(page.text, /data-chat-mute aria-pressed="true"/);
+    assert.match(page.text, /<a class="rank-n" href="\/r\/[a-z0-9-]+\/spieler\/[0-9a-f-]{36}">/, 'Namen in der Rangliste rechts führen zum Profil');
+    assert.equal((await anna.post('/konto/chat-stumm', { stumm: '0' })).status, 204);
+    assert.match((await anna.get(`/r/${slug}/rangliste`)).text, /data-muted="0"/);
+    assert.match((await anna.get('/konto?bereich=benachrichtigungen')).text, /name="chat" value="an" checked/);
+    assert.equal((await anna.post('/konto/chat-stumm', { stumm: '1' })).status, 204);
+    assert.match((await anna.get('/konto?bereich=benachrichtigungen')).text, /name="chat" value="aus" checked/);
+
+    // Profil: Vorname = Anzeigename wird nur einmal gezeigt
+    await db.run(`update users set first_name = 'Ben' where email = 'ben@example.de'`);
+    const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
+    const benProfile = (await anna.get(`/r/${slug}/spieler/${benId}`)).text;
+    assert.match(benProfile, /<h1>Ben<\/h1>\s*<p class="muted">Mitglied in /);
 
     const empty = JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text);
     assert.deepEqual(empty.messages, []);

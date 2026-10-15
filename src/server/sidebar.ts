@@ -10,6 +10,8 @@ export interface Sidebar {
   rows: StandingRow[];
   avatarOf: Map<string, Date | null>;
   possible: number;
+  /** Chat stummgeschaltet (Standard) – false, wenn Push-Hinweise für Chat-Nachrichten an sind */
+  chatMuted: boolean;
 }
 
 interface LeagueRow {
@@ -29,6 +31,9 @@ export async function loadSidebar(db: Db, userId: string, slug: string | null): 
   }
   league ??= await db.one<LeagueRow>(`select ${cols} from leagues l join league_members m on m.league_id = l.id where m.user_id = $1 order by m.joined_at desc limit 1`, [userId]);
   if (!league) return null;
-  const s = await loadStandings(db, league);
-  return { slug: league.slug, leagueName: league.name, rows: s.rows, avatarOf: s.avatarOf, possible: s.possible };
+  const [s, prefs] = await Promise.all([
+    loadStandings(db, league),
+    db.one<{ chat_push: boolean }>('select chat_push from notification_prefs where user_id = $1', [userId]),
+  ]);
+  return { slug: league.slug, leagueName: league.name, rows: s.rows, avatarOf: s.avatarOf, possible: s.possible, chatMuted: !prefs?.chat_push };
 }

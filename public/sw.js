@@ -52,6 +52,8 @@ self.addEventListener('push', (event) => {
       body: data.body || '',
       icon: '/static/icon-192.png',
       badge: '/static/icon-192.png',
+      tag: typeof data.tag === 'string' ? data.tag : undefined,
+      renotify: typeof data.tag === 'string',
       data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/' },
     }),
   );
