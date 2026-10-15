@@ -80,7 +80,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
 <div class="page${o.wide ? ' page-wide' : ''}">
-${adBox('left')}
+<div class="ad ad-ghost${ctx.sidebar ? ' ad-ghost-wide' : ''}" aria-hidden="true"></div>
 <main class="main${o.wide ? ' main-wide' : ''}">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
@@ -179,15 +179,20 @@ function rankBox(ctx: Ctx): Html {
   </aside>`;
 }
 
-/** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite). */
+/** Nur für den Betreiber: Umschalter zwischen Spielleiter (Tipprunde verwalten) und Administrator (ganze Seite).
+ *  Mit nur einer verfügbaren Rolle bleibt es ein einfacher Text ohne Aufklapp-Pfeil. */
 function roleSwitch(ctx: Ctx, league: LeagueNav | undefined): Html {
   const admin = ctx.path.startsWith('/admin');
-  const leaderHref = league ? `/r/${league.slug}/verwalten` : '/';
+  const slug = league?.slug ?? ctx.sidebar?.slug ?? null;
+  const roles: { label: string; href: string; current: boolean }[] = [];
+  if (slug) roles.push({ label: 'Spielleiter', href: `/r/${slug}/verwalten`, current: !admin });
+  roles.push({ label: 'Administrator', href: '/admin', current: admin || !slug });
+  const current = roles.find((r) => r.current) ?? roles[0];
+  if (roles.length < 2) return html`<a class="role-single" href="${current.href}">${current.label}</a>`;
   return html`<details class="role-switch">
-    <summary>${admin ? 'Administrator' : 'Spielleiter'}</summary>
+    <summary>${current.label}</summary>
     <div class="role-menu">
-      <a href="${leaderHref}"${!admin ? html` aria-current="true"` : nothing}>Spielleiter</a>
-      <a href="/admin"${admin ? html` aria-current="true"` : nothing}>Administrator</a>
+      ${roles.map((r) => html`<a href="${r.href}"${r.current ? html` aria-current="true"` : nothing}>${r.label}</a>`)}
     </div>
   </details>`;
 }

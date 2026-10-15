@@ -451,7 +451,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(status, { status: 'finished', wins_a: 1, wins_b: 2 });
 
     const table = await anna.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
     const tips = await anna.get(`/r/${slug}/tippen`);
@@ -635,7 +635,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span><\/td>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><span class="who">(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/span>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 
@@ -904,7 +904,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
-    assert.equal((pub.text.match(/class="ad ad-(left|right)"/g) ?? []).length, 2);
+    // Links nur ein unsichtbarer Platzhalter (Werbung ist ausgeblendet), rechts die Werbefläche bzw. – angemeldet – die Rangliste
+    assert.equal((pub.text.match(/class="ad ad-right"/g) ?? []).length, 1);
+    assert.match(pub.text, /class="ad ad-ghost" aria-hidden="true"/);
+    assert.doesNotMatch(pub.text, /ad-left/);
   });
 
   test('Kopfzeile: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {
@@ -914,6 +917,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const normal = await admin.get(`/r/${slug}/rangliste`);
     assert.match(normal.text, /<summary>Spielleiter<\/summary>/);
     assert.match(normal.text, new RegExp(`href="/r/${slug}/verwalten"`));
+    assert.match(normal.text, /<a href="\/admin">Administrator<\/a>/);
+    assert.match(normal.text, /<a href="\/r\/[a-z0-9-]+\/verwalten" aria-current="true">Spielleiter<\/a>/, 'gewählte Rolle ist markiert');
     assert.doesNotMatch((await new Client().get('/impressum')).text, /role-switch/);
   });
 
@@ -961,7 +966,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Swiss: Runden stehen schon, die Paarungen sind noch offen
     const swiss = await admin.get(`${path}?turnier=${tid}&phase=swiss`);
     assert.match(swiss.text, /Schweizer System/);
-    assert.match(swiss.text, /<h3 class="bk-round-title">Round 5<\/h3>/);
+    assert.match(swiss.text, /<span class="sw-title">Round 5<\/span>/);
     assert.doesNotMatch(swiss.text, /bk-table/);
     // K.-o.-Phase: Viertelfinale, Halbfinale, Finale als Spalten
     const ko = await admin.get(`${path}?turnier=${tid}&phase=knockout-stage`);
