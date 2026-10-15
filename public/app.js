@@ -221,3 +221,12 @@ if ('serviceWorker' in navigator) {
     reader.readAsDataURL(f);
   });
 })();
+
+// Sonderfragen: Rückfrage, wenn beim Speichern Fragen abgewählt (also gelöscht) werden
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  const text = form.dataset && form.dataset.confirmUncheck;
+  if (!text || (e.submitter && e.submitter.dataset.confirm)) return;
+  const removed = [...form.querySelectorAll('input[data-was-checked]')].some((i) => !i.checked && !i.disabled);
+  if (removed && !window.confirm(text)) e.preventDefault();
+});
