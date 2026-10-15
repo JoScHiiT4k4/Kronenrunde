@@ -24,6 +24,10 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'avatar-geloescht': { text: 'Dein Profilbild ist entfernt.', kind: 'ok' },
   'avatar-fehler': { text: 'Das Bild konnte nicht gespeichert werden. Bitte wähle ein anderes Bild (JPG, PNG oder WebP).', kind: 'warn' },
   gespeichert: { text: 'Gespeichert.', kind: 'ok' },
+  'test-eingeblendet': { text: 'Das Testspiel ist eingeblendet und mit dem Hauptspiel abgeglichen.', kind: 'ok' },
+  'test-ausgeblendet': { text: 'Das Testspiel ist ausgeblendet.', kind: 'ok' },
+  'test-abgeglichen': { text: 'Das Testspiel ist mit dem Hauptspiel abgeglichen.', kind: 'ok' },
+  'test-fehlt': { text: 'Dafür braucht es ein Hauptspiel, in dem du Mitglied bist.', kind: 'warn' },
   abgeglichen: { text: 'Champions und Spielerkader sind auf dem neuesten Stand.', kind: 'ok' },
   beigetreten: { text: 'Willkommen in der Tipprunde!', kind: 'ok' },
   erstellt: { text: 'Die Tipprunde ist angelegt. Lade jetzt deine Leute mit dem Einladungslink ein.', kind: 'ok' },
@@ -82,9 +86,9 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${leagueSwitch(ctx)}
-    ${ctx.isAdmin ? roleSwitch(ctx, o.league) : nothing}
-    ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>
-    <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn">Abmelden</button></form>` : html`<a href="/anmelden">Anmelden</a>`}
+    ${ctx.isAdmin && !ctx.sidebar?.isTest ? roleSwitch(ctx, o.league) : nothing}
+    ${ctx.user ? html`<a href="/konto" class="top-user" title="Dein Konto">${ICON_USER}<span class="top-user-name">${ctx.user.display_name}</span></a>
+    <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn" title="Abmelden" aria-label="Abmelden">${ICON_LOGOUT}</button></form>`: html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
 ${o.league ? leagueNav(o.league) : nothing}
@@ -212,6 +216,9 @@ function rankBox(ctx: Ctx): Html {
     </div>
   </aside>`;
 }
+
+const ICON_USER = html`<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>`;
+const ICON_LOGOUT = html`<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`;
 
 /** Dropdown zum Wechseln der Tipprunde – nur mit mehr als einer Tipprunde. */
 function leagueSwitch(ctx: Ctx): Html {

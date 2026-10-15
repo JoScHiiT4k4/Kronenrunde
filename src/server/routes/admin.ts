@@ -8,6 +8,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { formatBytes, formatUptime, percent, readSystemInfo } from '../system-info.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
 import { clearChat } from './chat.ts';
+import { hideTestLeague, loadTestState, showTestLeague, syncTestLeague } from '../testspiel.ts';
 import { runSync, SYNC_LABELS } from '../abgleich.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
@@ -90,6 +91,7 @@ const ADMIN_AREAS = [
   ['nutzer', 'Nutzer'],
   ['system', 'Server'],
   ['abgleich', 'Datenabgleich'],
+  ['test', 'Test'],
   ['impressum', 'Impressum'],
   ['datenschutz', 'Datenschutz'],
 ] as const;
@@ -267,6 +269,21 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
     ${csrfField(ctx)}
     <button type="submit" class="btn">Jetzt abgleichen</button>
   </form>
+</section>`;
+  } else if (area === 'test') {
+    const st = await loadTestState(db, ctx.user!.id);
+    content = html`<section class="panel">
+  <h2>Testspiel</h2>
+  <p class="muted">Eine zweite Tipprunde nur für dich. Dort siehst du die Seite so, wie sie ein normaler Teilnehmer sieht – ohne Spielleiter- und Administrator-Auswahl. Zum Zurückwechseln nimmst du oben das Dropdown mit den Tipprunden.</p>
+  <p>Hauptspiel: <strong>${st.main?.name ?? 'keines gefunden'}</strong><br>
+  Testspiel: <strong>${st.visible ? 'eingeblendet' : st.exists ? 'ausgeblendet' : 'noch nicht angelegt'}</strong></p>
+  <div class="btn-row">
+    ${st.visible ? html`<a class="btn" href="/r/testspiel/tippen">Testspiel öffnen</a>` : nothing}
+    ${st.main && !st.visible ? postButton(ctx, '/admin/test/einblenden', st.exists ? 'Testspiel einblenden' : 'Testspiel anlegen und einblenden') : nothing}
+    ${st.visible ? postButton(ctx, '/admin/test/abgleichen', 'Mit Hauptspiel abgleichen', { confirm: 'Einstellungen, Turniere und Sonderfragen des Testspiels werden mit dem Hauptspiel überschrieben. Deine Test-Antworten auf Sonderfragen gehen dabei verloren. Fortfahren?' }) : nothing}
+    ${st.visible ? postButton(ctx, '/admin/test/ausblenden', 'Testspiel ausblenden', { cls: 'btn btn-danger', confirm: 'Testspiel ausblenden? Deine Test-Tipps dort werden gelöscht.' }) : nothing}
+  </div>
+  <p class="muted">Abgeglichen werden Punkte, Tippschluss, Turniere und Sonderfragen – nie Teilnehmer, Tipps oder Antworten anderer.</p>
 </section>`;
   } else {
     const legal = await loadLegal(ctx);
@@ -544,6 +561,13 @@ export function registerAdminRoutes(router: Router<Ctx>) {
       return tournamentPage(ctx, dbError(e));
     }
     return redirect(`/admin/turnier/${ctx.params.id}?hinweis=gespeichert`);
+  });
+
+  post('/admin/test/einblenden', async (ctx) => redirect(`/admin?bereich=test&hinweis=${(await showTestLeague(ctx.deps.db, ctx.user!.id)) ? 'test-eingeblendet' : 'test-fehlt'}`));
+  post('/admin/test/abgleichen', async (ctx) => redirect(`/admin?bereich=test&hinweis=${(await syncTestLeague(ctx.deps.db, ctx.user!.id)) ? 'test-abgeglichen' : 'test-fehlt'}`));
+  post('/admin/test/ausblenden', async (ctx) => {
+    await hideTestLeague(ctx.deps.db, ctx.user!.id);
+    return redirect('/admin?bereich=test&hinweis=test-ausgeblendet');
   });
 
   post('/admin/chat-leeren', async (ctx) => {
