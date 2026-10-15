@@ -495,6 +495,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await restore();
     const after = await anna.get(`/r/${slug}/tippen`);
     assert.doesNotMatch(after.text, /data-countdown/);
+    assert.match(after.text, /class="tbar-label">[^<]+<\/span>/, 'läuft: nur der Turniername');
+    assert.doesNotMatch(after.text, /class="tbar-label">[^<]* in<\/span>/);
     assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
   });
@@ -768,9 +770,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(page.text, /<a class="rank-n" href="\/r\/[a-z0-9-]+\/spieler\/[0-9a-f-]{36}">/, 'Namen in der Rangliste rechts führen zum Profil');
     assert.equal((await anna.post('/konto/chat-stumm', { stumm: '0' })).status, 204);
     assert.match((await anna.get(`/r/${slug}/rangliste`)).text, /data-muted="0"/);
-    assert.match((await anna.get('/konto?bereich=benachrichtigungen')).text, /name="chat" value="an" checked/);
+    assert.match((await anna.get('/konto?bereich=chat')).text, /name="chat" value="an" checked/);
     assert.equal((await anna.post('/konto/chat-stumm', { stumm: '1' })).status, 204);
-    assert.match((await anna.get('/konto?bereich=benachrichtigungen')).text, /name="chat" value="aus" checked/);
+    assert.match((await anna.get('/konto?bereich=chat')).text, /name="chat" value="aus" checked/);
 
     // Profil: Vorname = Anzeigename wird nur einmal gezeigt
     await db.run(`update users set first_name = 'Ben' where email = 'ben@example.de'`);
@@ -794,13 +796,40 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await ben.post(`/r/${slug}/chat`, { text: 'Moin' });
     assert.equal(JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten?nach=${got.messages[0].id}`)).text).messages.length, 1);
 
+    // Schimpfwortfilter: Standard Sterne, pro Teilnehmer abschaltbar
+    await ben.post(`/r/${slug}/chat`, { text: 'Du Arsch' });
+    const starred = JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1);
+    assert.equal(starred.x, 'Du *****');
+    assert.match((await anna.get('/konto?bereich=chat')).text, /name="filter" value="an" checked/);
+    assert.match((await anna.post('/konto/chat', { chat: 'aus', filter: 'aus' })).location ?? '', /bereich=chat/);
+    assert.equal(JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1).x, 'Du Arsch');
+    assert.equal(JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1).x, 'Du *****', 'Ben behält seinen Filter');
+    await anna.post('/konto/chat', { chat: 'aus', filter: 'an' });
+    assert.doesNotMatch((await anna.get('/konto?bereich=benachrichtigungen')).text, /Chat-Nachrichten/, 'Chat-Einstellungen sind im Reiter Chat');
+
+    // Eigene Nachricht löschen: nur die eigene
+    const last = JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1);
+    assert.equal((await anna.post(`/r/${slug}/chat/${last.id}/loeschen`)).status, 404, 'fremde Nachricht bleibt');
+    assert.equal((await ben.post(`/r/${slug}/chat/${last.id}/loeschen`)).status, 200);
+    assert.ok(!JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text).messages.some((m: { id: number }) => m.id === last.id));
+
     assert.equal((await stranger.get(`/r/${slug}/chat/nachrichten`)).status, 404, 'Fremde lesen nicht mit');
     assert.equal((await stranger.post(`/r/${slug}/chat`, { text: 'hi' })).status, 404);
     assert.equal((await new Client().get(`/r/${slug}/chat/nachrichten`)).status, 303);
 
+    // Spielleiter leert den Chat der Runde (mit Rückfrage im Browser), Administrator alle Chats
+    assert.match((await anna.get(`/r/${slug}/verwalten?bereich=einstellungen`)).text, /data-confirm="Wirklich den ganzen Chatverlauf dieser Tipprunde/);
+    assert.equal((await stranger.post(`/r/${slug}/verwalten/chat-leeren`)).status, 404);
+    assert.match((await anna.post(`/r/${slug}/verwalten/chat-leeren`)).location ?? '', /hinweis=chat-geleert/);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from chat_messages'))!.n, 0);
+    await anna.post(`/r/${slug}/chat`, { text: 'Noch eine' });
+    assert.match((await admin.get('/admin?bereich=system')).text, /Alle Chatverläufe leeren/);
+    assert.match((await admin.post('/admin/chat-leeren')).location ?? '', /hinweis=chat-geleert/);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from chat_messages'))!.n, 0);
+    await ben.post(`/r/${slug}/chat`, { text: 'Moin' });
     await db.run(`update chat_messages set created_at = now() - interval '8 days' where body = 'Moin'`);
     assert.equal(await purgeOldMessages(db), 1);
-    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from chat_messages'))!.n, 1);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from chat_messages'))!.n, 0);
   });
 
   test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {

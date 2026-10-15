@@ -37,3 +37,5 @@ body[data-angemeldet] .foot { padding-bottom: 76px; }
 .chat-mute .spk { width: 20px; height: 20px; fill: currentColor; }
 .chat-mute[aria-pressed="true"] { color: var(--muted); }
 .chat-mute[aria-pressed="true"] .spk-on, .chat-mute[aria-pressed="false"] .spk-off { display: none; }
+.chat-del { margin-left: 8px; border: 0; background: none; color: var(--muted); font-size: 1.05rem; line-height: 1; cursor: pointer; padding: 0 2px; vertical-align: baseline; }
+.chat-del:hover { color: var(--red); }

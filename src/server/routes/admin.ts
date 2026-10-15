@@ -7,6 +7,7 @@ import type { BestOf } from '../../domain/types.ts';
 import { existsSync, writeFileSync } from 'node:fs';
 import { formatBytes, formatUptime, percent, readSystemInfo } from '../system-info.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
+import { clearChat } from './chat.ts';
 import { runSync, SYNC_LABELS } from '../abgleich.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
@@ -127,14 +128,16 @@ function gauge(label: string, p: number, detail: string, note?: string): Html {
 async function systemPanel(ctx: Ctx): Promise<Html> {
   const { db } = ctx.deps;
   const sys = readSystemInfo();
-  const [dbSize, tables] = await Promise.all([
+  const [dbSize, tables, chatRow] = await Promise.all([
     db.one<{ bytes: string }>('select pg_database_size(current_database())::text as bytes'),
     db.query<{ name: string; bytes: string }>(
       `select relname as name, pg_total_relation_size(c.oid)::text as bytes
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 6`,
     ),
+    db.one<{ n: number }>('select count(*)::int as n from chat_messages'),
   ]);
+  const chatCount = chatRow?.n ?? 0;
   const dbBytes = Number(dbSize?.bytes ?? 0);
   const maxTable = Math.max(1, ...tables.map((t) => Number(t.bytes)));
   const load1 = sys.load ? Math.round((sys.load[0] / sys.cores) * 100) : null;
@@ -154,6 +157,11 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
     <p class="muted">Holt sofort die neueste geprüfte Version von GitHub, ohne auf den nächsten 15-Minuten-Takt zu warten. Die Seite startet dabei kurz neu.</p>
     <button type="submit" class="btn">Jetzt aktualisieren</button>
   </form>
+</section>
+<section class="panel">
+  <h2>Chat</h2>
+  <p class="muted">Im Chat liegen aktuell ${chatCount} ${chatCount === 1 ? 'Nachricht' : 'Nachrichten'} (alle Tipprunden zusammen). Sie verschwinden nach 7 Tagen von selbst.</p>
+  ${postButton(ctx, '/admin/chat-leeren', 'Alle Chatverläufe leeren', { cls: 'btn btn-danger', confirm: 'Wirklich die Chatverläufe ALLER Tipprunden löschen? Das lässt sich nicht rückgängig machen.' })}
 </section>
 <section class="panel">
   <h2>Server</h2>
@@ -536,6 +544,11 @@ export function registerAdminRoutes(router: Router<Ctx>) {
       return tournamentPage(ctx, dbError(e));
     }
     return redirect(`/admin/turnier/${ctx.params.id}?hinweis=gespeichert`);
+  });
+
+  post('/admin/chat-leeren', async (ctx) => {
+    await clearChat(ctx.deps.db);
+    return redirect('/admin?bereich=system&hinweis=chat-geleert');
   });
 
   post('/admin/update-erzwingen', async (ctx) => {

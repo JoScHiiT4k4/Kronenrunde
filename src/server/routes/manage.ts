@@ -9,6 +9,7 @@ import { HttpError, htmlResponse, redirect, type Res, type Router } from '../htt
 import { csrfField, layout, postButton, tabMenu } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
 import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, toDomainMatch } from './league-data.ts';
+import { clearChat } from './chat.ts';
 import { lockModeOptions, parseLockMode } from './leagues.ts';
 
 async function manageAccess(ctx: Ctx): Promise<LeagueAccess> {
@@ -64,7 +65,7 @@ const isArea = (v: string | null | undefined): v is Area => AREAS.some(([k]) => 
 /** Zu welchem Bereich eine Aktion gehört (dorthin geht es nach dem Speichern zurück). */
 function areaOfPath(path: string): Area {
   const rest = path.replace(/^\/r\/[^/]+\/verwalten/, '');
-  if (rest.startsWith('/einstellungen') || rest.startsWith('/loeschen')) return 'einstellungen';
+  if (rest.startsWith('/einstellungen') || rest.startsWith('/loeschen') || rest.startsWith('/chat')) return 'einstellungen';
   if (rest.startsWith('/turnier')) return 'turniere';
   if (rest.startsWith('/frage')) return 'fragen';
   if (rest.startsWith('/mitglied')) return 'mitglieder';
@@ -329,6 +330,13 @@ ${area === 'anfragen' ? html`
   }
 </section>` : nothing}
 
+${area === 'einstellungen' ? html`
+<section class="panel">
+  <h2>Chat</h2>
+  <p class="muted">Nachrichten verschwinden nach 7 Tagen von selbst. Hier löschst du den ganzen Chatverlauf dieser Tipprunde sofort.</p>
+  ${postButton(ctx, `${base}/chat-leeren`, 'Chat dieser Tipprunde leeren', { cls: 'btn btn-danger', confirm: 'Wirklich den ganzen Chatverlauf dieser Tipprunde löschen? Das lässt sich nicht rückgängig machen.' })}
+</section>` : nothing}
+
 ${
   area === 'einstellungen' && access.isOwner
     ? html`<section class="panel danger-zone">
@@ -397,6 +405,11 @@ export function registerManageRoutes(router: Router<Ctx>) {
   };
   post('/anfrage/:id/bestaetigen', decide(true));
   post('/anfrage/:id/ablehnen', decide(false));
+
+  post('/chat-leeren', async (ctx, { league }) => {
+    await clearChat(ctx.deps.db, league.id);
+    return redirect(`${areaHref(league.slug, 'einstellungen')}&hinweis=chat-geleert`);
+  });
 
   post('/einladung-neu', async (ctx, { league }) => {
     await ctx.deps.db.run(`update leagues set invite_code = encode(gen_random_bytes(6), 'hex') where id = $1`, [league.id]);
