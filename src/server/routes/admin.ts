@@ -100,6 +100,7 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   const body = html`<section class="panel">
   <h1>Admin</h1>
   <p class="muted">Turniere, Teams, Spiele und Ergebnisse gelten für alle Tipprunden.</p>
+  <p><a href="/admin/rechtliches">Rechtliche Angaben (Impressum, Datenschutz)</a></p>
   <h2>Turniere</h2>
   <ul class="league-list">
     ${tournaments.map(

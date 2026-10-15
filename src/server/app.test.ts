@@ -480,6 +480,20 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch(after.text, /data-countdown/);
     assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+  test('Rechtliches: Impressum/Datenschutz öffentlich, Angaben nur vom Admin', async () => {
+    const pub = await new Client().get('/impressum');
+    assert.equal(pub.status, 200);
+    assert.match(pub.text, /Name fehlt noch/);
+    assert.match(pub.text, /href="\/datenschutz"/, 'Footer-Links');
+    assert.equal((await new Client().get('/datenschutz')).status, 200);
+    assert.equal((await anna.get('/admin/rechtliches')).status, 404, 'normale Nutzer: nicht vorhanden');
+    assert.equal((await anna.post('/admin/rechtliches', { name: 'X' })).status, 404);
+    const adm = await admin.post('/admin/rechtliches', { name: 'Max <b>Muster', email: 'kontakt@example.de', street: 'Weg 1', city: '12345 Stadt', country: 'Deutschland', hosting: 'Eigener Server' });
+    assert.equal(adm.location, '/admin/rechtliches?hinweis=gespeichert');
+    const after = (await new Client().get('/impressum')).text;
+    assert.match(after, /Max &lt;b&gt;Muster/);
+    assert.doesNotMatch(after, /Name fehlt noch/);
+    await db.run(`delete from app_settings where key like 'legal\\_%'`);
   });
 
   test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
