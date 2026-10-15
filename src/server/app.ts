@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
+import { loadHeaderTournament, type HeaderTournament } from './header-info.ts';
 import { csrfToken, csrfValid, loadSession, sessionCookieName, SESSION_DAYS, type User } from './auth.ts';
 import { type FetchJson, fetchJson } from './abgleich.ts';
 import type { Config } from './config.ts';
@@ -56,6 +57,8 @@ export interface Ctx {
   csrf: string;
   /** Darf Turniere, Spiele und Ergebnisse pflegen (ADMIN_EMAILS). */
   isAdmin: boolean;
+  /** Turnier für Countdown/Livestream im Kopf (nur bei Seitenaufrufen gefüllt). */
+  headerTournament: HeaderTournament | null;
   now: Date;
 }
 
@@ -202,6 +205,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
       sessionId: session?.sessionId ?? null,
       csrf: session ? csrfToken(config.secret, session.sessionId) : '',
       isAdmin: !!user && config.adminEmails.has(user.email.toLowerCase()),
+      headerTournament: null,
       now: new Date(),
     };
 
@@ -209,6 +213,10 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     if (route === null) return errorPage(ctx, 404, 'Diese Seite gibt es nicht.');
     if (route === 'method') return errorPage(ctx, 405, 'Diese Aktion ist hier nicht möglich.');
     ctx.params = route.params;
+    if (method === 'GET' && ctx.user) {
+      const slug = /^\/r\/([^/]+)/.exec(path)?.[1] ?? null;
+      ctx.headerTournament = await loadHeaderTournament(db, ctx.user.id, slug, ctx.now);
+    }
 
     if (method === 'POST') {
       ctx.form = await readForm(req);

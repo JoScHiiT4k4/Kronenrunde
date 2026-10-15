@@ -24,6 +24,7 @@ Was die App kann:
 - **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
 - **Sonderfragen** mit automatischer Frist (Start des ersten Spiels; Team-Auswahl, eigene Liste oder Freitext); Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
+- **Kopfzeile:** Countdown bis zum Turnierstart, danach Links zu Twitch/YouTube (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`) und grünes „Live“, wenn gespielt wird.
 - **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).

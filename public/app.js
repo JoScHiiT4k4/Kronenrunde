@@ -154,3 +154,23 @@ if ('serviceWorker' in navigator) {
   });
   if (isIOS) setTimeout(() => show('ios'), 1500);
 })();
+
+// Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann erscheinen die Livestream-Links)
+(() => {
+  const el = document.querySelector('[data-countdown]');
+  if (!el) return;
+  const target = new Date(el.dataset.countdown).getTime();
+  const two = (n) => String(n).padStart(2, '0');
+  const tick = () => {
+    const s = Math.max(0, Math.floor((target - Date.now()) / 1000));
+    const d = Math.floor(s / 86400);
+    const rest = `${two(Math.floor((s % 86400) / 3600))}:${two(Math.floor((s % 3600) / 60))}:${two(s % 60)}`;
+    el.textContent = d > 0 ? `${d} Tg ${rest}` : rest;
+    if (s === 0) {
+      clearInterval(timer);
+      setTimeout(() => location.reload(), 1500);
+    }
+  };
+  const timer = setInterval(tick, 1000);
+  tick();
+})();

@@ -444,6 +444,18 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rowsOf(match['G2-KC']), [['Anna', 'KC 2:0', '1', false], ['Ben', 'KC 2:1', '2', true]]);
   });
 
+  test('Kopfzeile: Countdown vor dem Start, danach Livestream-Links', async () => {
+    const restore = await postponeTournament(tournamentId);
+    const before = await anna.get(`/r/${slug}/tippen`);
+    assert.match(before.text, /data-countdown="/);
+    assert.doesNotMatch(before.text, /twitch\.tv/);
+    await restore();
+    const after = await anna.get(`/r/${slug}/tippen`);
+    assert.doesNotMatch(after.text, /data-countdown/);
+    assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
+    assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+  });
+
   test('Sonderfragen: anlegen, beantworten, Frist, Auflösung', async () => {
     const add = await anna.post(`/r/${slug}/verwalten/typische-fragen`, { tournament_id: tournamentId });
     assert.equal(add.status, 303);

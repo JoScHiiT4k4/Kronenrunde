@@ -62,6 +62,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 <body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
   <a class="brand" href="/"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
+  ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${ctx.isAdmin ? html`<a href="/admin">Admin</a>` : nothing}
     ${ctx.user ? html`<a href="/konto">${ctx.user.display_name}</a>` : html`<a href="/anmelden">Anmelden</a>`}
@@ -79,6 +80,37 @@ ${o.body}
 </footer>
 </body>
 </html>`;
+}
+
+const TWITCH_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 2.5 7v13H7v3h3l3-3h4l5-5V3H4Zm15 11-3 3h-4l-3 3v-3H6V5h13v9Zm-3-6h-2v5h2V8Zm-5 0H9v5h2V8Z"/></svg>`;
+const YOUTUBE_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.5 2.5 0 0 0 2.4 7.2C2 8.800 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8C5.800 19 12 19 12 19s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8C22 15.2 22 12 22 12s0-3.2-.4-4.8ZM10 15V9l5.200 3L10 15Z"/></svg>`;
+
+function countdownText(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return d > 0 ? `${d} Tg ${two(h)}:${two(m)}:${two(sec)}` : `${two(h)}:${two(m)}:${two(sec)}`;
+}
+
+/** Mitte im Kopf: Countdown bis zum Turnierstart, danach Links zum Livestream (mit grünem „Live“, wenn gespielt wird). */
+function tournamentBar(ctx: Ctx): Html {
+  const t = ctx.headerTournament;
+  if (!t) return nothing;
+  if (!t.running) {
+    return html`<div class="tbar" aria-label="Countdown ${t.name}">
+    <span class="tbar-label">${t.name} in</span>
+    <time class="tbar-count" datetime="${t.startsAt.toISOString()}" data-countdown="${t.startsAt.toISOString()}">${countdownText(t.startsAt.getTime() - ctx.now.getTime())}</time>
+  </div>`;
+  }
+  const { twitch, youtube } = ctx.deps.config.streams;
+  return html`<div class="tbar" aria-label="Livestream ${t.name}">
+    ${t.live ? html`<span class="tbar-live">Live</span>` : nothing}
+    <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
+    <a class="tbar-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>
+  </div>`;
 }
 
 function leagueNav(l: LeagueNav): Html {

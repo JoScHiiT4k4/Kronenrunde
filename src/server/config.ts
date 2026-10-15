@@ -17,6 +17,8 @@ export interface Config {
   /** Diese E-Mail-Adressen dürfen Turniere, Teams, Spiele und Ergebnisse pflegen. */
   adminEmails: Set<string>;
   timeZone: string;
+  /** Offizielle Livestreams (Links im Kopf, sobald ein Turnier läuft). */
+  streams: { twitch: string; youtube: string };
   mail: {
     mode: MailMode;
     from: string;
@@ -63,6 +65,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         .filter(Boolean),
     ),
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
+    streams: {
+      twitch: env.STREAM_TWITCH_URL?.trim() || 'https://www.twitch.tv/lolesports',
+      youtube: env.STREAM_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@lolesports',
+    },
     mail: {
       mode,
       from: (env.MAIL_FROM || (mode === 'smtp' ? env.SMTP_USER : '') || '').trim(),
