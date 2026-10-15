@@ -679,7 +679,7 @@ details > summary > span:first-of-type { flex: 1; }
 }
 
 /* ---------- Turnierbaum ---------- */
-.main-wide { flex-basis: 1100px; max-width: 1100px; }
+.main-wide { flex-basis: 1320px; max-width: 1320px; }
 .bk-title { margin: 0 0 10px; font-size: 1.4rem; }
 .bk-note { margin: 0 0 10px; color: var(--muted); font-size: 0.92rem; }
 .bk-hint { margin: 4px 0 0; font-size: 0.88rem; }
@@ -781,6 +781,8 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 /* Turnierbaum mit Linien (SVG): durchgezogen = Sieger zieht weiter, gestrichelt = Verlierer fällt ins Lower Bracket */
 .bracket-tree { display: block; }
 .bk-svg { display: block; max-width: none; font-family: inherit; }
+/* Am PC füllt der Baum die Breite aus; kleine Bildschirme scrollen seitlich */
+@media (min-width: 900px) { .bracket-tree .bk-svg { width: 100%; height: auto; max-width: 1300px; } }
 .bk-box { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
 a.bk-match:hover .bk-box { stroke: var(--gold); }
 a.bk-match:focus-visible { outline: none; }
@@ -790,12 +792,12 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .bk-edge { fill: none; stroke: var(--muted); stroke-opacity: 0.55; stroke-width: 2; }
 .bk-edge-lose { stroke: var(--gold); stroke-dasharray: 5 4; }
 .bk-edge-lose.bk-arrow { stroke-dasharray: none; }
-.bk-rtitle { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
-.bk-t-meta { fill: var(--muted); font-size: 11px; }
+.bk-rtitle { fill: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.bk-t-meta { fill: var(--muted); font-size: 12px; }
 .bk-t-bo { fill: var(--gold-text); font-weight: 700; }
-.bk-t-name { fill: var(--text); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+.bk-t-name { fill: var(--text); font-size: 17px; font-weight: 600; letter-spacing: 0.02em; }
 .bk-t-tbd { fill: var(--muted); font-style: italic; font-weight: 400; }
-.bk-t-score { fill: var(--muted); font-size: 15px; font-weight: 700; }
+.bk-t-score { fill: var(--muted); font-size: 17px; font-weight: 700; }
 .bk-t-tag { fill: var(--gold-bright); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .bk-stripe { fill: var(--blue); }
 .bk-b .bk-stripe { fill: var(--red); }

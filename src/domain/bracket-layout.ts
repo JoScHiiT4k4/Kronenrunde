@@ -6,15 +6,17 @@
 
 import { type BracketMatch, type Phase } from './bracket.ts';
 
-export const BOX_W = 200;
-export const BOX_H = 76;
+export const BOX_W = 250;
+export const BOX_H = 92;
 /** Höhe der Kopfzeile (Termin, Bo) im Kasten; darunter folgen zwei Teamzeilen */
-export const META_H = 20;
-export const ROW_H = 28;
-const COL_GAP = 64;
-const ROW_GAP = 20;
-const LEFT = 30;
-const TOP = 28;
+export const META_H = 26;
+export const ROW_H = 33;
+const COL_GAP = 110;
+const ROW_GAP = 32;
+const LEFT = 52;
+const TOP = 40;
+/** Abstand zwischen Linienende und Kasten, damit Linien nicht in die Formen übergehen */
+const PAD = 4;
 
 export interface TreeNode {
   match: BracketMatch;
@@ -48,11 +50,11 @@ const rowY = (n: TreeNode, row: 0 | 1) => n.y + META_H + ROW_H / 2 + row * ROW_H
 
 /** Linie vom rechten Rand eines Spiels in die Teamzeile des nächsten (Sieger zieht weiter). */
 function win(from: TreeNode, to: TreeNode, row: 0 | 1): TreeEdge {
-  const x1 = from.x + BOX_W;
+  const x1 = from.x + BOX_W + PAD;
   const y1 = from.y + BOX_H / 2;
   const y2 = rowY(to, row);
-  const xm = x1 + COL_GAP / 2;
-  return { kind: 'win', d: `M${x1},${y1} H${xm} V${y2} H${to.x}`, arrow: null };
+  const xm = x1 + (COL_GAP - 2 * PAD) / 2;
+  return { kind: 'win', d: `M${x1},${y1} H${xm} V${y2} H${to.x - PAD}`, arrow: null };
 }
 
 function arrowDown(x: number, y: number): string {
@@ -61,20 +63,22 @@ function arrowDown(x: number, y: number): string {
 
 /** Verlierer fällt senkrecht ins Spiel darunter (gleiche Spalte, nichts dazwischen). */
 function loseDown(from: TreeNode, to: TreeNode): TreeEdge {
-  const x = from.x + BOX_W / 2;
-  return { kind: 'lose', d: `M${x},${from.y + BOX_H} V${to.y}`, arrow: arrowDown(x, to.y) };
+  // rechts im Kasten, damit die Linie nicht durch die Rundenüberschrift läuft
+  const x = from.x + BOX_W - 36;
+  return { kind: 'lose', d: `M${x},${from.y + BOX_H + PAD} V${to.y - PAD}`, arrow: arrowDown(x, to.y - PAD) };
 }
 
 /** Verlierer läuft links am Rand entlang nach unten (ein Spiel dazwischen) und tritt in die Teamzeile ein. */
 function loseGutter(from: TreeNode, to: TreeNode, lane: number, row: 0 | 1): TreeEdge {
-  const gx = from.x - 8 - lane * 7;
+  const gx = from.x - 16 - lane * 12;
   const y1 = from.y + BOX_H / 2;
   const y2 = rowY(to, row);
-  return { kind: 'lose', d: `M${from.x},${y1} H${gx} V${y2} H${to.x}`, arrow: `M${to.x - 8},${y2 - 5} L${to.x},${y2} L${to.x - 8},${y2 + 5}` };
+  const end = to.x - PAD;
+  return { kind: 'lose', d: `M${from.x - PAD},${y1} H${gx} V${y2} H${end}`, arrow: `M${end - 8},${y2 - 5} L${end},${y2} L${end - 8},${y2 + 5}` };
 }
 
 function finish(nodes: TreeNode[], edges: TreeEdge[], titles: TreeTitle[], cols: number): TreeLayout {
-  const height = Math.max(...nodes.map((n) => n.y + BOX_H)) + 12;
+  const height = Math.max(...nodes.map((n) => n.y + BOX_H)) + 16;
   return { width: colX(cols - 1) + BOX_W + 12, height, nodes, edges, titles };
 }
 
@@ -91,7 +95,7 @@ function koTree(phase: Phase): TreeLayout | null {
   if (cols.length < 2) return null;
   const edges: TreeEdge[] = [];
   for (let c = 1; c < cols.length; c++) for (const [i, n] of cols[c].entries()) edges.push(win(cols[c - 1][2 * i], n, 0), win(cols[c - 1][2 * i + 1], n, 1));
-  const titles = rounds.map((r, c) => ({ text: r.name, x: colX(c), y: cols[c][0].y - 8 }));
+  const titles = rounds.map((r, c) => ({ text: r.name, x: colX(c), y: cols[c][0].y - 10 }));
   return finish(cols.flat(), edges, titles, cols.length);
 }
 
@@ -107,7 +111,7 @@ function doubleTree(phase: Phase): TreeLayout | null {
 
   const usN = us.map((match, i): TreeNode => ({ match, x: colX(0), y: TOP + i * (BOX_H + ROW_GAP) }));
   const ufY = (usN[0].y + usN[usN.length - 1].y) / 2;
-  const lowerY = TOP + us.length * (BOX_H + ROW_GAP) + 44;
+  const lowerY = TOP + us.length * (BOX_H + ROW_GAP) + 56;
   const ufN: TreeNode = { match: uf[0], x: colX(1), y: ufY };
   const lsN: TreeNode = { match: ls[0], x: colX(0), y: lowerY };
   const lfN: TreeNode = { match: lf[0], x: colX(1), y: lowerY };
@@ -122,11 +126,11 @@ function doubleTree(phase: Phase): TreeLayout | null {
   edges.push(win(lsN, lfN, 0), loseDown(ufN, lfN), win(ufN, fN, 0), win(lfN, fN, 1));
 
   const titles: TreeTitle[] = [
-    { text: 'Upper Bracket Semifinal', x: colX(0), y: usN[0].y - 8 },
-    { text: 'Upper Bracket Final', x: colX(1), y: ufN.y - 8 },
-    { text: 'Lower Bracket Semifinal', x: colX(0), y: lsN.y - 8 },
-    { text: 'Lower Bracket Final', x: colX(1), y: lfN.y - 8 },
-    { text: 'Final', x: colX(2), y: fN.y - 8 },
+    { text: 'Upper Bracket Semifinal', x: colX(0), y: usN[0].y - 10 },
+    { text: 'Upper Bracket Final', x: colX(1), y: ufN.y - 10 },
+    { text: 'Lower Bracket Semifinal', x: colX(0), y: lsN.y - 10 },
+    { text: 'Lower Bracket Final', x: colX(1), y: lfN.y - 10 },
+    { text: 'Final', x: colX(2), y: fN.y - 10 },
   ];
   return finish([...usN, lsN, ufN, lfN, fN], edges, titles, 3);
 }
