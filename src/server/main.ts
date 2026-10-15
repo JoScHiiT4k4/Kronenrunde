@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startSyncSchedule } from './abgleich.ts';
 import { startNotifySchedule } from './benachrichtigung.ts';
+import { startChatCleanup } from './routes/chat.ts';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, migrate } from './db/index.ts';
@@ -40,6 +41,7 @@ if (config.dataSync) startSyncSchedule(db, (m) => console.log(m));
 
 // Erinnerungen an fehlende Tipps (E-Mail, Push)
 startNotifySchedule(db, config, mailer, (m) => console.log(m));
+startChatCleanup(db, (m) => console.log(m));
 
 let stopping = false;
 function stop() {

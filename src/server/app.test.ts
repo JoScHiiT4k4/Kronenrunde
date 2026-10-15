@@ -21,6 +21,7 @@ import { fakeRiot, lolesports, worldsSchedule } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
 import { notifyDue } from './benachrichtigung.ts';
+import { purgeOldMessages } from './routes/chat.ts';
 
 const DB_URL = process.env.TEST_DATABASE_URL;
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -729,6 +730,37 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await stranger.get(`/r/${slug}/spieler/${annaId}`)).status, 404, 'Fremde ohne Mitgliedschaft');
     assert.equal((await new Client().get(`/r/${slug}/spieler/${annaId}`)).status, 303, 'ohne Anmeldung');
     assert.equal((await ben.get(`/r/${slug}/spieler/${randomUUID()}`)).status, 404);
+  });
+
+  test('Chat: nur für Mitglieder, Nachrichten senden und abholen, nach 7 Tagen gelöscht', async () => {
+    const page = await anna.get(`/r/${slug}/rangliste`);
+    assert.match(page.text, /data-chat data-slug=/);
+    assert.match(page.text, /chat\.js/);
+    assert.match(page.text, /Nachrichten werden nach 7 Tagen gelöscht/);
+
+    const empty = JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text);
+    assert.deepEqual(empty.messages, []);
+    assert.equal((await anna.post(`/r/${slug}/chat`, { text: '   ' })).status, 400);
+    assert.equal((await anna.post(`/r/${slug}/chat`, { text: 'x'.repeat(501) })).status, 400);
+    const sent = await anna.post(`/r/${slug}/chat`, { text: 'Hallo <b>zusammen</b>' });
+    assert.equal(sent.status, 201);
+    assert.equal(JSON.parse(sent.text).message.x, 'Hallo <b>zusammen</b>', 'Text bleibt Text (der Browser setzt ihn per textContent ein)');
+
+    const got = JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text);
+    assert.equal(got.messages.length, 1);
+    assert.equal(got.messages[0].n, 'Anna');
+    const none = JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten?nach=${got.messages[0].id}`)).text);
+    assert.deepEqual(none.messages, []);
+    await ben.post(`/r/${slug}/chat`, { text: 'Moin' });
+    assert.equal(JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten?nach=${got.messages[0].id}`)).text).messages.length, 1);
+
+    assert.equal((await stranger.get(`/r/${slug}/chat/nachrichten`)).status, 404, 'Fremde lesen nicht mit');
+    assert.equal((await stranger.post(`/r/${slug}/chat`, { text: 'hi' })).status, 404);
+    assert.equal((await new Client().get(`/r/${slug}/chat/nachrichten`)).status, 303);
+
+    await db.run(`update chat_messages set created_at = now() - interval '8 days' where body = 'Moin'`);
+    assert.equal(await purgeOldMessages(db), 1);
+    assert.equal((await db.one<{ n: number }>('select count(*)::int as n from chat_messages'))!.n, 1);
   });
 
   test('Konto löschen: Spielleiter geht an Mit-Spielleiter über, Daten sind weg', async () => {
