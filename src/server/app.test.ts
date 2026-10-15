@@ -325,7 +325,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match((await admin.get('/')).text, /href="\/neu"/);
     assert.match((await admin.get('/admin')).text, /name="league_creation" value="admins" checked/);
     assert.equal((await anna.post('/admin/einstellungen', { league_creation: 'alle' })).status, 404);
-    assert.equal((await admin.post('/admin/einstellungen', { league_creation: 'alle' })).location, '/admin?hinweis=gespeichert');
+    assert.equal((await admin.post('/admin/einstellungen', { league_creation: 'alle' })).location, '/admin?bereich=uebersicht&hinweis=gespeichert');
     assert.match((await anna.get('/')).text, /href="\/neu"/);
     assert.equal((await anna.get('/neu')).status, 200);
 
@@ -474,12 +474,24 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const restore = await postponeTournament(tournamentId);
     const before = await anna.get(`/r/${slug}/tippen`);
     assert.match(before.text, /data-countdown="/);
-    assert.doesNotMatch(before.text, /twitch\.tv/);
+    assert.match(before.text, /twitch\.tv/, 'Links gibt es schon vor dem Start');
     await restore();
     const after = await anna.get(`/r/${slug}/tippen`);
     assert.doesNotMatch(after.text, /data-countdown/);
     assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/lolesports"/);
     assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+  });
+
+  test('Administrator: Reiter, keine Turnier-Bearbeitung auf der Startseite', async () => {
+    const home = await admin.get('/admin');
+    assert.match(home.text, /class="sub-tabs"/);
+    assert.doesNotMatch(home.text, /Neues Turnier|Teams \(\d+\)/);
+    for (const area of ['uebersicht', 'nutzer', 'abgleich', 'impressum', 'datenschutz']) {
+      assert.equal((await admin.get(`/admin?bereich=${area}`)).status, 200, area);
+    }
+    assert.match((await admin.get('/admin?bereich=nutzer')).text, /admin@example\.de/);
+    assert.match((await admin.get('/admin?bereich=datenschutz')).text, /name="hosting"/);
+    assert.doesNotMatch((await admin.get('/admin?bereich=datenschutz')).text, /name="street"/);
   });
 
   test('Rechtliches: Impressum/Datenschutz öffentlich, Angaben nur vom Admin', async () => {
@@ -491,7 +503,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await anna.get('/admin/rechtliches')).status, 404, 'normale Nutzer: nicht vorhanden');
     assert.equal((await anna.post('/admin/rechtliches', { name: 'X' })).status, 404);
     const adm = await admin.post('/admin/rechtliches', { name: 'Max <b>Muster', email: 'kontakt@example.de', street: 'Weg 1', city: '12345 Stadt', country: 'Deutschland', hosting: 'Eigener Server' });
-    assert.equal(adm.location, '/admin/rechtliches?hinweis=gespeichert');
+    assert.equal(adm.location, '/admin?bereich=impressum&hinweis=gespeichert');
     const after = (await new Client().get('/impressum')).text;
     assert.match(after, /Max &lt;b&gt;Muster/);
     assert.doesNotMatch(after, /Name fehlt noch/);
@@ -539,7 +551,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const restore = await postponeTournament(tournamentId);
     const manage = await anna.get(`/r/${slug}/verwalten?bereich=fragen`);
     assert.match(manage.text, /name="frage" value="weltmeister"/);
-    assert.doesNotMatch(manage.text, /<fieldset class="field" disabled>/);
+    assert.doesNotMatch(manage.text, /name="frage"[^>]*disabled/);
     assert.doesNotMatch(manage.text, /name="answer_type"|name="choices"|name="hint"|bonus_deadline_at/, 'keine komplizierten Felder mehr');
     assert.doesNotMatch(manage.text, /Neue Sonderfrage|action="[^"]*\/verwalten\/frage"/, 'niemand legt selbst Fragen an');
     const all = new URLSearchParams([['tournament_id', tournamentId], ...['weltmeister', 'finals-mvp', 'meistgebannt', 'kuerzestes-spiel', 'pentakill-team', 'pentakill-spieler'].map((k) => ['frage', k])]);
@@ -559,6 +571,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 6);
     // Nur die Leitung darf wählen
     assert.equal((await ben.post(`/r/${slug}/verwalten/fragen-auswahl`, all)).status, 403);
+    // Einstellungen stehen in derselben Liste und werden mit der Auswahl gespeichert
+    const withSettings = new URLSearchParams(all);
+    withSettings.set('punkte_weltmeister', '7');
+    withSettings.set('antworten_weltmeister', 'Gen.G\nT1');
+    assert.equal((await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, withSettings)).status, 303);
+    const wm = (await db.one<{ points: number; correct_answers: string[] }>(`select points, correct_answers from bonus_questions where catalog_key = 'weltmeister'`))!;
+    assert.deepEqual([wm.points, wm.correct_answers], [7, ['Gen.G', 'T1']]);
+    await db.run(`update bonus_questions set points = 5, correct_answers = '{}' where catalog_key = 'weltmeister'`);
 
     // Vorschlag für neue Fragen geht per E-Mail an den Betreiber
     assert.equal((await anna.post(`/r/${slug}/verwalten/frage-vorschlag`, { vorschlag: '   ' })).status, 400);
@@ -581,7 +601,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();
     const locked = await anna.get(`/r/${slug}/verwalten?bereich=fragen`);
-    assert.match(locked.text, /<fieldset class="field" disabled>/);
+    assert.match(locked.text, /name="frage"[^>]*disabled/);
     assert.match(locked.text, /Die Auswahl ist gesperrt/);
     assert.match(locked.text, /Frage löschen/);
     const refused = await anna.post(`/r/${slug}/verwalten/fragen-auswahl`, less);
@@ -741,13 +761,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Worlds 2026 ist aus dem vorigen Test eingespielt; die Tipprunde hat das Turnier und den Admin als Mitglied
     const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
     const league = (await db.one<{ id: string }>('select id from leagues where slug = $1', [slug]))!.id;
-    const before = await admin.get('/admin');
-    assert.match(before.text, /Datenabgleich mit Riot/);
+    const before = await admin.get('/admin?bereich=abgleich');
+    assert.match(before.text, /Datenabgleich/);
     assert.match(before.text, /noch nie/);
 
     const r = await admin.post('/admin/abgleich');
     assert.equal(r.status, 303, r.text);
-    assert.equal(r.location, '/admin?hinweis=abgeglichen');
+    assert.equal(r.location, '/admin?bereich=abgleich&hinweis=abgeglichen');
     const n = (await db.one<{ c: number; p: number; t: number }>(
       `select (select count(*)::int from champions) as c, (select count(*)::int from players where active) as p,
               (select count(*)::int from teams where external_id is not null) as t`,
@@ -755,7 +775,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Die vier Teams aus dem Admin-Test haben die Region "X" – sie werden trotzdem über Name und Kürzel gefunden
     assert.deepEqual([n.c, n.t], [120, 19]);
     assert.ok(n.p > 19 * 5, `${n.p} Spieler`);
-    assert.match((await admin.get('/admin')).text, /Spieler aus 19 von 19 Teams/);
+    assert.match((await admin.get('/admin?bereich=abgleich')).text, /Spieler aus 19 von 19 Teams/);
 
     // Fragen mit Spieler- und Champion-Auswahl
     const mvp = (await db.one<{ id: string }>(
@@ -791,7 +811,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     });
     assert.ok(failed.every((x) => !x.ok));
     assert.equal((await db.one<{ c: number }>('select count(*)::int as c from champions'))!.c, 120);
-    assert.match((await admin.get('/admin')).text, /Fehler: offline/);
+    assert.match((await admin.get('/admin?bereich=abgleich')).text, /Fehler: offline/);
     await restoreAgain();
   });
 
