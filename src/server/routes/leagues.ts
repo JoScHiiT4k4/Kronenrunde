@@ -336,9 +336,15 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     shares && mine !== undefined && other !== undefined
       ? html` <span class="pct ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">(${mine} %)</span>`
       : nothing;
-  const teams = html`<div class="teams">
+  // Gewonnene Spiele je Team – mit Spoilerschutz: erst nach einem Klick sichtbar
+  const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
+  const wins = (n: number | null, cls: string, team: string) =>
+    html`<button type="button" class="wins ${cls}" data-spoiler data-team="${team}" aria-label="Ergebnis anzeigen">${n}</button>`;
+  const teams = html`<div class="teams${hasScore ? ' has-score' : ''}">
     <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}${pct(shares?.a, shares?.b)}</span>
+    ${hasScore ? wins(m.wins_a, 'wins-a', shortA(m)) : nothing}
     <span class="vs">VS</span>
+    ${hasScore ? wins(m.wins_b, 'wins-b', shortB(m)) : nothing}
     <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}${pct(shares?.b, shares?.a)}</span>
   </div>`;
 
@@ -436,7 +442,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     </table>
   </details>`;
   };
-  const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
+  const beforeLock = (m: MatchRow) => m.status !== 'finished' && (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
 

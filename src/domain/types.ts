@@ -24,6 +24,8 @@ export interface Match {
   liveAt?: Date | null;
   /** Wann das vorherige Spiel desselben Spieltags vorbei war (Ergebnis eingetragen). */
   previousFinishedAt?: Date | null;
+  /** Begegnung ist abgeschlossen – dann gibt es nichts mehr zu tippen. */
+  finished?: boolean;
 }
 
 export interface Prediction {

@@ -71,7 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
     updateRequestFile: env.UPDATE_REQUEST_FILE?.trim() || '/run/lol-tippspiel/update-anfrage',
     streams: {
-      twitch: env.STREAM_TWITCH_URL?.trim() || 'https://www.twitch.tv/lolesports',
+      twitch: env.STREAM_TWITCH_URL?.trim() || 'https://www.twitch.tv/riotgames',
       youtube: env.STREAM_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@lolesports',
     },
     mail: {
