@@ -10,6 +10,7 @@ import { buildInfo } from '../version.ts';
 const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   abgemeldet: { text: 'Du bist abgemeldet.', kind: 'ok' },
   'update-angefordert': { text: 'Update angefordert. In ein bis zwei Minuten ist die neue Version da – danach die Seite neu laden.', kind: 'ok' },
+  'benachrichtigung-gespeichert': { text: 'Deine Benachrichtigungen sind gespeichert.', kind: 'ok' },
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },

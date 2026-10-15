@@ -258,3 +258,59 @@ document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
   if (region) region.addEventListener('change', apply);
   bar.hidden = false;
 });
+
+// Push-Benachrichtigungen im Konto: dieses Gerät an- und abmelden
+(function () {
+  const box = document.querySelector('[data-push]');
+  if (!box || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+  const on = box.querySelector('[data-push-on]');
+  const off = box.querySelector('[data-push-off]');
+  const status = box.querySelector('[data-push-status]');
+  const csrf = box.querySelector('[data-push-csrf]').value;
+  const toBytes = (b64) => {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+  const post = (url, data) =>
+    fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ _csrf: csrf, ...data }) });
+  const show = (subscribed) => {
+    on.hidden = subscribed;
+    off.hidden = !subscribed;
+    if (subscribed) status.textContent = 'Push ist auf diesem Gerät aktiv.';
+  };
+  const registration = () => navigator.serviceWorker.ready;
+  registration().then(async (reg) => {
+    box.hidden = false;
+    show(!!(await reg.pushManager.getSubscription()));
+  });
+  on.addEventListener('click', async () => {
+    try {
+      if ((await Notification.requestPermission()) !== 'granted') {
+        status.textContent = 'Der Browser blockiert Benachrichtigungen. Erlaube sie in den Seiteneinstellungen.';
+        return;
+      }
+      const reg = await registration();
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(box.dataset.key) }));
+      const j = sub.toJSON();
+      const r = await post('/konto/push', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+      if (!r.ok) throw new Error('save');
+      show(true);
+      status.textContent = 'Push ist auf diesem Gerät aktiv. Mit „Speichern“ oben legst du Vorlaufzeit fest.';
+      const cb = document.querySelector('input[name="push"]');
+      if (cb) cb.checked = true;
+    } catch {
+      status.textContent = 'Das hat nicht geklappt. Auf dem iPhone muss die App zuerst zum Startbildschirm hinzugefügt werden.';
+    }
+  });
+  off.addEventListener('click', async () => {
+    const reg = await registration();
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await post('/konto/push/entfernen', { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+    show(false);
+    status.textContent = 'Push ist auf diesem Gerät abgeschaltet.';
+  });
+})();
