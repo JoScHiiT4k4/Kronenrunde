@@ -2,9 +2,10 @@
 // Reine Logik ohne Datenbank und ohne Seitenaufbau – so lässt sie sich leicht testen.
 //
 // Phasen entstehen aus den Namen der Abschnitte (stages):
-//   "Play-In: oberes Halbfinale"  → Phase "Play-In", Runde "Oberes Halbfinale"
-//   "Swiss: Runde 3"              → Phase "Swiss", Runde "Runde 3"
-//   "Viertelfinale", "Halbfinale", "Finale" → zusammen die Phase "K.-o.-Phase"
+//   "Play-In: oberes Halbfinale"  → Phase "Play-In", Runde "Upper Bracket Semifinal"
+//   "Swiss: Runde 3"              → Phase "Swiss", Runde "Round 3"
+//   "Viertelfinale", "Halbfinale", "Finale" → zusammen die Phase "Knockout Stage"
+// Angezeigt werden die englischen Turnierbegriffe (Upper/Lower Bracket, Quarterfinals …); gespeichert bleiben die Namen aus den Daten.
 //
 // Wer ausgeschieden ist, richtet sich nach dem Modus der Phase:
 //   Swiss   3 Siege = weiter, 3 Niederlagen = ausgeschieden (Worlds-Format)
@@ -72,9 +73,33 @@ export const SWISS_WINS = 3;
 export const SWISS_LOSSES = 3;
 export const DOUBLE_ELIM_LOSSES = 2;
 
-const KNOCKOUT_PHASE = 'K.-o.-Phase';
-const KO_STAGE = /^(?:(?:achtel|viertel|halb)?finale|playoffs?|knockouts?)$/i;
-const FINAL_ROUND = /^finale$/i;
+const KNOCKOUT_PHASE = 'Knockout Stage';
+const KO_STAGE = /^(?:(?:achtel|viertel|halb)?finale|playoffs?|knockouts?|round of 16|quarterfinals?|semifinals?|finals?)$/i;
+const FINAL_ROUND = /^final$/i;
+
+/** Englische Turnierbegriffe für Runden (die Daten sind teils deutsch benannt). */
+const ROUND_NAMES: [RegExp, string][] = [
+  [/^(?:oberes|upper(?: bracket)?) (?:halbfinale|semifinals?)$/i, 'Upper Bracket Semifinal'],
+  [/^(?:unteres|lower(?: bracket)?) (?:halbfinale|semifinals?)$/i, 'Lower Bracket Semifinal'],
+  [/^(?:oberes|upper(?: bracket)?) (?:finale|final)$/i, 'Upper Bracket Final'],
+  [/^(?:unteres|lower(?: bracket)?) (?:finale|final)$/i, 'Lower Bracket Final'],
+  [/^achtelfinale$|^round of 16$/i, 'Round of 16'],
+  [/^viertelfinale$|^quarterfinals?$/i, 'Quarterfinals'],
+  [/^halbfinale$|^semifinals?$/i, 'Semifinals'],
+  [/^finale?$|^finals?$/i, 'Final'],
+  [/^(?:runde|round) (\d+)$/i, 'Round $1'],
+];
+
+export function roundLabel(name: string): string {
+  for (const [re, label] of ROUND_NAMES) if (re.test(name)) return name.replace(re, label);
+  return name;
+}
+
+/** Abschnittsname für die Anzeige, z. B. "Play-In: Upper Bracket Semifinal". */
+export function stageLabel(stage: string): string {
+  const colon = stage.indexOf(':');
+  return colon > 0 ? `${stage.slice(0, colon).trim()}: ${roundOf(stage)}` : roundOf(stage);
+}
 
 /** Phase eines Abschnitts: Teil vor dem Doppelpunkt; Viertel-/Halbfinale/Finale bilden zusammen die K.-o.-Phase. */
 export function phaseOf(stage: string | null): string {
@@ -85,12 +110,12 @@ export function phaseOf(stage: string | null): string {
   return KO_STAGE.test(s) ? KNOCKOUT_PHASE : s;
 }
 
-/** Runde innerhalb der Phase: Teil nach dem Doppelpunkt, mit großem Anfangsbuchstaben. */
+/** Runde innerhalb der Phase: Teil nach dem Doppelpunkt, mit großem Anfangsbuchstaben und englischem Begriff. */
 export function roundOf(stage: string | null): string {
   const s = (stage ?? '').trim();
   const colon = s.indexOf(':');
   const name = colon > 0 ? s.slice(colon + 1).trim() : s;
-  return name ? name[0].toUpperCase() + name.slice(1) : 'Spiele';
+  return name ? roundLabel(name[0].toUpperCase() + name.slice(1)) : 'Spiele';
 }
 
 export function phaseKind(phase: string): PhaseKind {

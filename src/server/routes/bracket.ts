@@ -11,6 +11,7 @@ import {
   type Phase,
   type TeamRecord,
 } from '../../domain/bracket.ts';
+import { BOX_H, BOX_W, layoutTree, META_H, ROW_H, type TreeLayout, type TreeNode } from '../../domain/bracket-layout.ts';
 import type { Ctx } from '../app.ts';
 import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
@@ -59,8 +60,8 @@ const phaseSlug = (name: string) => slugify(name) || 'phase';
 
 const PHASE_NOTES: Record<Phase['kind'], string> = {
   swiss: 'Schweizer System: Wer 3 Siege hat, ist weiter, wer 3 Niederlagen hat, scheidet aus. Gespielt wird gegen Teams mit gleicher Bilanz.',
-  doppel: 'Doppeltes K.o.: Wer zweimal verliert, scheidet aus. Nur der Sieger des Finales kommt weiter.',
-  ko: 'K.o.-System: Wer verliert, scheidet aus.',
+  doppel: 'Double Elimination: Wer im Upper Bracket verliert, fällt ins Lower Bracket. Wer zweimal verliert, scheidet aus. Nur der Sieger des Finals kommt weiter.',
+  ko: 'Single Elimination: Wer verliert, scheidet aus.',
   offen: '',
 };
 
@@ -100,7 +101,50 @@ function matchBox(slug: string, phase: Phase, m: BracketMatch, tz: string): Html
     : html`<div class="${cls} bk-open">${inner}</div>`;
 }
 
+function treeNode(slug: string, phase: Phase, n: TreeNode, tz: string): Html {
+  const m = n.match;
+  const o = outcome(m);
+  const row = (side: 'a' | 'b', team: BracketTeam | null, wins: number | null, i: number): Html => {
+    const mark = team ? markFor(phase, team.id, m.id) : null;
+    const result = o && team ? (o.winner.id === team.id ? 'won' : 'lost') : null;
+    const cls = ['bk-row', `bk-${side}`];
+    if (result) cls.push(`bk-${result}`);
+    if (mark === 'ausgeschieden') cls.push('bk-out');
+    else if (mark) cls.push('bk-through');
+    const y = META_H + i * ROW_H;
+    return html`<g class="${cls.join(' ')}">
+      <rect class="bk-stripe" x="0" y="${y}" width="3" height="${ROW_H}"/>
+      <text class="bk-t-name${team ? '' : ' bk-t-tbd'}" x="12" y="${y + 19}">${team ? team.short || team.name : 'offen'}</text>
+      ${mark === 'weiter' || mark === 'sieger' ? html`<text class="bk-t-tag" x="${BOX_W - 34}" y="${y + 18}" text-anchor="end">${mark === 'sieger' ? 'Sieger' : 'weiter'}</text>` : nothing}
+      <text class="bk-t-score" x="${BOX_W - 10}" y="${y + 19}" text-anchor="end">${o ? (wins ?? '') : ''}</text>
+    </g>`;
+  };
+  const inner = html`<rect class="bk-box" width="${BOX_W}" height="${BOX_H}"/>
+    <line class="bk-sep" x1="0" y1="${META_H + ROW_H}" x2="${BOX_W}" y2="${META_H + ROW_H}"/>
+    <text class="bk-t-meta" x="10" y="14">${m.scheduledAt ? formatDateTime(m.scheduledAt, tz) : 'Termin offen'}</text>
+    <text class="bk-t-meta bk-t-bo" x="${BOX_W - 10}" y="14" text-anchor="end">${m.status === 'live' ? 'läuft · ' : ''}Bo${m.bestOf}</text>
+    ${row('a', m.teamA, m.winsA, 0)}${row('b', m.teamB, m.winsB, 1)}`;
+  const label = m.teamA && m.teamB ? `${m.teamA.name} gegen ${m.teamB.name}${o ? ` – ${o.winner.name} gewinnt` : ''}` : 'Paarung noch offen';
+  const cls = `bk-match${m.status === 'live' ? ' bk-live' : ''}`;
+  const pos = `translate(${n.x} ${n.y})`;
+  return m.teamA && m.teamB
+    ? html`<a class="${cls}" href="/r/${slug}/spiel/${m.id}" transform="${pos}" aria-label="${label}">${inner}</a>`
+    : html`<g class="${cls} bk-open" transform="${pos}" role="img" aria-label="${label}">${inner}</g>`;
+}
+
+function tree(slug: string, phase: Phase, t: TreeLayout, tz: string): Html {
+  return html`<div class="bracket bracket-tree" tabindex="0" role="region" aria-label="Turnierbaum ${phase.name}">
+  <svg class="bk-svg" width="${t.width}" height="${t.height}" viewBox="0 0 ${t.width} ${t.height}">
+    ${t.edges.map((e) => html`<path class="bk-edge bk-edge-${e.kind}" d="${e.d}"/>${e.arrow ? html`<path class="bk-edge bk-edge-${e.kind} bk-arrow" d="${e.arrow}"/>` : nothing}`)}
+    ${t.titles.map((x) => html`<text class="bk-rtitle" x="${x.x}" y="${x.y}">${x.text}</text>`)}
+    ${t.nodes.map((n) => treeNode(slug, phase, n, tz))}
+  </svg>
+</div>`;
+}
+
 function rounds(slug: string, phase: Phase, tz: string): Html {
+  const layout = layoutTree(phase);
+  if (layout) return tree(slug, phase, layout, tz);
   const flow = phase.kind === 'swiss' || phase.kind === 'offen';
   return html`<div class="bracket${flow ? ' is-flow' : ''}" tabindex="0" role="region" aria-label="Turnierbaum ${phase.name}">
   ${phase.rounds.map(
@@ -205,7 +249,7 @@ ${
 ${PHASE_NOTES[current.kind] ? html`<p class="bk-note">${PHASE_NOTES[current.kind]}</p>` : nothing}
 ${
   hasMarks
-    ? html`<p class="bk-legend" aria-hidden="true"><span class="bk-key bk-key-through">weiter / Sieger</span><span class="bk-key bk-key-out">ausgeschieden</span></p>`
+    ? html`<p class="bk-legend" aria-hidden="true"><span class="bk-key bk-key-through">weiter / Sieger</span><span class="bk-key bk-key-out">ausgeschieden</span>${current.kind === 'doppel' ? html`<span class="bk-key bk-key-line">Sieger</span><span class="bk-key bk-key-line bk-key-dash">Verlierer</span>` : nothing}</p>`
     : nothing
 }
 ${current.kind === 'swiss' ? swissTable(current) : current.kind === 'doppel' || current.kind === 'ko' ? teamChips(current) : nothing}
