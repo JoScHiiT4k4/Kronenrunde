@@ -831,7 +831,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
     ${rows.map(
       (r) => html`<tr data-item data-text="${r.displayName.toLowerCase()}" class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
-        <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span>
+        <td><a class="who who-link" href="/r/${league.slug}/spieler/${r.userId}">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></a>
           <span class="rk-sub">${scaleBar(r.points, possible)}<small>${r.correctWinners} Sieger · ${r.exactResults} exakt${hasBonus ? ` · ${r.bonusPoints} Sonder` : ''}</small></span></td>
         <td class="scale-col col-x">${scaleBar(r.points, possible)}</td>
         <td class="num col-x">${r.correctWinners}</td>

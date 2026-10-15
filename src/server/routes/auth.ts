@@ -29,7 +29,7 @@ import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCoo
 import { avatar, csrfField, layout } from '../views/layout.ts';
 import { leadLabel } from '../benachrichtigung.ts';
 import { loadVapid, validEndpoint } from '../webpush.ts';
-import { cleanName, intField, loginRedirect } from './common.ts';
+import { cleanFirstName, cleanName, FIRST_NAME_HELP, FIRST_NAME_PATTERN, intField, loginRedirect } from './common.ts';
 
 const withNext = (path: string, next: string) => (next !== '/' ? `${path}?weiter=${encodeURIComponent(next)}` : path);
 
@@ -70,7 +70,12 @@ function loginForm(ctx: Ctx, o: { email?: string; next: string; error?: string }
   );
 }
 
-function registerForm(ctx: Ctx, o: { email?: string; name?: string; next: string; error?: string }): Res {
+const firstNameField = (value: string) => html`<label class="field">
+      <span>Vorname <small class="muted">(nur Buchstaben, ggf. mit Bindestrich; steht in deinem Profil)</small></span>
+      <input type="text" name="first_name" value="${value}" required maxlength="40" autocomplete="given-name" pattern="${FIRST_NAME_PATTERN}" title="Nur Buchstaben und Bindestriche, keine Leerzeichen oder Zahlen">
+    </label>`;
+
+function registerForm(ctx: Ctx, o: { email?: string; name?: string; first?: string; next: string; error?: string }): Res {
   return page(
     ctx,
     'Konto erstellen',
@@ -80,9 +85,10 @@ function registerForm(ctx: Ctx, o: { email?: string; name?: string; next: string
     ${csrfField(ctx)}
     <input type="hidden" name="weiter" value="${o.next}">
     <label class="field">
-      <span>Dein Name <small class="muted">(so sehen dich die anderen in der Rangliste)</small></span>
+      <span>Anzeigename <small class="muted">(so sehen dich die anderen in der Rangliste)</small></span>
       <input type="text" name="display_name" value="${o.name ?? ''}" required maxlength="40" autocomplete="nickname" autofocus>
     </label>
+    ${firstNameField(o.first ?? '')}
     <label class="field">
       <span>E-Mail-Adresse</span>
       <input type="email" name="email" value="${o.email ?? ''}" required autocomplete="username" inputmode="email" maxlength="254">
@@ -220,11 +226,14 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const next = safeNext(ctx.form.get('weiter'));
     const rawEmail = ctx.form.get('email') ?? '';
     const rawName = ctx.form.get('display_name') ?? '';
+    const rawFirst = ctx.form.get('first_name') ?? '';
     const email = normalizeEmail(rawEmail);
     const name = cleanName(rawName);
+    const first = cleanFirstName(rawFirst);
     const password = ctx.form.get('password') ?? '';
-    const back = (error: string) => registerForm(ctx, { email: rawEmail, name: rawName, next, error });
-    if (!name) return back('Bitte wähle einen Namen mit 1 bis 40 Zeichen.');
+    const back = (error: string) => registerForm(ctx, { email: rawEmail, name: rawName, first: rawFirst, next, error });
+    if (!name) return back('Bitte wähle einen Anzeigenamen mit 1 bis 40 Zeichen.');
+    if (!first) return back(FIRST_NAME_HELP);
     if (!email) return back('Bitte gib eine gültige E-Mail-Adresse ein.');
     const problem = passwordProblem(password, email);
     if (problem) return back(problem);
@@ -237,8 +246,8 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     let user: { id: string } | null;
     try {
       user = await db.one<{ id: string }>(
-        `insert into users (email, display_name, password_hash, password_changed_at) values ($1, $2, $3, now()) returning id`,
-        [email, name, await hashPassword(password)],
+        `insert into users (email, display_name, first_name, password_hash, password_changed_at) values ($1, $2, $3, $4, now()) returning id`,
+        [email, name, first, await hashPassword(password)],
       );
     } catch (e) {
       if (e instanceof PgError && e.code === '23505') return back('Für diese E-Mail-Adresse gibt es schon ein Konto.');
@@ -297,8 +306,11 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     if (!ctx.user) return loginRedirect(ctx);
     const next = safeNext(ctx.form.get('weiter'));
     const name = cleanName(ctx.form.get('display_name'));
-    if (!name) return welcomePage(ctx, ctx.form.get('display_name') ?? '', next, 'Bitte wähle einen Namen mit 1 bis 40 Zeichen.');
-    await ctx.deps.db.run('update users set display_name = $2 where id = $1', [ctx.user.id, name]);
+    const first = cleanFirstName(ctx.form.get('first_name'));
+    const raw = ctx.form.get('first_name') ?? '';
+    if (!name) return welcomePage(ctx, ctx.form.get('display_name') ?? '', next, 'Bitte wähle einen Anzeigenamen mit 1 bis 40 Zeichen.', raw);
+    if (!first) return welcomePage(ctx, name, next, FIRST_NAME_HELP, raw);
+    await ctx.deps.db.run('update users set display_name = $2, first_name = $3 where id = $1', [ctx.user.id, name, first]);
     return redirect(next);
   });
 
@@ -319,9 +331,11 @@ export function registerAuthRoutes(router: Router<Ctx>) {
   router.post('/konto/name', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const name = cleanName(ctx.form.get('display_name'));
-    if (!name) return accountPage(ctx, 'Bitte wähle einen Namen mit 1 bis 40 Zeichen.');
-    await ctx.deps.db.run('update users set display_name = $2 where id = $1', [ctx.user.id, name]);
-    return redirect('/konto?hinweis=name-gespeichert');
+    const first = cleanFirstName(ctx.form.get('first_name'));
+    if (!name) return accountPage(ctx, 'Bitte wähle einen Anzeigenamen mit 1 bis 40 Zeichen.', 'profil');
+    if (!first) return accountPage(ctx, FIRST_NAME_HELP, 'profil');
+    await ctx.deps.db.run('update users set display_name = $2, first_name = $3 where id = $1', [ctx.user.id, name, first]);
+    return redirect('/konto?bereich=profil&hinweis=name-gespeichert');
   });
 
   router.post('/konto/benachrichtigung', async (ctx) => {
@@ -329,13 +343,13 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const h = intField(ctx.form.get('stunden') || '0', 0, 168);
     const m = intField(ctx.form.get('minuten') || '0', 0, 59);
     const minutes = h === null || m === null ? null : h * 60 + m;
-    if (minutes === null || minutes < 5 || minutes > 10080) return accountPage(ctx, 'Bitte wähle eine Vorlaufzeit zwischen 5 Minuten und 7 Tagen.');
+    if (minutes === null || minutes < 5 || minutes > 10080) return accountPage(ctx, 'Bitte wähle eine Vorlaufzeit zwischen 5 Minuten und 7 Tagen.', 'benachrichtigungen');
     await ctx.deps.db.run(
       `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes) values ($1, $2, $3, $4)
        on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, updated_at = now()`,
       [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes],
     );
-    return redirect('/konto?hinweis=benachrichtigung-gespeichert#benachrichtigungen');
+    return redirect('/konto?bereich=benachrichtigungen&hinweis=benachrichtigung-gespeichert');
   });
 
   // Dieses Gerät für Push an- oder abmelden (vom Browser-Skript aufgerufen)
@@ -370,15 +384,15 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const { db } = ctx.deps;
     const row = await db.one<{ password_hash: string | null }>('select password_hash from users where id = $1', [ctx.user.id]);
     if (row?.password_hash && !(await verifyPassword(ctx.form.get('current') ?? '', row.password_hash))) {
-      return accountPage(ctx, 'Das bisherige Passwort stimmt nicht.');
+      return accountPage(ctx, 'Das bisherige Passwort stimmt nicht.', 'sicherheit');
     }
     const password = ctx.form.get('password') ?? '';
-    if (password !== (ctx.form.get('password2') ?? '')) return accountPage(ctx, 'Die beiden neuen Passwörter sind nicht gleich.');
+    if (password !== (ctx.form.get('password2') ?? '')) return accountPage(ctx, 'Die beiden neuen Passwörter sind nicht gleich.', 'sicherheit');
     const problem = passwordProblem(password, ctx.user.email);
-    if (problem) return accountPage(ctx, problem);
+    if (problem) return accountPage(ctx, problem, 'sicherheit');
     await setPassword(db, ctx.user.id, password);
     // Alle Sitzungen sind beendet (auch auf anderen Geräten) – hier gleich wieder anmelden
-    return signIn(ctx, ctx.user.id, '/konto?hinweis=passwort-gespeichert');
+    return signIn(ctx, ctx.user.id, '/konto?bereich=sicherheit&hinweis=passwort-gespeichert');
   });
 
   router.post('/konto/email', async (ctx) => {
@@ -386,13 +400,13 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const { db, config, mailer } = ctx.deps;
     const row = await db.one<{ password_hash: string | null }>('select password_hash from users where id = $1', [ctx.user.id]);
     if (row?.password_hash && !(await verifyPassword(ctx.form.get('current') ?? '', row.password_hash))) {
-      return accountPage(ctx, 'Das Passwort stimmt nicht.');
+      return accountPage(ctx, 'Das Passwort stimmt nicht.', 'sicherheit');
     }
     const email = normalizeEmail(ctx.form.get('email') ?? '');
-    if (!email) return accountPage(ctx, 'Bitte gib eine gültige E-Mail-Adresse ein.');
-    if (email === ctx.user.email.toLowerCase()) return accountPage(ctx, 'Das ist schon deine E-Mail-Adresse.');
+    if (!email) return accountPage(ctx, 'Bitte gib eine gültige E-Mail-Adresse ein.', 'sicherheit');
+    if (email === ctx.user.email.toLowerCase()) return accountPage(ctx, 'Das ist schon deine E-Mail-Adresse.', 'sicherheit');
     const recent = await db.one<{ n: number }>(`select count(*)::int as n from email_changes where user_id = $1 and created_at > now() - interval '1 hour'`, [ctx.user.id]);
-    if ((recent?.n ?? 0) >= 3) return accountPage(ctx, 'Zu viele Anfragen. Bitte versuche es in einer Stunde noch einmal.');
+    if ((recent?.n ?? 0) >= 3) return accountPage(ctx, 'Zu viele Anfragen. Bitte versuche es in einer Stunde noch einmal.', 'sicherheit');
     const taken = await db.one<{ x: number }>('select 1 as x from users where email = $1', [email]);
     // Ob die Adresse schon vergeben ist, verraten wir nicht – es wird dann einfach keine Mail verschickt
     if (!taken) {
@@ -409,31 +423,31 @@ export function registerAuthRoutes(router: Router<Ctx>) {
 <p style="color:#666">Der Link gilt 60 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail einfach.</p>`;
       await mailer.send({ to: email, subject: `Neue E-Mail-Adresse bestätigen – ${config.appName}`, text, html: body.value });
     }
-    return redirect('/konto?hinweis=email-gesendet');
+    return redirect('/konto?bereich=sicherheit&hinweis=email-gesendet');
   });
 
   router.get('/konto/email-bestaetigen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const { db } = ctx.deps;
     const token = ctx.query.get('token') ?? '';
-    if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.');
+    if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.', 'sicherheit');
     const row = await db.one<{ new_email: string }>(
       `delete from email_changes where token_hash = $1 and user_id = $2 and expires_at > now() returning new_email`,
       [hashToken(token), ctx.user.id],
     );
-    if (!row) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.');
+    if (!row) return accountPage(ctx, 'Der Link ist ungültig oder abgelaufen.', 'sicherheit');
     try {
       await db.run('update users set email = $2 where id = $1', [ctx.user.id, row.new_email]);
     } catch (e) {
-      if (e instanceof PgError && e.code === '23505') return accountPage(ctx, 'Diese E-Mail-Adresse ist inzwischen vergeben.');
+      if (e instanceof PgError && e.code === '23505') return accountPage(ctx, 'Diese E-Mail-Adresse ist inzwischen vergeben.', 'sicherheit');
       throw e;
     }
-    return redirect('/konto?hinweis=email-geaendert');
+    return redirect('/konto?bereich=sicherheit&hinweis=email-geaendert');
   });
 
   router.post('/konto/loeschen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
-    if (ctx.form.get('bestaetigt') !== 'ja') return accountPage(ctx, 'Bitte bestätige das Löschen mit dem Häkchen.');
+    if (ctx.form.get('bestaetigt') !== 'ja') return accountPage(ctx, 'Bitte bestätige das Löschen mit dem Häkchen.', 'konto');
     const user = ctx.user;
     await ctx.deps.db.tx(async (q) => {
       // Eigene Tipprunden an das nächste Mitglied übergeben (zuerst Admins); leere Runden löschen.
@@ -466,59 +480,84 @@ export function registerAuthRoutes(router: Router<Ctx>) {
   });
 }
 
-function welcomePage(ctx: Ctx, name: string, next: string, error?: string): Res {
+function welcomePage(ctx: Ctx, name: string, next: string, error?: string, first = ''): Res {
   const body = html`<section class="panel narrow">
   <h1>Willkommen!</h1>
-  <p>Unter welchem Namen sollen dich die anderen in der Rangliste sehen?</p>
+  <p>Wie heißt du, und unter welchem Namen sollen dich die anderen in der Rangliste sehen?</p>
   <form method="post" action="/willkommen" class="stack">
     ${csrfField(ctx)}
     <input type="hidden" name="weiter" value="${next}">
     <label class="field">
-      <span>Dein Name</span>
+      <span>Anzeigename</span>
       <input type="text" name="display_name" value="${name}" required maxlength="40" autocomplete="nickname" autofocus>
     </label>
+    ${firstNameField(first)}
     <button type="submit" class="btn btn-primary">Weiter</button>
   </form>
 </section>`;
   return htmlResponse(layout(ctx, { title: 'Willkommen', body, error }), error ? 400 : 200);
 }
 
-async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
+const ACCOUNT_AREAS = [
+  ['profil', 'Profil'],
+  ['benachrichtigungen', 'Benachrichtigungen'],
+  ['sicherheit', 'E-Mail & Passwort'],
+  ['konto', 'Konto'],
+] as const;
+
+async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<Res> {
   const user = ctx.user!;
-  const hasPassword = !!(await ctx.deps.db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
-  const av = await ctx.deps.db.one<{ avatar_updated_at: Date | null }>('select avatar_updated_at from users where id = $1', [user.id]);
-  const prefs = (await ctx.deps.db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
-    'select email_enabled, push_enabled, lead_minutes from notification_prefs where user_id = $1',
-    [user.id],
-  )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120 };
-  const devices = (await ctx.deps.db.one<{ n: number }>('select count(*)::int as n from push_subscriptions where user_id = $1', [user.id]))?.n ?? 0;
-  const vapid = await loadVapid(ctx.deps.db);
-  const body = html`<section class="panel narrow">
-  <h1>Dein Konto</h1>
-  <p class="muted">Angemeldet als ${user.email}</p>
+  const { db } = ctx.deps;
+  const wanted = forced ?? ctx.query.get('bereich');
+  const area = ACCOUNT_AREAS.find(([k]) => k === wanted)?.[0] ?? 'profil';
+  const tabs = html`<nav class="sub-tabs" aria-label="Bereiche">
+  ${ACCOUNT_AREAS.map(([k, label]) => html`<a href="/konto?bereich=${k}"${k === area ? html` aria-current="page"` : nothing}>${label}</a>`)}
+</nav>`;
+  let content: Html = nothing;
+
+  if (area === 'profil') {
+    const row = await db.one<{ avatar_updated_at: Date | null; first_name: string | null }>('select avatar_updated_at, first_name from users where id = $1', [user.id]);
+    content = html`<section class="panel narrow">
+  <h2>Profilbild</h2>
   <div class="avatar-edit">
-    ${avatar(user.id, user.display_name, av?.avatar_updated_at ?? null, 'lg')}
-    <div class="stack">
-      <form method="post" action="/konto/avatar" class="stack" data-avatar-form>
+    ${avatar(user.id, user.display_name, row?.avatar_updated_at ?? null, 'lg')}
+    <div class="stack tight">
+      <form method="post" action="/konto/avatar" class="stack tight" id="avatar-form" data-avatar-form>
         ${csrfField(ctx)}
         <input type="hidden" name="avatar" value="">
-        <label class="field"><span>Profilbild <small class="muted">(wird auf 128 × 128 Pixel verkleinert)</small></span>
+        <label class="field"><span>Neues Bild <small class="muted">(wird auf 128 × 128 Pixel verkleinert)</small></span>
           <input type="file" accept="image/*" data-avatar-file></label>
-        <button type="submit" class="btn" data-avatar-submit disabled>Bild speichern</button>
       </form>
-      ${av?.avatar_updated_at ? html`<form method="post" action="/konto/avatar/loeschen">${csrfField(ctx)}<button type="submit" class="btn btn-quiet">Bild entfernen</button></form>` : nothing}
+      <div class="btn-row">
+        <button type="submit" form="avatar-form" class="btn" data-avatar-submit disabled>Bild speichern</button>
+        ${row?.avatar_updated_at ? html`<form method="post" action="/konto/avatar/loeschen">${csrfField(ctx)}<button type="submit" class="btn btn-quiet">Bild entfernen</button></form>` : nothing}
+      </div>
     </div>
   </div>
+</section>
+<section class="panel narrow">
+  <h2>Namen</h2>
   <form method="post" action="/konto/name" class="stack">
     ${csrfField(ctx)}
     <label class="field">
-      <span>Name in der Rangliste</span>
+      <span>Anzeigename <small class="muted">(so stehst du in der Rangliste)</small></span>
       <input type="text" name="display_name" value="${user.display_name}" required maxlength="40" autocomplete="nickname">
     </label>
-    <button type="submit" class="btn">Name speichern</button>
+    <label class="field">
+      <span>Vorname <small class="muted">(nur Buchstaben, ggf. mit Bindestrich; steht in deinem Profil)</small></span>
+      <input type="text" name="first_name" value="${row?.first_name ?? ''}" required maxlength="40" autocomplete="given-name" pattern="${FIRST_NAME_PATTERN}" title="Nur Buchstaben und Bindestriche, keine Leerzeichen oder Zahlen">
+    </label>
+    <button type="submit" class="btn">Speichern</button>
   </form>
-</section>
-<section class="panel narrow" id="benachrichtigungen">
+</section>`;
+  } else if (area === 'benachrichtigungen') {
+    const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
+      'select email_enabled, push_enabled, lead_minutes from notification_prefs where user_id = $1',
+      [user.id],
+    )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120 };
+    const devices = (await db.one<{ n: number }>('select count(*)::int as n from push_subscriptions where user_id = $1', [user.id]))?.n ?? 0;
+    const vapid = await loadVapid(db);
+    content = html`<section class="panel narrow" id="benachrichtigungen">
   <h2>Benachrichtigungen</h2>
   <form method="post" action="/konto/benachrichtigung" class="stack">
     ${csrfField(ctx)}
@@ -541,9 +580,12 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="button" class="btn btn-quiet" data-push-off hidden>Push auf diesem Gerät abschalten</button>
     <input type="hidden" name="_csrf" value="${ctx.csrf}" data-push-csrf>
   </div>
-</section>
-<section class="panel narrow">
+</section>`;
+  } else if (area === 'sicherheit') {
+    const hasPassword = !!(await db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
+    content = html`<section class="panel narrow">
   <h2>E-Mail-Adresse ändern</h2>
+  <p class="muted">Aktuell: ${user.email}</p>
   <form method="post" action="/konto/email" class="stack">
     ${csrfField(ctx)}
     <label class="field">
@@ -566,13 +608,16 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="submit" class="btn">Passwort speichern</button>
   </form>
   <p class="muted">Danach bist du auf allen anderen Geräten abgemeldet.</p>
-</section>
-<section class="panel narrow" data-install-section hidden>
+</section>`;
+  } else {
+    content = html`<section class="panel narrow" data-install-section hidden>
   <h2>Aufs Handy oder den Desktop legen</h2>
   <p class="muted">Dann startest du das Tippspiel wie eine App.</p>
   <button type="button" class="btn" data-install>Zum Startbildschirm hinzufügen</button>
 </section>
 <section class="panel narrow">
+  <h2>Abmelden</h2>
+  <p class="muted">Angemeldet als ${user.email}</p>
   <form method="post" action="/abmelden" class="stack">
     ${csrfField(ctx)}
     <button type="submit" class="btn">Abmelden</button>
@@ -587,5 +632,9 @@ async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="submit" class="btn btn-danger">Konto löschen</button>
   </form>
 </section>`;
+  }
+  const body = html`<h1 class="small-title">Dein Konto</h1>
+${tabs}
+${content}`;
   return htmlResponse(layout(ctx, { title: 'Dein Konto', body, error }), error ? 400 : 200);
 }

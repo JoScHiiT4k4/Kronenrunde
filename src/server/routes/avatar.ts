@@ -39,14 +39,14 @@ export function registerAvatarRoutes(router: Router<Ctx>) {
   router.post('/konto/avatar', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const b64 = parseAvatar(ctx.form.get('avatar') ?? '');
-    if (!b64) return redirect('/konto?hinweis=avatar-fehler');
+    if (!b64) return redirect('/konto?bereich=profil&hinweis=avatar-fehler');
     await ctx.deps.db.run('update users set avatar_b64 = $2, avatar_updated_at = now() where id = $1', [ctx.user.id, b64]);
-    return redirect('/konto?hinweis=avatar-gespeichert');
+    return redirect('/konto?bereich=profil&hinweis=avatar-gespeichert');
   });
 
   router.post('/konto/avatar/loeschen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     await ctx.deps.db.run('update users set avatar_b64 = null, avatar_updated_at = null where id = $1', [ctx.user.id]);
-    return redirect('/konto?hinweis=avatar-geloescht');
+    return redirect('/konto?bereich=profil&hinweis=avatar-geloescht');
   });
 }

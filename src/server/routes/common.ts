@@ -15,6 +15,16 @@ export function cleanName(value: string | null, max = 40): string | null {
   return name.length >= 1 && name.length <= max ? name : null;
 }
 
+export const FIRST_NAME_HELP = 'Bitte gib deinen Vornamen an – nur Buchstaben, ohne Leerzeichen und Zahlen (ein Bindestrich ist erlaubt, z. B. Anna-Lena).';
+
+export const FIRST_NAME_PATTERN = '\\p{L}+(-\\p{L}+)*';
+
+/** Vorname: nur Buchstaben, dazwischen einzelne Bindestriche; keine Leerzeichen, Zahlen oder Sonderzeichen. */
+export function cleanFirstName(value: string | null): string | null {
+  const name = (value ?? '').trim();
+  return name.length >= 1 && name.length <= 40 && /^\p{L}+(?:-\p{L}+)*$/u.test(name) ? name : null;
+}
+
 export function intField(value: string | null, min: number, max: number): number | null {
   if (value === null || !/^-?\d+$/.test(value.trim())) return null;
   const n = Number(value);
