@@ -10,7 +10,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, emptyState, layout, postButton } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, layout, postButton } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
   canCreateLeague,
@@ -759,8 +759,8 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const { league } = access;
   const { db } = ctx.deps;
   const [members, matches, preds, questions, answers] = await Promise.all([
-    db.query<{ user_id: string; display_name: string }>(
-      `select u.id as user_id, u.display_name from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1`,
+    db.query<{ user_id: string; display_name: string; avatar_updated_at: Date | null }>(
+      `select u.id as user_id, u.display_name, u.avatar_updated_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1`,
       [league.id],
     ),
     leagueMatches(db, league.id),
@@ -786,6 +786,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
     bonusAnswers: answers.map((a) => ({ questionId: a.question_id, userId: a.user_id, answer: a.answer })),
   });
   const hasBonus = questions.some((q) => q.correct_answers.length);
+  const avatarOf = new Map(members.map((m) => [m.user_id, m.avatar_updated_at]));
 
   const body = html`<section class="panel">
   <h1>Rangliste</h1>
@@ -802,7 +803,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
     ${rows.map(
       (r) => html`<tr class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
-        <td>${r.displayName}</td>
+        <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span></td>
         <td class="num">${r.correctWinners}</td>
         <td class="num">${r.exactResults}</td>
         ${hasBonus ? html`<td class="num">${r.bonusPoints}</td>` : nothing}

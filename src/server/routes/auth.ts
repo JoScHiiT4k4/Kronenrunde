@@ -25,7 +25,7 @@ import {
 import { PgError } from '../db/index.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
-import { csrfField, layout } from '../views/layout.ts';
+import { avatar, csrfField, layout } from '../views/layout.ts';
 import { cleanName, loginRedirect } from './common.ts';
 
 const withNext = (path: string, next: string) => (next !== '/' ? `${path}?weiter=${encodeURIComponent(next)}` : path);
@@ -391,9 +391,23 @@ function welcomePage(ctx: Ctx, name: string, next: string, error?: string): Res 
 async function accountPage(ctx: Ctx, error?: string): Promise<Res> {
   const user = ctx.user!;
   const hasPassword = !!(await ctx.deps.db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
+  const av = await ctx.deps.db.one<{ avatar_updated_at: Date | null }>('select avatar_updated_at from users where id = $1', [user.id]);
   const body = html`<section class="panel narrow">
   <h1>Dein Konto</h1>
   <p class="muted">Angemeldet als ${user.email}</p>
+  <div class="avatar-edit">
+    ${avatar(user.id, user.display_name, av?.avatar_updated_at ?? null, 'lg')}
+    <div class="stack">
+      <form method="post" action="/konto/avatar" class="stack" data-avatar-form>
+        ${csrfField(ctx)}
+        <input type="hidden" name="avatar" value="">
+        <label class="field"><span>Profilbild <small class="muted">(wird auf 128 × 128 Pixel verkleinert)</small></span>
+          <input type="file" accept="image/*" data-avatar-file></label>
+        <button type="submit" class="btn" data-avatar-submit disabled>Bild speichern</button>
+      </form>
+      ${av?.avatar_updated_at ? html`<form method="post" action="/konto/avatar/loeschen">${csrfField(ctx)}<button type="submit" class="btn btn-quiet">Bild entfernen</button></form>` : nothing}
+    </div>
+  </div>
   <form method="post" action="/konto/name" class="stack">
     ${csrfField(ctx)}
     <label class="field">

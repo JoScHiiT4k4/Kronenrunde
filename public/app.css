@@ -791,3 +791,14 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
   .top { flex-wrap: wrap; }
   .tbar { order: 3; flex-basis: 100%; }
 }
+
+/* Profilbilder */
+.avatar { flex: none; border-radius: 50%; object-fit: cover; border: 1px solid var(--frame); background: var(--surface); }
+.avatar-sm { width: 28px; height: 28px; }
+.avatar-lg { width: 96px; height: 96px; }
+.avatar-ph { display: inline-flex; align-items: center; justify-content: center; color: var(--gold-text); font-family: var(--font-display); font-weight: 700; }
+.avatar-sm.avatar-ph { font-size: 0.85rem; }
+.avatar-lg.avatar-ph { font-size: 2.2rem; }
+.who { display: flex; align-items: center; gap: 10px; }
+.avatar-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 12px 0 18px; }
+.avatar-edit .stack { flex: 1 1 220px; }
