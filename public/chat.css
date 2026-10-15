@@ -32,3 +32,8 @@ body[data-angemeldet] .foot { padding-bottom: 76px; }
   .chat-label { display: none; }
   .chat-panel { position: fixed; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; height: min(70vh, 480px); max-height: calc(100dvh - 120px); }
 }
+.chat-mute { border: 0; background: none; color: var(--gold-text); cursor: pointer; padding: 2px 4px; display: inline-flex; }
+.chat-mute:hover { color: var(--gold-bright); }
+.chat-mute .spk { width: 20px; height: 20px; fill: currentColor; }
+.chat-mute[aria-pressed="true"] { color: var(--muted); }
+.chat-mute[aria-pressed="true"] .spk-on, .chat-mute[aria-pressed="false"] .spk-off { display: none; }

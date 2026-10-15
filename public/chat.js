@@ -123,6 +123,45 @@
     input.disabled = false;
     input.focus();
   });
+  // Lautsprecher: Chat-Benachrichtigungen laut/stumm (gleicht sich mit „Dein Konto → Benachrichtigungen“ ab)
+  const mute = root.querySelector('[data-chat-mute]');
+  let muted = root.dataset.muted !== '0';
+  const showMute = () => {
+    mute.setAttribute('aria-pressed', String(muted));
+    mute.title = muted ? 'Stumm – Benachrichtigungen einschalten' : 'Laut – stummschalten';
+    mute.setAttribute('aria-label', muted ? 'Chat ist stumm, Benachrichtigungen einschalten' : 'Chat-Benachrichtigungen an, stummschalten');
+  };
+  const toBytes = (b64) => {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    return Uint8Array.from(atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+  };
+  const post = (url, data) => fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ _csrf: csrf, ...data }) });
+  // Beim Laut-Schalten dieses Gerät gleich für Push anmelden (falls möglich)
+  const ensurePush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+    if ((await Notification.requestPermission()) !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { key } = await (await fetch('/konto/push-schluessel', { credentials: 'same-origin' })).json();
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(key) });
+    }
+    const j = sub.toJSON();
+    await post('/konto/push', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+  };
+  mute.addEventListener('click', async () => {
+    muted = !muted;
+    showMute();
+    try {
+      const r = await post('/konto/chat-stumm', { stumm: muted ? '1' : '0' });
+      if (!r.ok) throw new Error('save');
+      if (!muted) await ensurePush().catch(() => {});
+    } catch {
+      muted = !muted;
+      showMute();
+    }
+  });
+  showMute();
   root.hidden = false;
   load();
   setInterval(() => { if (!document.hidden) load(); }, 12000);

@@ -864,7 +864,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .avatar-lg.avatar-ph { font-size: 2.2rem; }
 .who { display: flex; align-items: center; gap: 10px; }
 .avatar-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 12px 0 18px; }
-.avatar-edit .stack { flex: 1 1 220px; }
+.avatar-edit > .stack { flex: 1 1 220px; }
 /* Umschalter Spielleiter / Administrator (nur Betreiber) */
 .role-switch { position: relative; }
 .role-switch summary { cursor: pointer; list-style: none; font-weight: 600; color: var(--gold-text); white-space: nowrap; }
@@ -1075,3 +1075,18 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .profile-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; }
 .who-link { color: inherit; text-decoration: none; }
 .who-link:hover span { color: var(--gold-bright); text-decoration: underline; }
+
+/* Handy: Menü von Spielleiter/Administrator am Rand des Kopfes ausrichten, nie über den Bildschirmrand hinaus */
+@media (max-width: 640px) {
+  .role-switch { position: static; }
+  .role-menu { right: 12px; top: calc(100% + 4px); }
+}
+/* Rangliste rechts: ganze Fläche führt zur Rangliste, die Namen zu den Profilen */
+.rank-box:hover { border-color: var(--gold); }
+.rank-box:focus-within { outline: 2px solid var(--gold-bright); outline-offset: -2px; }
+.rank-stretch { color: inherit; text-decoration: none; }
+.rank-stretch::after { content: ""; position: absolute; inset: 0; }
+a.rank-n { position: relative; z-index: 1; color: inherit; text-decoration: none; }
+a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
+.rank-box:hover .rank-more { color: var(--gold-bright); }
+.rank-box:not(a) .rank-more { display: block; }

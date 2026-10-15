@@ -43,13 +43,15 @@ async function profilePage(ctx: Ctx): Promise<Res> {
     sections.push({ t, answers });
   }
 
+  // Sind Vorname und Anzeigename gleich, steht der Name nur einmal da
+  const sameName = !!person.first_name && person.first_name.trim().toLowerCase() === person.display_name.trim().toLowerCase();
   const norm = (v: string) => v.trim().toLowerCase();
   const body = html`<p class="muted page-note"><a href="/r/${league.slug}/rangliste">← Zur Rangliste</a></p>
 <section class="panel profile-head">
   ${avatar(id, person.display_name, person.avatar_updated_at, 'lg')}
   <div>
-    <h1>${person.display_name}</h1>
-    <p class="muted">${person.first_name ? person.first_name : 'Vorname noch nicht eingetragen'} · Mitglied in ${league.name}</p>
+    <h1>${person.first_name && sameName ? person.first_name : person.display_name}</h1>
+    <p class="muted">${person.first_name && !sameName ? html`${person.first_name} · ` : nothing}Mitglied in ${league.name}</p>
   </div>
 </section>
 <section class="panel">
