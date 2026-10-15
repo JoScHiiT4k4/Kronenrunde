@@ -2,12 +2,13 @@
 
 import type { Ctx } from '../app.ts';
 import { ANSWER_TYPE_LABELS, type AnswerType, QUESTION_CATALOG } from '../../domain/questions.ts';
-import { formatDateTime } from '../format.ts';
+import { missingTips } from '../../domain/missing.ts';
+import { formatDateTime, formatRemaining } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { csrfField, layout, postButton } from '../views/layout.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
-import { type LeagueAccess, leagueTournaments, loadLeague } from './league-data.ts';
+import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, toDomainMatch } from './league-data.ts';
 import { lockModeOptions, parseLockMode } from './leagues.ts';
 
 async function manageAccess(ctx: Ctx): Promise<LeagueAccess> {
@@ -49,12 +50,36 @@ function questionFields(q: QuestionRow): Html {
       <textarea name="correct_answers" rows="2">${q.correct_answers.join('\n')}</textarea></label>`;
 }
 
-async function managePage(ctx: Ctx, error?: string): Promise<Res> {
+const AREAS = [
+  ['uebersicht', 'Übersicht'],
+  ['einstellungen', 'Einstellungen'],
+  ['turniere', 'Turniere'],
+  ['fragen', 'Sonderfragen'],
+  ['mitglieder', 'Mitglieder'],
+] as const;
+type Area = (typeof AREAS)[number][0];
+const isArea = (v: string | null | undefined): v is Area => AREAS.some(([k]) => k === v);
+
+/** Zu welchem Bereich eine Aktion gehört (dorthin geht es nach dem Speichern zurück). */
+function areaOfPath(path: string): Area {
+  const rest = path.replace(/^\/r\/[^/]+\/verwalten/, '');
+  if (rest.startsWith('/einstellungen') || rest.startsWith('/loeschen')) return 'einstellungen';
+  if (rest.startsWith('/turnier')) return 'turniere';
+  if (rest.startsWith('/frage')) return 'fragen';
+  if (rest.startsWith('/mitglied')) return 'mitglieder';
+  return 'uebersicht';
+}
+
+const areaHref = (slug: string, area: Area) => `/r/${slug}/verwalten?bereich=${area}`;
+
+async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<Res> {
   if (!ctx.user) return loginRedirect(ctx);
   const access = await manageAccess(ctx);
   const { league } = access;
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
+  const queryArea = ctx.query.get('bereich');
+  const area: Area = forcedArea ?? (isArea(queryArea) ? queryArea : 'uebersicht');
   const [tournaments, allTournaments, questions, members] = await Promise.all([
     leagueTournaments(db, league.id),
     db.query<{ id: string; name: string }>('select id, name from tournaments order by starts_on desc nulls last, name'),
@@ -76,9 +101,49 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
   const available = allTournaments.filter((t) => !tournaments.some((x) => x.id === t.id));
   const roleLabel: Record<string, string> = { owner: 'Spielleiter', admin: 'Mit-Spielleiter', member: 'Mitglied' };
 
+  // Wer hat die anstehenden Spiele noch nicht getippt? Nur Anzahl und Frist, nie der Inhalt der Tipps.
+  let missing: ReturnType<typeof missingTips> = [];
+  if (area === 'uebersicht') {
+    const [matches, tipped] = await Promise.all([
+      leagueMatches(db, league.id),
+      db.query<{ user_id: string; match_id: string }>('select user_id, match_id from predictions where league_id = $1', [league.id]),
+    ]);
+    missing = missingTips(
+      members.map((m) => m.user_id),
+      matches.map(toDomainMatch),
+      new Set(tipped.map((t) => `${t.user_id}:${t.match_id}`)),
+      league.lock_mode,
+      ctx.now,
+    );
+  }
+  const nameOf = new Map(members.map((m) => [m.user_id, m.display_name]));
+
   const body = html`
+<h1 class="small-title">Verwalten</h1>
+<nav class="sub-tabs" aria-label="Bereiche">
+  ${AREAS.map(([key, label]) => html`<a href="${areaHref(league.slug, key)}"${area === key ? html` aria-current="page"` : nothing}>${label}</a>`)}
+</nav>
+
+${area === 'uebersicht' ? html`
 <section class="panel">
-  <h1>Verwalten</h1>
+  <h2>Noch nicht getippt</h2>
+  ${
+    missing.length
+      ? html`<p class="muted">Diese Mitspieler haben für anstehende Spiele noch keinen Tipp abgegeben. Die Tipps selbst siehst du – wie alle anderen – erst nach Tippschluss.</p>
+  <table class="table">
+    <thead><tr><th>Name</th><th class="num">Offen</th><th>Nächster Tippschluss</th></tr></thead>
+    <tbody>
+    ${missing.map(
+      (r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td><td class="num">${r.missing}</td>
+      <td>${formatDateTime(r.nextLock, tz)} Uhr <span class="muted">(${formatRemaining(r.nextLock, ctx.now)})</span></td></tr>`,
+    )}
+    </tbody>
+  </table>`
+      : html`<p class="muted">Alle haben die anstehenden Spiele getippt – oder es steht gerade kein Spiel zum Tippen an.</p>`
+  }
+</section>
+
+<section class="panel">
   <h2>Leute einladen</h2>
   <p>Schick diesen Link an alle, die mittippen sollen. Wer ihn öffnet, meldet sich an und ist dabei.</p>
   <div class="copy-row">
@@ -89,8 +154,9 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     cls: 'btn btn-quiet',
     confirm: 'Der bisherige Link funktioniert danach nicht mehr. Fortfahren?',
   })}
-</section>
+</section>` : nothing}
 
+${area === 'einstellungen' ? html`
 <section class="panel">
   <h2>Einstellungen</h2>
   <form method="post" action="${base}/einstellungen" class="stack">
@@ -110,7 +176,9 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     <button type="submit" class="btn btn-primary">Einstellungen speichern</button>
   </form>
 </section>
+` : nothing}
 
+${area === 'turniere' ? html`
 <section class="panel" id="turniere">
   <h2>Turniere</h2>
   ${tournaments.map(
@@ -135,8 +203,9 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
         ? nothing
         : html`<p class="muted">Es sind noch keine Turniere angelegt.${ctx.isAdmin ? html` <a href="/admin">Turnier anlegen</a>` : ''}</p>`
   }
-</section>
+</section>` : nothing}
 
+${area === 'fragen' ? html`
 <section class="panel" id="fragen">
   <h2>Sonderfragen</h2>
   ${
@@ -194,8 +263,9 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     </form>
   </details>`
   }
-</section>
+</section>` : nothing}
 
+${area === 'mitglieder' ? html`
 <section class="panel">
   <h2>Mitglieder (${members.length})</h2>
   <table class="table">
@@ -220,10 +290,10 @@ async function managePage(ctx: Ctx, error?: string): Promise<Res> {
     )}
     </tbody>
   </table>
-</section>
+</section>` : nothing}
 
 ${
-  access.isOwner
+  area === 'einstellungen' && access.isOwner
     ? html`<section class="panel danger-zone">
   <h2>Tipprunde löschen</h2>
   <p>Löscht die Tipprunde mit allen Tipps, Sonderfragen und Antworten. Das lässt sich nicht rückgängig machen.</p>
@@ -255,8 +325,8 @@ export function registerManageRoutes(router: Router<Ctx>) {
       if (!ctx.user) return loginRedirect(ctx);
       const access = await manageAccess(ctx);
       const result = await fn(ctx, access);
-      if (typeof result === 'string') return managePage(ctx, result);
-      return result ?? redirect(`/r/${access.league.slug}/verwalten?hinweis=gespeichert`);
+      if (typeof result === 'string') return managePage(ctx, result, areaOfPath(ctx.path));
+      return result ?? redirect(`${areaHref(access.league.slug, areaOfPath(ctx.path))}&hinweis=gespeichert`);
     });
 
   post('/einstellungen', async (ctx, { league }) => {
@@ -274,7 +344,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
 
   post('/einladung-neu', async (ctx, { league }) => {
     await ctx.deps.db.run(`update leagues set invite_code = encode(gen_random_bytes(6), 'hex') where id = $1`, [league.id]);
-    return redirect(`/r/${league.slug}/verwalten?hinweis=link-erneuert`);
+    return redirect(`${areaHref(league.slug, 'uebersicht')}&hinweis=link-erneuert`);
   });
 
   post('/turnier', async (ctx, { league }) => {
@@ -323,7 +393,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
         }
       }
     });
-    return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
+    return redirect(`${areaHref(league.slug, 'fragen')}&hinweis=gespeichert`);
   });
 
   post('/frage/:qid', async (ctx, { league }) => {
@@ -341,7 +411,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
         lines(ctx.form.get('correct_answers')),
       ]);
     }
-    return redirect(`/r/${league.slug}/verwalten?hinweis=gespeichert#fragen`);
+    return redirect(`${areaHref(league.slug, 'fragen')}&hinweis=gespeichert`);
   });
 
   post('/frage-vorschlag', async (ctx, { league }) => {
@@ -354,7 +424,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
     const page = html`<p>Neuer Vorschlag für eine Sonderfrage:</p><blockquote>${text}</blockquote>
 <p>Von: ${user.display_name} &lt;${user.email}&gt;<br>Tipprunde: ${league.name}</p>`;
     await mailer.send({ to: config.suggestionsTo, subject: `Sonderfragen-Vorschlag aus „${league.name}“`, text: body, html: page.value });
-    return redirect(`/r/${league.slug}/verwalten?hinweis=vorschlag-gesendet#fragen`);
+    return redirect(`${areaHref(league.slug, 'fragen')}&hinweis=vorschlag-gesendet`);
   });
 
   post('/mitglied/:uid', async (ctx, access) => {
