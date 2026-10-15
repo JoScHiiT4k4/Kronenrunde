@@ -5,6 +5,7 @@ import type { Db } from '../db/index.ts';
 import { HttpError, type Res, type Router } from '../http.ts';
 import { vapidSubject } from '../benachrichtigung.ts';
 import { loadVapid, sendPush } from '../webpush.ts';
+import { maskProfanity } from '../../domain/profanity.ts';
 import { loginRedirect } from './common.ts';
 import { loadLeague } from './league-data.ts';
 
@@ -26,7 +27,18 @@ interface Row {
   body: string;
 }
 
-const view = (r: Row) => ({ id: Number(r.id), u: r.user_id, n: r.name, t: r.created_at.toISOString(), x: r.body });
+const view = (r: Row, filter: boolean) => ({ id: Number(r.id), u: r.user_id, n: r.name, t: r.created_at.toISOString(), x: filter ? maskProfanity(r.body) : r.body });
+
+/** Schimpfwortfilter des Teilnehmers (Standard: an) */
+async function wantsFilter(ctx: Ctx): Promise<boolean> {
+  const p = await ctx.deps.db.one<{ chat_filter: boolean }>('select chat_filter from notification_prefs where user_id = $1', [ctx.user!.id]);
+  return p?.chat_filter ?? true;
+}
+
+/** Alle Nachrichten einer Tipprunde löschen (Spielleiter) bzw. aller Tipprunden (Administrator, ohne leagueId). */
+export async function clearChat(db: Db, leagueId?: string): Promise<number> {
+  return leagueId ? db.run('delete from chat_messages where league_id = $1', [leagueId]) : db.run('delete from chat_messages');
+}
 
 /** Nachrichten löschen, die älter als 7 Tage sind. */
 export async function purgeOldMessages(db: Db): Promise<number> {
@@ -74,7 +86,8 @@ export function registerChatRoutes(router: Router<Ctx>) {
       after === null
         ? (await ctx.deps.db.query<Row>(`${select} where m.league_id = $1 order by m.id desc limit 50`, [league.id])).reverse()
         : await ctx.deps.db.query<Row>(`${select} where m.league_id = $1 and m.id > $2 order by m.id limit 100`, [league.id, after]);
-    return json({ me: ctx.user.id, messages: rows.map(view) });
+    const filter = await wantsFilter(ctx);
+    return json({ me: ctx.user.id, messages: rows.map((r) => view(r, filter)) });
   });
 
   router.post('/r/:slug/chat', async (ctx) => {
@@ -90,7 +103,17 @@ export function registerChatRoutes(router: Router<Ctx>) {
        select ins.id::text, ins.user_id, u.display_name as name, ins.created_at, ins.body from ins join users u on u.id = ins.user_id`,
       [league.id, ctx.user.id, text],
     );
-    pushToMembers(ctx, league, ctx.user.id, ctx.user.display_name, text).catch(() => {});
-    return json({ message: view(row!) }, 201);
+    pushToMembers(ctx, league, ctx.user.id, ctx.user.display_name, maskProfanity(text)).catch(() => {});
+    return json({ message: view(row!, await wantsFilter(ctx)) }, 201);
+  });
+
+  // Eigene Nachricht löschen (nur die eigene)
+  router.post('/r/:slug/chat/:id/loeschen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { league } = await loadLeague(ctx, ctx.params.slug);
+    if (!/^\d{1,15}$/.test(ctx.params.id)) throw new HttpError(404, 'Diese Seite gibt es nicht.');
+    const n = await ctx.deps.db.run('delete from chat_messages where id = $1 and league_id = $2 and user_id = $3', [ctx.params.id, league.id, ctx.user.id]);
+    if (!n) throw new HttpError(404, 'Diese Nachricht gibt es nicht (mehr) oder sie ist nicht von dir.');
+    return json({ ok: true });
   });
 }

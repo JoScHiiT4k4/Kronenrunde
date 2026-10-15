@@ -47,6 +47,16 @@
       text.className = 'chat-text';
       text.textContent = m.x;
       row.append(meta, text);
+      if (own) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'chat-del';
+        del.textContent = '×';
+        del.title = 'Meine Nachricht löschen';
+        del.setAttribute('aria-label', 'Meine Nachricht löschen');
+        del.addEventListener('click', () => remove(m.id));
+        text.append(del);
+      }
       log.append(row);
     }
     if (stick || open) log.scrollTop = log.scrollHeight;
@@ -70,14 +80,32 @@
     list = list.concat(add).slice(-200);
     return true;
   };
+  // Gelöschte Nachrichten verschwinden bei allen: die Liste wird bei jedem Abruf ersetzt
+  const sig = (l) => l.map((m) => m.id + ':' + m.x).join('|');
+  const remove = async (id) => {
+    try {
+      const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat/' + id + '/loeschen', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+        body: new URLSearchParams({ _csrf: csrf }),
+      });
+      if (r.ok || r.status === 404) {
+        list = list.filter((m) => m.id !== id);
+        render();
+        update();
+      }
+    } catch { /* später noch einmal */ }
+  };
   const load = async () => {
     try {
-      const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat/nachrichten' + (list.length ? '?nach=' + lastId() : ''), { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+      const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat/nachrichten', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
       if (!r.ok) return;
       const data = await r.json();
       me = data.me;
       const first = !list.length && seen === null;
-      const changed = merge(data.messages);
+      const changed = sig(list) !== sig(data.messages);
+      list = data.messages;
       if (first) {
         // Neue Sitzung: bisherige Nachrichten gelten als gelesen
         seen = lastId();

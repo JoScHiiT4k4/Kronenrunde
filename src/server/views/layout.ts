@@ -13,6 +13,8 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'benachrichtigung-gespeichert': { text: 'Deine Benachrichtigungen sind gespeichert.', kind: 'ok' },
   'aenderung-angefragt': { text: 'Deine Änderung ist angefragt. Sie gilt, sobald dein Spielleiter sie bestätigt.', kind: 'ok' },
   'anfrage-zurueckgezogen': { text: 'Deine Anfrage ist zurückgezogen.', kind: 'ok' },
+  'chat-geleert': { text: 'Der Chatverlauf ist gelöscht.', kind: 'ok' },
+  'chat-gespeichert': { text: 'Deine Chat-Einstellungen sind gespeichert.', kind: 'ok' },
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
@@ -158,7 +160,7 @@ function tournamentBar(ctx: Ctx): Html {
   return html`<div class="tbar" aria-label="${t.name}">
     ${
       t.running
-        ? nothing
+        ? html`<span class="tbar-label">${t.name}</span>`
         : html`<span class="tbar-label">${t.name} in</span>
     <time class="tbar-count" datetime="${t.startsAt.toISOString()}" data-countdown="${t.startsAt.toISOString()}">${countdownText(t.startsAt.getTime() - ctx.now.getTime())}</time>`
     }

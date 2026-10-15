@@ -363,9 +363,9 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const minutes = h === null || m === null ? null : h * 60 + m;
     if (minutes === null || minutes < 5 || minutes > 10080) return accountPage(ctx, 'Bitte wähle eine Vorlaufzeit zwischen 5 Minuten und 7 Tagen.', 'benachrichtigungen');
     await ctx.deps.db.run(
-      `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes, chat_push) values ($1, $2, $3, $4, $5)
-       on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, chat_push = $5, updated_at = now()`,
-      [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes, ctx.form.get('chat') === 'an'],
+      `insert into notification_prefs (user_id, email_enabled, push_enabled, lead_minutes) values ($1, $2, $3, $4)
+       on conflict (user_id) do update set email_enabled = $2, push_enabled = $3, lead_minutes = $4, updated_at = now()`,
+      [ctx.user.id, ctx.form.get('email') === 'ja', ctx.form.get('push') === 'ja', minutes],
     );
     return redirect('/konto?bereich=benachrichtigungen&hinweis=benachrichtigung-gespeichert');
   });
@@ -389,6 +389,16 @@ export function registerAuthRoutes(router: Router<Ctx>) {
       [ctx.user.id],
     );
     return { status: 204, headers: {}, body: '' };
+  });
+
+  router.post('/konto/chat', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run(
+      `insert into notification_prefs (user_id, chat_push, chat_filter) values ($1, $2, $3)
+       on conflict (user_id) do update set chat_push = $2, chat_filter = $3, updated_at = now()`,
+      [ctx.user.id, ctx.form.get('chat') === 'an', ctx.form.get('filter') !== 'aus'],
+    );
+    return redirect('/konto?bereich=chat&hinweis=chat-gespeichert');
   });
 
   // Chat laut/stumm (Lautsprecher im Chat); gleicht sich mit der Einstellung unter Benachrichtigungen ab
@@ -536,6 +546,7 @@ function welcomePage(ctx: Ctx, name: string, next: string, error?: string, first
 const ACCOUNT_AREAS = [
   ['profil', 'Profil'],
   ['benachrichtigungen', 'Benachrichtigungen'],
+  ['chat', 'Chat'],
   ['sicherheit', 'E-Mail & Passwort'],
   ['konto', 'Konto'],
 ] as const;
@@ -614,10 +625,10 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
   }
 </section>`;
   } else if (area === 'benachrichtigungen') {
-    const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number; chat_push: boolean }>(
-      'select email_enabled, push_enabled, lead_minutes, chat_push from notification_prefs where user_id = $1',
+    const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number }>(
+      'select email_enabled, push_enabled, lead_minutes from notification_prefs where user_id = $1',
       [user.id],
-    )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120, chat_push: false };
+    )) ?? { email_enabled: false, push_enabled: false, lead_minutes: 120 };
     const devices = (await db.one<{ n: number }>('select count(*)::int as n from push_subscriptions where user_id = $1', [user.id]))?.n ?? 0;
     const vapid = await loadVapid(db);
     content = html`<section class="panel" id="benachrichtigungen">
@@ -635,12 +646,6 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
       </div>
       <small class="muted">Aktuell: ${leadLabel(prefs.lead_minutes)} vorher, nur wenn Tipps fehlen.</small>
     </fieldset>
-    <fieldset class="field lead-field">
-      <legend>Chat-Nachrichten</legend>
-      <label class="check"><input type="radio" name="chat" value="aus"${prefs.chat_push ? nothing : html` checked`}> Stummgeschaltet <small class="muted">(Standard)</small></label>
-      <label class="check"><input type="radio" name="chat" value="an"${prefs.chat_push ? html` checked` : nothing}> Bei neuen Nachrichten per Push informieren (Handy oder PC)</label>
-      <small class="muted">Dafür muss Push auf dem jeweiligen Gerät aktiviert sein. Im Chat selbst schaltest du mit dem Lautsprecher um.</small>
-    </fieldset>
     <button type="submit" class="btn">Speichern</button>
   </form>
   <div class="push-box" data-push data-key="${vapid.publicKey}" hidden>
@@ -649,6 +654,26 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     <button type="button" class="btn btn-quiet" data-push-off hidden>Push auf diesem Gerät abschalten</button>
     <input type="hidden" name="_csrf" value="${ctx.csrf}" data-push-csrf>
   </div>
+</section>`;
+  } else if (area === 'chat') {
+    const prefs = (await db.one<{ chat_push: boolean; chat_filter: boolean }>('select chat_push, chat_filter from notification_prefs where user_id = $1', [user.id])) ?? { chat_push: false, chat_filter: true };
+    content = html`<section class="panel">
+  <h2>Chat</h2>
+  <form method="post" action="/konto/chat" class="stack">
+    ${csrfField(ctx)}
+    <fieldset class="field lead-field">
+      <legend>Benachrichtigung bei neuen Nachrichten</legend>
+      <label class="check"><input type="radio" name="chat" value="aus"${prefs.chat_push ? nothing : html` checked`}> Stummgeschaltet <small class="muted">(Standard)</small></label>
+      <label class="check"><input type="radio" name="chat" value="an"${prefs.chat_push ? html` checked` : nothing}> Per Push informieren (Handy oder PC)</label>
+      <small class="muted">Push musst du auf jedem Gerät unter „Benachrichtigungen“ einmal aktivieren. Im Chat selbst schaltest du mit dem Lautsprecher um.</small>
+    </fieldset>
+    <fieldset class="field lead-field">
+      <legend>Schimpfwörter</legend>
+      <label class="check"><input type="radio" name="filter" value="an"${prefs.chat_filter ? html` checked` : nothing}> Mit Sternen ausblenden <small class="muted">(Standard)</small></label>
+      <label class="check"><input type="radio" name="filter" value="aus"${prefs.chat_filter ? nothing : html` checked`}> Anzeigen</label>
+    </fieldset>
+    <button type="submit" class="btn">Speichern</button>
+  </form>
 </section>`;
   } else if (area === 'sicherheit') {
     const hasPassword = !!(await db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
