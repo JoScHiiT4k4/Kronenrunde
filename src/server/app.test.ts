@@ -764,6 +764,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch(swissPage.text, /class="match/);
   });
 
+  test('Layout: Werbeflächen links und rechts', async () => {
+    const pub = await new Client().get('/impressum');
+    assert.equal((pub.text.match(/class="ad ad-(left|right)"/g) ?? []).length, 2);
+  });
+
   test('Turnierbaum: Phasen, Begegnungen, ausgeschiedene Teams grau', async () => {
     const tid = (await db.one<{ id: string }>(`select id from tournaments where external_id = 'worlds-2026'`))!.id;
     const matchId = async (key: string) => (await db.one<{ id: string }>(`select id from matches where tournament_id = $1 and external_id = $2`, [tid, key]))!.id;
