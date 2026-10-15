@@ -457,6 +457,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const tips = await anna.get(`/r/${slug}/tippen`);
     assert.match(tips.text, /Vorbei/);
     assert.match(tips.text, /pts pts-hit pts-exact">\+2</);
+    // Gewinnchance aus den Tipps: GEN–T1 je einer (50/50), G2–KC beide auf KC (100/0); offene Spiele zeigen nichts
+    assert.equal((tips.text.match(/class="pct pct-even"/g) ?? []).length, 2);
+    assert.match(tips.text, /class="pct pct-up"[^>]*>\(100 %\)/);
+    assert.match(tips.text, /class="pct pct-down"[^>]*>\(0 %\)/);
+    assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.match(tips.text, new RegExp(`href="/r/${slug}/spiel/${match['GEN-T1']}">Tipps zu diesem Spiel</a>`));
 
     // Reiter "Alle Tipps": beide geschlossenen Spiele mit allen Tipps und Punkten – offene Spiele nicht
