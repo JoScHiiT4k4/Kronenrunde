@@ -713,10 +713,34 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       assert.match(r.text, new RegExp(text), k);
       assert.match(r.text, new RegExp(`<a href="/konto\\?bereich=${k}" aria-current="page">`), k);
     }
-    // Namen ändern
+    // Namen sind gesperrt: Änderung wird beantragt und vom Spielleiter entschieden
     assert.equal((await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna Lena' })).status, 400);
-    assert.match((await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna-Lena' })).location ?? '', /bereich=profil/);
-    assert.match((await anna.get('/konto')).text, /name="first_name" value="Anna-Lena"/);
+    const asked = await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna-Lena' });
+    assert.match(asked.location ?? '', /hinweis=aenderung-angefragt/);
+    assert.equal((await db.one<{ first_name: string }>(`select first_name from users where display_name = 'Anna'`))!.first_name, 'Test', 'noch unverändert');
+    assert.match((await anna.get('/konto')).text, /Änderung angefragt: <strong>Anna<\/strong> \(Anna-Lena\)/);
+    const inbox = await anna.get(`/r/${slug}/verwalten?bereich=anfragen`);
+    assert.match(inbox.text, /Test → <strong>Anna-Lena<\/strong>/);
+    assert.match(inbox.text, /class="tab-badge"/);
+    assert.equal((await stranger.get(`/r/${slug}/verwalten?bereich=anfragen`)).status, 404, 'Fremde sehen keine Anfragen');
+    const reqId = (await db.one<{ id: string }>(`select id from name_requests where status = 'pending'`))!.id;
+    assert.equal((await stranger.post(`/r/${slug}/verwalten/anfrage/${reqId}/bestaetigen`)).status, 404);
+    assert.equal((await anna.post(`/r/${slug}/verwalten/anfrage/${reqId}/bestaetigen`)).status, 303);
+    assert.equal((await db.one<{ first_name: string }>(`select first_name from users where display_name = 'Anna'`))!.first_name, 'Anna-Lena');
+    // Ablehnen: Name bleibt, Anfrage ist erledigt
+    await ben.post('/konto/name', { display_name: 'Benny', first_name: 'Ben' });
+    const benReq = (await db.one<{ id: string }>(`select id from name_requests where status = 'pending'`))!.id;
+    assert.equal((await anna.post(`/r/${slug}/verwalten/anfrage/${benReq}/ablehnen`)).status, 303);
+    assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from users where display_name = 'Ben'`))!.n, 1);
+    assert.match((await ben.get('/konto')).text, /vom Spielleiter abgelehnt/);
+    // Zurückziehen
+    await ben.post('/konto/name', { display_name: 'Benny', first_name: 'Ben' });
+    await ben.post('/konto/name/zurueckziehen');
+    assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from name_requests where status = 'pending'`))!.n, 0);
+    // Älteres Konto ohne Vornamen: der Vorname wird einmal direkt gespeichert
+    await db.run(`update users set first_name = null where display_name = 'Ben'`);
+    assert.match((await ben.post('/konto/name', { display_name: 'Ben', first_name: 'Ben' })).location ?? '', /hinweis=name-gespeichert/);
+    assert.equal((await db.one<{ first_name: string }>(`select first_name from users where display_name = 'Ben'`))!.first_name, 'Ben');
 
     // Profil: nur über gemeinsame Tipprunde, mit Vorname und Zahlen
     const annaId = (await db.one<{ id: string }>(`select id from users where email = 'anna.neu@example.de' or display_name = 'Anna' order by created_at limit 1`))!.id;

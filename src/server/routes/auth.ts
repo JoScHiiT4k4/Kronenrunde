@@ -26,7 +26,7 @@ import {
 import { PgError } from '../db/index.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
-import { avatar, csrfField, layout } from '../views/layout.ts';
+import { avatar, csrfField, layout, postButton } from '../views/layout.ts';
 import { leadLabel } from '../benachrichtigung.ts';
 import { loadVapid, validEndpoint } from '../webpush.ts';
 import { cleanFirstName, cleanName, FIRST_NAME_HELP, FIRST_NAME_PATTERN, intField, loginRedirect } from './common.ts';
@@ -328,14 +328,32 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return accountPage(ctx);
   });
 
+  // Namen sind nach der Registrierung gesperrt: nur der erste Vorname (bei älteren Konten) wird direkt gespeichert, alles andere ist eine Anfrage an den Spielleiter
   router.post('/konto/name', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
+    const { db } = ctx.deps;
     const name = cleanName(ctx.form.get('display_name'));
     const first = cleanFirstName(ctx.form.get('first_name'));
     if (!name) return accountPage(ctx, 'Bitte wähle einen Anzeigenamen mit 1 bis 40 Zeichen.', 'profil');
     if (!first) return accountPage(ctx, FIRST_NAME_HELP, 'profil');
-    await ctx.deps.db.run('update users set display_name = $2, first_name = $3 where id = $1', [ctx.user.id, name, first]);
-    return redirect('/konto?bereich=profil&hinweis=name-gespeichert');
+    const current = await db.one<{ display_name: string; first_name: string | null }>('select display_name, first_name from users where id = $1', [ctx.user.id]);
+    let currentFirst = current?.first_name ?? null;
+    if (currentFirst === null) {
+      await db.run('update users set first_name = $2 where id = $1', [ctx.user.id, first]);
+      currentFirst = first;
+    }
+    if (name === current?.display_name && first === currentFirst) return redirect('/konto?bereich=profil&hinweis=name-gespeichert');
+    await db.tx(async (q) => {
+      await q.run(`delete from name_requests where user_id = $1 and status = 'pending'`, [ctx.user!.id]);
+      await q.run('insert into name_requests (user_id, new_display_name, new_first_name) values ($1, $2, $3)', [ctx.user!.id, name, first]);
+    });
+    return redirect('/konto?bereich=profil&hinweis=aenderung-angefragt');
+  });
+
+  router.post('/konto/name/zurueckziehen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run(`delete from name_requests where user_id = $1 and status = 'pending'`, [ctx.user.id]);
+    return redirect('/konto?bereich=profil&hinweis=anfrage-zurueckgezogen');
   });
 
   router.post('/konto/benachrichtigung', async (ctx) => {
@@ -534,6 +552,8 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
 
   if (area === 'profil') {
     const row = await db.one<{ avatar_updated_at: Date | null; first_name: string | null }>('select avatar_updated_at, first_name from users where id = $1', [user.id]);
+    const pending = await db.one<{ new_display_name: string; new_first_name: string }>(`select new_display_name, new_first_name from name_requests where user_id = $1 and status = 'pending'`, [user.id]);
+    const lastDecision = await db.one<{ status: string }>(`select status from name_requests where user_id = $1 and status <> 'pending' and decided_at > now() - interval '14 days' order by decided_at desc limit 1`, [user.id]);
     content = html`<section class="panel">
   <h2>Profilbild</h2>
   <div class="avatar-edit">
@@ -554,18 +574,46 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
 </section>
 <section class="panel">
   <h2>Namen</h2>
+  ${
+    row?.first_name
+      ? html`<dl class="facts">
+    <dt>Anzeigename</dt><dd>${user.display_name} <small class="muted">(so stehst du in der Rangliste)</small></dd>
+    <dt>Vorname</dt><dd>${row.first_name} <small class="muted">(steht in deinem Profil)</small></dd>
+  </dl>
+  ${
+    pending
+      ? html`<p class="notice notice-warn">Änderung angefragt: <strong>${pending.new_display_name}</strong> (${pending.new_first_name}). Sie wird wirksam, sobald dein Spielleiter sie bestätigt.</p>
+  ${postButton(ctx, '/konto/name/zurueckziehen', 'Anfrage zurückziehen', { cls: 'btn btn-quiet' })}`
+      : html`${
+          lastDecision?.status === 'rejected' ? html`<p class="notice notice-warn">Deine letzte Änderung wurde vom Spielleiter abgelehnt.</p>` : nothing
+        }<details class="name-change">
+    <summary>Änderung beantragen</summary>
+    <p class="muted">Namen sind gesperrt. Eine Änderung muss dein Spielleiter erst bestätigen.</p>
+    <form method="post" action="/konto/name" class="stack">
+      ${csrfField(ctx)}
+      <label class="field">
+        <span>Neuer Anzeigename</span>
+        <input type="text" name="display_name" value="${user.display_name}" required maxlength="40" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>Neuer Vorname <small class="muted">(nur Buchstaben, ggf. mit Bindestrich)</small></span>
+        <input type="text" name="first_name" value="${row.first_name}" required maxlength="40" autocomplete="off" pattern="${FIRST_NAME_PATTERN}" title="Nur Buchstaben und Bindestriche, keine Leerzeichen oder Zahlen">
+      </label>
+      <button type="submit" class="btn">Änderung beantragen</button>
+    </form>
+  </details>`
+  }`
+      : html`<p class="muted">Dein Anzeigename ist <strong>${user.display_name}</strong>. Bitte trage jetzt deinen Vornamen ein – danach sind die Namen gesperrt.</p>
   <form method="post" action="/konto/name" class="stack">
     ${csrfField(ctx)}
-    <label class="field">
-      <span>Anzeigename <small class="muted">(so stehst du in der Rangliste)</small></span>
-      <input type="text" name="display_name" value="${user.display_name}" required maxlength="40" autocomplete="nickname">
-    </label>
+    <input type="hidden" name="display_name" value="${user.display_name}">
     <label class="field">
       <span>Vorname <small class="muted">(nur Buchstaben, ggf. mit Bindestrich; steht in deinem Profil)</small></span>
-      <input type="text" name="first_name" value="${row?.first_name ?? ''}" required maxlength="40" autocomplete="given-name" pattern="${FIRST_NAME_PATTERN}" title="Nur Buchstaben und Bindestriche, keine Leerzeichen oder Zahlen">
+      <input type="text" name="first_name" value="" required maxlength="40" autocomplete="given-name" pattern="${FIRST_NAME_PATTERN}" title="Nur Buchstaben und Bindestriche, keine Leerzeichen oder Zahlen">
     </label>
-    <button type="submit" class="btn">Speichern</button>
-  </form>
+    <button type="submit" class="btn">Vornamen speichern</button>
+  </form>`
+  }
 </section>`;
   } else if (area === 'benachrichtigungen') {
     const prefs = (await db.one<{ email_enabled: boolean; push_enabled: boolean; lead_minutes: number; chat_push: boolean }>(
