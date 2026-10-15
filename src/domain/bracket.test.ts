@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { type BracketMatch, type BracketTeam, buildPhases, currentPhase, markFor, phaseKind, phaseOf, roundOf } from './bracket.ts';
+import { layoutTree } from './bracket-layout.ts';
+import { type BracketMatch, type BracketTeam, buildPhases, currentPhase, markFor, phaseKind, phaseOf, roundOf, stageLabel } from './bracket.ts';
 
 const team = (id: string): BracketTeam => ({ id, name: `Team ${id}`, short: id });
 const T = Object.fromEntries(['KC', 'C9', 'FUR', 'MVK', 'GEN', 'T1', 'HLE', 'G2'].map((id) => [id, team(id)]));
@@ -27,14 +28,16 @@ function match(stage: string | null, pos: number, a: string | null, b: string | 
 
 test('Phase und Runde aus dem Abschnittsnamen', () => {
   assert.equal(phaseOf('Play-In: oberes Halbfinale'), 'Play-In');
-  assert.equal(roundOf('Play-In: oberes Halbfinale'), 'Oberes Halbfinale');
+  assert.equal(roundOf('Play-In: oberes Halbfinale'), 'Upper Bracket Semifinal');
   assert.equal(phaseOf('Swiss: Runde 3'), 'Swiss');
-  assert.equal(roundOf('Swiss: Runde 3'), 'Runde 3');
-  for (const s of ['Viertelfinale', 'Halbfinale', 'Finale', 'Achtelfinale']) assert.equal(phaseOf(s), 'K.-o.-Phase');
-  assert.equal(roundOf('Viertelfinale'), 'Viertelfinale');
+  assert.equal(roundOf('Swiss: Runde 3'), 'Round 3');
+  for (const s of ['Viertelfinale', 'Halbfinale', 'Finale', 'Achtelfinale']) assert.equal(phaseOf(s), 'Knockout Stage');
+  assert.equal(roundOf('Viertelfinale'), 'Quarterfinals');
+  assert.equal(roundOf('Swiss: Runde 3'), 'Round 3');
+  assert.equal(stageLabel('Play-In: unteres Finale'), 'Play-In: Lower Bracket Final');
   assert.equal(phaseOf(null), 'Weitere Spiele');
   assert.equal(phaseOf('Gruppenphase'), 'Gruppenphase');
-  assert.deepEqual(['Play-In', 'Swiss', 'K.-o.-Phase', 'Gruppenphase'].map(phaseKind), ['doppel', 'swiss', 'ko', 'offen']);
+  assert.deepEqual(['Play-In', 'Swiss', 'Knockout Stage', 'Gruppenphase'].map(phaseKind), ['doppel', 'swiss', 'ko', 'offen']);
 });
 
 test('Play-In (doppeltes K.o.): zweimal verloren oder Finale verloren = ausgeschieden', () => {
@@ -50,7 +53,7 @@ test('Play-In (doppeltes K.o.): zweimal verloren oder Finale verloren = ausgesch
   const [phase] = buildPhases(Object.values(m));
   const state = Object.fromEntries(phase.records.map((r) => [r.team.id, r.state]));
   assert.deepEqual(state, { KC: 'weiter', C9: 'ausgeschieden', FUR: 'ausgeschieden', MVK: 'ausgeschieden' });
-  assert.deepEqual(phase.rounds.map((r) => r.name), ['Oberes Halbfinale', 'Unteres Halbfinale', 'Oberes Finale', 'Unteres Finale', 'Finale']);
+  assert.deepEqual(phase.rounds.map((r) => r.name), ['Upper Bracket Semifinal', 'Lower Bracket Semifinal', 'Upper Bracket Final', 'Lower Bracket Final', 'Final']);
 
   // Gekennzeichnet wird erst ab dem Spiel, mit dem ein Team ausgeschieden ist
   assert.equal(markFor(phase, 'C9', m.oh1.id), null, 'C9 hat das erste Spiel verloren, ist dort aber noch dabei');
@@ -108,8 +111,8 @@ test('K.-o.-Phase: jede Niederlage scheidet aus, das Finale gewinnt der Sieger',
   const hf1 = match('Halbfinale', 11, 'GEN', 'HLE', '3-2');
   const finale = match('Finale', 12, 'GEN', 'G2');
   const [phase] = buildPhases([vf1, vf2, hf1, finale]);
-  assert.equal(phase.name, 'K.-o.-Phase');
-  assert.deepEqual(phase.rounds.map((r) => r.name), ['Viertelfinale', 'Halbfinale', 'Finale']);
+  assert.equal(phase.name, 'Knockout Stage');
+  assert.deepEqual(phase.rounds.map((r) => r.name), ['Quarterfinals', 'Semifinals', 'Final']);
   const state = Object.fromEntries(phase.records.map((r) => [r.team.id, r.state]));
   assert.deepEqual(state, { GEN: 'aktiv', KC: 'ausgeschieden', T1: 'ausgeschieden', HLE: 'ausgeschieden', G2: 'aktiv' });
   assert.equal(markFor(phase, 'HLE', vf2.id), null, 'HLE gewinnt das Viertelfinale und ist dort nicht ausgegraut');
@@ -154,4 +157,43 @@ test('Welche Phase zuerst: laufendes Spiel, sonst nächstes offenes, sonst die l
   assert.equal(currentPhase(buildPhases([live, match('Swiss: Runde 1', 5, 'GEN', 'T1')]))!.name, 'Play-In');
   assert.equal(currentPhase(buildPhases([done('Play-In: Finale', 0), done('Swiss: Runde 1', 5)]))!.name, 'Swiss');
   assert.equal(currentPhase([]), undefined);
+});
+
+test('Baum: K.-o.-Phase – Spiele mittig zwischen den Vorgängern, Linien in beide Teamzeilen', () => {
+  const qf = [0, 1, 2, 3].map(() => match('Viertelfinale', 10, 'GEN', 'KC'));
+  const sf = [0, 1].map(() => match('Halbfinale', 11, null, null));
+  const fin = match('Finale', 12, null, null);
+  const [phase] = buildPhases([...qf, ...sf, fin]);
+  const t = layoutTree(phase)!;
+  assert.equal(t.nodes.length, 7);
+  assert.equal(t.edges.length, 6);
+  assert.ok(t.edges.every((e) => e.kind === 'win' && e.arrow === null));
+  const y = (m: BracketMatch) => t.nodes.find((n) => n.match === m)!.y;
+  assert.equal(y(sf[0]), (y(qf[0]) + y(qf[1])) / 2);
+  assert.equal(y(fin), (y(sf[0]) + y(sf[1])) / 2);
+  assert.deepEqual(t.titles.map((x) => x.text), ['Quarterfinals', 'Semifinals', 'Final']);
+});
+
+test('Baum: Play-In – Upper und Lower Bracket mit gestrichelten Verlierer-Linien', () => {
+  const ms = [
+    match('Play-In: oberes Halbfinale', 0, 'KC', 'C9'),
+    match('Play-In: oberes Halbfinale', 0, 'FUR', 'MVK'),
+    match('Play-In: unteres Halbfinale', 1, null, null),
+    match('Play-In: oberes Finale', 2, null, null),
+    match('Play-In: unteres Finale', 3, null, null),
+    match('Play-In: Finale', 4, null, null),
+  ];
+  const t = layoutTree(buildPhases(ms)[0])!;
+  assert.equal(t.nodes.length, 6);
+  assert.equal(t.edges.filter((e) => e.kind === 'lose').length, 3, 'zwei Verlierer der Halbfinals + Verlierer des Upper Bracket Final');
+  assert.equal(t.edges.filter((e) => e.kind === 'win').length, 5);
+  const at = (m: BracketMatch) => t.nodes.find((n) => n.match === m)!;
+  assert.ok(at(ms[2]).y > at(ms[1]).y, 'Lower Bracket unter dem Upper Bracket');
+  assert.equal(at(ms[3]).y, (at(ms[0]).y + at(ms[1]).y) / 2);
+});
+
+test('Baum: unbekannte Struktur → keine Baum-Ansicht', () => {
+  assert.equal(layoutTree(buildPhases([match('Swiss: Runde 1', 5, 'GEN', 'T1')])[0]), null);
+  assert.equal(layoutTree(buildPhases([match('Viertelfinale', 10, 'GEN', 'KC'), match('Viertelfinale', 10, 'T1', 'HLE'), match('Halbfinale', 11, null, null), match('Finale', 12, null, null)])[0]), null, '2 → 1 → 1 passt nicht');
+  assert.equal(layoutTree(buildPhases([match('Play-In: Finale', 4, 'KC', 'C9')])[0]), null);
 });

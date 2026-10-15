@@ -932,11 +932,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(play.text, /<h1 class="bk-title">Worlds 2026<\/h1>/);
     assert.match(play.text, /<nav class="phase-tabs" aria-label="Phasen">/);
     assert.match(play.text, /phase=swiss"/);
-    assert.match(play.text, /phase=k-o-phase"/);
-    for (const round of ['Oberes Halbfinale', 'Unteres Halbfinale', 'Oberes Finale', 'Unteres Finale', 'Finale']) {
-      assert.match(play.text, new RegExp(`<h3 class="bk-round-title">${round}</h3>`));
+    assert.match(play.text, /phase=knockout-stage"/);
+    for (const round of ['Upper Bracket Semifinal', 'Lower Bracket Semifinal', 'Upper Bracket Final', 'Lower Bracket Final', 'Final']) {
+      assert.match(play.text, new RegExp(`class="bk-rtitle" x="\\d+" y="\\d+">${round}</text>`));
     }
-    assert.match(play.text, /Doppeltes K\.o\./);
+    assert.match(play.text, /Double Elimination/);
     assert.match(play.text, new RegExp(`href="/r/${slug}/spiel/${await matchId('pi-oh-1')}"`));
     // Noch ist niemand ausgeschieden (alle haben höchstens eine Niederlage)
     assert.doesNotMatch(play.text, /bk-out/);
@@ -946,7 +946,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Unteres Halbfinale C9 – MVK endet 3:0: MVK hat zwei Niederlagen und ist ausgeschieden
     await db.run(`update matches set wins_a = 3, wins_b = 0, status = 'finished' where id = $1`, [await matchId('pi-uh')]);
     const after = await admin.get(`${path}?turnier=${tid}&phase=play-in`);
-    assert.match(after.text, /bk-team bk-b bk-lost bk-out"[^]*?title="MVK Esports">MVK<\/span>[^]*?\(ausgeschieden\)/);
+    assert.match(after.text, /bk-row bk-b bk-lost bk-out"[^]*?>MVK<\/text>/);
+    assert.match(after.text, /<svg class="bk-svg"/);
+    assert.match(after.text, /bk-edge-lose/, 'Verlierer-Linien im Lower Bracket');
     assert.match(after.text, /<li class="bk-chip bk-out" title="MVK Esports">MVK/);
     assert.doesNotMatch(after.text, /<li class="bk-chip bk-out" title="Cloud9[^"]*">/, 'C9 hat erst eine Niederlage');
     assert.match(after.text, /bk-legend/);
@@ -954,11 +956,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Swiss: Runden stehen schon, die Paarungen sind noch offen
     const swiss = await admin.get(`${path}?turnier=${tid}&phase=swiss`);
     assert.match(swiss.text, /Schweizer System/);
-    assert.match(swiss.text, /<h3 class="bk-round-title">Runde 5<\/h3>/);
+    assert.match(swiss.text, /<h3 class="bk-round-title">Round 5<\/h3>/);
     assert.doesNotMatch(swiss.text, /bk-table/);
     // K.-o.-Phase: Viertelfinale, Halbfinale, Finale als Spalten
-    const ko = await admin.get(`${path}?turnier=${tid}&phase=k-o-phase`);
-    for (const round of ['Viertelfinale', 'Halbfinale', 'Finale']) assert.match(ko.text, new RegExp(`<h3 class="bk-round-title">${round}</h3>`));
+    const ko = await admin.get(`${path}?turnier=${tid}&phase=knockout-stage`);
+    for (const round of ['Quarterfinals', 'Semifinals', 'Final']) assert.match(ko.text, new RegExp(`class="bk-rtitle" x="\\d+" y="\\d+">${round}</text>`));
     // Unbekannte Phase → die aktuelle wird gezeigt
     assert.equal((await admin.get(`${path}?turnier=${tid}&phase=gibt-es-nicht`)).status, 200);
   });

@@ -1,5 +1,6 @@
 // Startseite, Tipprunde anlegen/beitreten, Tippen, Spiel-Details, Rangliste, Sonderfragen.
 
+import { roundOf, stageLabel } from '../../domain/bracket.ts';
 import { isBonusCorrect } from '../../domain/bonus.ts';
 import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
@@ -295,7 +296,8 @@ export function parseLockMode(value: string | null): LockMode {
 
 /** Phase eines Spiels: der Teil des Phasennamens vor dem Doppelpunkt („Swiss: Runde 2“ → „Swiss“). */
 export function phaseName(m: { stage: string | null }): string {
-  return (m.stage ?? '').split(':')[0].trim() || 'Weitere Spiele';
+  const stage = (m.stage ?? '').trim();
+  return (stage.includes(':') ? stage.split(':')[0].trim() : stage && roundOf(stage)) || 'Weitere Spiele';
 }
 export const phaseSlug = (name: string) => slugify(name) || 'spiele';
 
@@ -323,7 +325,7 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
   const meta = html`<div class="match-meta">
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : 'Termin offen'}</span>
     <span class="bo">Bo${m.best_of}</span>
-    ${m.stage ? html`<span>${m.stage}</span>` : nothing}
+    ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
@@ -662,7 +664,7 @@ ${
   const body = html`<section class="panel">
   <p><a href="/r/${league.slug}/tippen?phase=${phaseSlug(phaseName(m))}#spiel-${m.id}">Zurück zu den Spielen</a></p>
   <h1 class="versus"><span class="team-a">${m.team_a ?? 'offen'}</span> <span class="vs">VS</span> <span class="team-b">${m.team_b ?? 'offen'}</span></h1>
-  <p class="muted">${m.tournament}${m.stage ? `, ${m.stage}` : ''}, Bo${m.best_of}${m.scheduled_at ? `, ${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : ''}</p>
+  <p class="muted">${m.tournament}${m.stage ? `, ${stageLabel(m.stage)}` : ''}, Bo${m.best_of}${m.scheduled_at ? `, ${formatDateTime(m.scheduled_at, config.timeZone)} Uhr` : ''}</p>
   ${result ? html`<p class="result">Ergebnis: <strong>${result}</strong></p>` : nothing}
   ${content}
 </section>`;
@@ -723,7 +725,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   <div class="match-meta">
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : ''}</span>
     <span class="bo">Bo${m.best_of}</span>
-    ${m.stage ? html`<span>${m.stage}</span>` : nothing}
+    ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
     ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   <div class="teams">

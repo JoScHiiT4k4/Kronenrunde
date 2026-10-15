@@ -778,6 +778,35 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 }
 .bk-out .bk-name, .bk-out .bk-score { color: var(--muted); font-weight: 600; }
 
+/* Turnierbaum mit Linien (SVG): durchgezogen = Sieger zieht weiter, gestrichelt = Verlierer fällt ins Lower Bracket */
+.bracket-tree { display: block; }
+.bk-svg { display: block; max-width: none; font-family: inherit; }
+.bk-box { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+a.bk-match:hover .bk-box { stroke: var(--gold); }
+a.bk-match:focus-visible { outline: none; }
+a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; }
+.bk-match.bk-live .bk-box { stroke: var(--red); stroke-width: 2; }
+.bk-sep { stroke: var(--line); }
+.bk-edge { fill: none; stroke: var(--muted); stroke-opacity: 0.55; stroke-width: 2; }
+.bk-edge-lose { stroke: var(--gold); stroke-dasharray: 5 4; }
+.bk-edge-lose.bk-arrow { stroke-dasharray: none; }
+.bk-rtitle { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.bk-t-meta { fill: var(--muted); font-size: 11px; }
+.bk-t-bo { fill: var(--gold-text); font-weight: 700; }
+.bk-t-name { fill: var(--text); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+.bk-t-tbd { fill: var(--muted); font-style: italic; font-weight: 400; }
+.bk-t-score { fill: var(--muted); font-size: 15px; font-weight: 700; }
+.bk-t-tag { fill: var(--gold-bright); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.bk-stripe { fill: var(--blue); }
+.bk-b .bk-stripe { fill: var(--red); }
+.bk-won .bk-t-name { fill: var(--gold-bright); font-weight: 700; }
+.bk-won .bk-t-score { fill: var(--green, #3ddc84); }
+.bk-lost .bk-t-name { fill: var(--muted); }
+.bk-through .bk-t-name { fill: var(--gold-bright); }
+.bk-out .bk-t-name, .bk-out .bk-t-score { fill: var(--muted); }
+.bk-key-line::before { width: 18px; height: 0; background: none; border-top: 2px solid var(--muted); transform: none; }
+.bk-key-dash::before { border-top: 2px dashed var(--gold); }
+
 /* Turnier-Leiste im Kopf: Countdown bzw. Livestream-Links */
 .tbar { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; flex: 1 1 auto; font-size: 0.9rem; }
 .tbar-label { color: var(--muted, #a09b8c); white-space: nowrap; }
