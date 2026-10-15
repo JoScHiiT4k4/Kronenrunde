@@ -53,11 +53,11 @@ function questionFields(q: QuestionRow): Html {
 
 const AREAS = [
   ['uebersicht', 'Übersicht'],
-  ['einstellungen', 'Einstellungen'],
-  ['turniere', 'Turniere'],
-  ['fragen', 'Sonderfragen'],
   ['mitglieder', 'Mitglieder'],
   ['anfragen', 'Anfragen'],
+  ['turniere', 'Turniere'],
+  ['fragen', 'Sonderfragen'],
+  ['einstellungen', 'Einstellungen'],
 ] as const;
 type Area = (typeof AREAS)[number][0];
 const isArea = (v: string | null | undefined): v is Area => AREAS.some(([k]) => k === v);
@@ -68,7 +68,7 @@ function areaOfPath(path: string): Area {
   if (rest.startsWith('/einstellungen') || rest.startsWith('/loeschen') || rest.startsWith('/chat')) return 'einstellungen';
   if (rest.startsWith('/turnier')) return 'turniere';
   if (rest.startsWith('/frage')) return 'fragen';
-  if (rest.startsWith('/mitglied')) return 'mitglieder';
+  if (rest.startsWith('/mitglied') || rest.startsWith('/einladung')) return 'mitglieder';
   if (rest.startsWith('/anfrage')) return 'anfragen';
   return 'uebersicht';
 }
@@ -149,7 +149,7 @@ ${tabMenu('sub-tabs', 'Bereiche', AREAS.map(([key, label]) => ({
 
 ${area === 'uebersicht' ? html`
 <section class="panel">
-  <h2>Tipps ${progress(members.length - missing.length, members.length, 'getippt')}</h2>
+  <h2>Tipps ${progress(members.length - missing.length, members.length, 'Teilnehmer haben getippt')}</h2>
   ${
     missing.length
       ? html`<p class="muted">Diese Mitspieler haben für anstehende Spiele noch keinen Tipp abgegeben. Die Tipps selbst siehst du – wie alle anderen – erst nach Tippschluss.</p>
@@ -168,34 +168,23 @@ ${area === 'uebersicht' ? html`
 </section>
 
 <section class="panel">
-  <h2>Sonderfragen ${openQuestions ? progress(members.length - missingQ.length, members.length, 'Fragen beantwortet') : nothing}</h2>
+  <h2>Sonderfragen ${openQuestions ? progress(members.length - missingQ.length, members.length, 'Teilnehmer haben alle Fragen beantwortet') : nothing}</h2>
   ${
     !openQuestions
       ? html`<p class="muted">Gerade gibt es keine offenen Sonderfragen.</p>`
       : missingQ.length
         ? html`<p class="muted">Diese Mitspieler haben noch nicht alle offenen Sonderfragen beantwortet.</p>
   <table class="table">
-    <thead><tr><th>Name</th><th>Unbeantwortet</th></tr></thead>
+    <thead><tr><th>Name</th><th class="num">Unbeantwortet</th></tr></thead>
     <tbody>
-    ${missingQ.map((r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td><td class="bad">${r.questions.join(' · ')}</td></tr>`)}
+    ${missingQ.map((r) => html`<tr><td>${nameOf.get(r.userId) ?? ''}</td><td class="num bad">${r.questions.length} von ${openQuestions}</td></tr>`)}
     </tbody>
   </table>`
         : html`<p class="muted">Alle haben alle offenen Sonderfragen beantwortet.</p>`
   }
 </section>
 
-<section class="panel">
-  <h2>Leute einladen</h2>
-  <p>Schick diesen Link an alle, die mittippen sollen. Wer ihn öffnet, meldet sich an und ist dabei.</p>
-  <div class="copy-row">
-    <input type="text" readonly value="${inviteLink}" id="invite-link" aria-label="Einladungslink">
-    <button type="button" class="btn" data-copy="invite-link">Kopieren</button>
-  </div>
-  ${postButton(ctx, `${base}/einladung-neu`, 'Neuen Link erstellen', {
-    cls: 'btn btn-quiet',
-    confirm: 'Der bisherige Link funktioniert danach nicht mehr. Fortfahren?',
-  })}
-</section>` : nothing}
+` : nothing}
 
 ${area === 'einstellungen' ? html`
 <section class="panel">
@@ -306,6 +295,18 @@ ${area === 'fragen' ? html`
 </section>` : nothing}
 
 ${area === 'mitglieder' ? html`
+<section class="panel">
+  <h2>Leute einladen</h2>
+  <p>Schick diesen Link an alle, die mittippen sollen. Wer ihn öffnet, meldet sich an und ist dabei.</p>
+  <div class="copy-row">
+    <input type="text" readonly value="${inviteLink}" id="invite-link" aria-label="Einladungslink">
+    <button type="button" class="btn" data-copy="invite-link">Kopieren</button>
+  </div>
+  ${postButton(ctx, `${base}/einladung-neu`, 'Neuen Link erstellen', {
+    cls: 'btn btn-quiet',
+    confirm: 'Der bisherige Link funktioniert danach nicht mehr. Fortfahren?',
+  })}
+</section>
 <section class="panel">
   <h2>Mitglieder (${members.length})</h2>
   <table class="table">
@@ -440,7 +441,7 @@ export function registerManageRoutes(router: Router<Ctx>) {
 
   post('/einladung-neu', async (ctx, { league }) => {
     await ctx.deps.db.run(`update leagues set invite_code = encode(gen_random_bytes(6), 'hex') where id = $1`, [league.id]);
-    return redirect(`${areaHref(league.slug, 'uebersicht')}&hinweis=link-erneuert`);
+    return redirect(`${areaHref(league.slug, 'mitglieder')}&hinweis=link-erneuert`);
   });
 
   post('/turnier', async (ctx, { league }) => {
