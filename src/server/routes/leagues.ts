@@ -12,7 +12,8 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, layout, postButton } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, layout, postButton, scaleBar } from '../views/layout.ts';
+import { loadStandings } from './standings-data.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
   canCreateLeague,
@@ -316,7 +317,7 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
   return [...days.values()];
 }
 
-function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null, tipped?: string): Html {
+function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null, tipped?: string, fold?: Html): Html {
   const tz = ctx.deps.config.timeZone;
   const match = toDomainMatch(m);
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
@@ -373,8 +374,8 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     ${teamsKnown || !open ? html`<span>Dein Tipp: <strong>${own ? predictionLabel(m, own) : '–'}</strong></span>` : nothing}
     ${result ? html`<span>Ergebnis: <strong>${result}</strong></span>` : nothing}
     ${score ? pointsBadge(score.points, score.exact) : nothing}
-    ${isPublic && teamsKnown ? html`<a href="/r/${league.slug}/spiel/${m.id}">Tipps zu diesem Spiel</a>` : nothing}
   </div>
+  ${isPublic && teamsKnown ? (fold ?? nothing) : nothing}
 </article>`;
 }
 
@@ -384,7 +385,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const { league } = access;
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
-  const [matches, preds, tournaments, votes, memberCount] = await Promise.all([
+  const [matches, preds, tournaments, votes, memberCount, members, allPreds] = await Promise.all([
     leagueMatches(db, league.id),
     db.query<PredictionRow>(
       `select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1 and user_id = $2`,
@@ -397,6 +398,11 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
       [league.id],
     ),
     db.one<{ n: number }>('select count(*)::int as n from league_members where league_id = $1', [league.id]),
+    db.query<{ user_id: string; display_name: string }>(
+      `select u.id as user_id, u.display_name from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 order by u.display_name, u.id`,
+      [league.id],
+    ),
+    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1`, [league.id]),
   ]);
   const own = new Map(preds.map((p) => [p.match_id, p]));
   // Nur für Spiele, deren Tipps schon öffentlich sind (nach Tippschluss) – vorher bleibt alles geheim
@@ -408,6 +414,28 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   // Wie viele schon getippt haben (nur die Anzahl – die Tipps selbst bleiben bis Tippschluss geheim)
   const tippedOf = (m: MatchRow): string | undefined =>
     m.team_a_id && m.team_b_id ? `${votes.find((x) => x.match_id === m.id)?.n ?? 0}/${memberCount?.n ?? 0} Spieler getippt` : undefined;
+  // Aufklappbare Tipps der anderen – nur bei Spielen, deren Tippschluss vorbei ist (der Aufrufer prüft das)
+  const foldOf = (m: MatchRow): Html => {
+    const match = toDomainMatch(m);
+    const byUser = new Map(allPreds.filter((p) => p.match_id === m.id).map((p) => [p.user_id, p]));
+    return html`<details class="tips-fold">
+    <summary>Tipps der Mitspieler</summary>
+    <table class="table compact tips-table">
+      <thead><tr><th>Name</th><th>Tipp</th><th class="num">Punkte</th></tr></thead>
+      <tbody>
+      ${members.map((u) => {
+        const p = byUser.get(u.user_id);
+        const points = p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)).points : null;
+        return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
+          <td>${u.display_name}</td>
+          <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
+          <td class="num${points ? ' hit' : ''}">${points ?? ''}</td>
+        </tr>`;
+      })}
+      </tbody>
+    </table>
+  </details>`;
+  };
   const beforeLock = (m: MatchRow) => (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -525,7 +553,7 @@ ${
   ${unscheduled.map(
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m), foldOf(m)))}
   </section>`,
   )}
   ${hiddenNote}
@@ -543,7 +571,7 @@ ${
   ${closedDays.map(
     (d, i) => html`<details class="day day-closed"${attr(i === 0, 'open')}>
     <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span>${dayPoints(d)}</summary>
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m)))}
+    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m), foldOf(m)))}
   </details>`,
   )}`
     : nothing
@@ -782,42 +810,15 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
   const { db } = ctx.deps;
-  const [members, matches, preds, questions, answers] = await Promise.all([
-    db.query<{ user_id: string; display_name: string; avatar_updated_at: Date | null }>(
-      `select u.id as user_id, u.display_name, u.avatar_updated_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1`,
-      [league.id],
-    ),
-    leagueMatches(db, league.id),
-    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1`, [league.id]),
-    db.query<{ id: string; points: number; correct_answers: string[] }>(
-      `select q.id, q.points, q.correct_answers from bonus_questions q
-         join league_tournaments lt on lt.league_id = q.league_id and lt.tournament_id = q.tournament_id
-        where q.league_id = $1`,
-      [league.id],
-    ),
-    db.query<{ question_id: string; user_id: string; answer: string }>(
-      `select question_id, user_id, answer from bonus_answers where league_id = $1`,
-      [league.id],
-    ),
-  ]);
-  const finished = matches.filter((m) => matchResult(toDomainMatch(m)));
-  const rows = computeStandings({
-    members: members.map((m) => ({ userId: m.user_id, displayName: m.display_name })),
-    matches: matches.map(toDomainMatch),
-    predictions: preds.map(toDomainPrediction),
-    rules: rulesOf(league),
-    bonusQuestions: questions.map((q) => ({ id: q.id, points: q.points, correctAnswers: q.correct_answers })),
-    bonusAnswers: answers.map((a) => ({ questionId: a.question_id, userId: a.user_id, answer: a.answer })),
-  });
-  const hasBonus = questions.some((q) => q.correct_answers.length);
-  const avatarOf = new Map(members.map((m) => [m.user_id, m.avatar_updated_at]));
+  const { rows, avatarOf, finished, possible, hasBonus } = await loadStandings(db, league);
 
   const body = html`<section class="panel">
   <h1>Rangliste</h1>
-  <p class="muted">${finished.length} ${finished.length === 1 ? 'Spiel' : 'Spiele'} gewertet. Richtiger Sieger ${league.points_winner} ${league.points_winner === 1 ? 'Punkt' : 'Punkte'}, exaktes Ergebnis ${league.points_exact} extra. Bei Gleichstand zählen die exakten Ergebnisse.</p>
+  <p class="muted">${finished} ${finished === 1 ? 'Spiel' : 'Spiele'} gewertet. Richtiger Sieger ${league.points_winner} ${league.points_winner === 1 ? 'Punkt' : 'Punkte'}, exaktes Ergebnis ${league.points_exact} extra. Bei Gleichstand zählen die exakten Ergebnisse.</p>
   <table class="table standings">
     <thead><tr>
       <th class="num">Platz</th><th>Name</th>
+      <th class="scale-col" title="Grün: geholte Punkte, rot: liegen gelassen (von ${possible} bisher möglichen)">Ausbeute</th>
       <th class="num" title="Richtige Sieger">Sieger</th>
       <th class="num" title="Exakte Ergebnisse">Exakt</th>
       ${hasBonus ? html`<th class="num" title="Punkte aus Sonderfragen">Sonder</th>` : nothing}
@@ -828,6 +829,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
       (r) => html`<tr class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
         <td><span class="who">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></span></td>
+        <td class="scale-col">${scaleBar(r.points, possible)}</td>
         <td class="num">${r.correctWinners}</td>
         <td class="num">${r.exactResults}</td>
         ${hasBonus ? html`<td class="num">${r.bonusPoints}</td>` : nothing}

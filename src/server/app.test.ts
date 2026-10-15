@@ -412,13 +412,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     const hidden = await anna.get(`/r/${slug}/spiel/${match['GEN-T1']}`);
     assert.match(hidden.text, /ab Tippschluss/);
-    assert.doesNotMatch(hidden.text, /Ben/);
+    assert.doesNotMatch(hidden.text, /<td>Ben<\/td>/, 'Tipps der anderen stehen noch nicht in der Tabelle');
     // Reiter "Alle Tipps": vor dem Tippschluss noch leer
     const all = await anna.get(`/r/${slug}/alle-tipps`);
     assert.equal(all.status, 200);
     assert.match(all.text, /Noch sind keine Tipps zu sehen/);
     assert.match(all.text, /aria-current="page">Alle Tipps</);
-    assert.doesNotMatch(all.text, /Ben/);
+    assert.doesNotMatch(all.text, /<td>Ben<\/td>|B-3-2/);
     assert.equal((await stranger.get(`/r/${slug}/alle-tipps`)).status, 404);
   });
 
@@ -464,7 +464,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
     assert.match(tips.text, /class="foot-version">Version /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
-    assert.match(tips.text, new RegExp(`href="/r/${slug}/spiel/${match['GEN-T1']}">Tipps zu diesem Spiel</a>`));
+    assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
+    assert.match(tips.text, /<summary>Tipps der Mitspieler<\/summary>[^]*?<td>Ben<\/td>/);
+    // Rangliste in der Seitenleiste, klickbar zur Rangliste
+    assert.match(tips.text, new RegExp(`<a class="rank-box" href="/r/${slug}/rangliste">`));
 
     // Reiter "Alle Tipps": beide geschlossenen Spiele mit allen Tipps und Punkten – offene Spiele nicht
     const all = await ben.get(`/r/${slug}/alle-tipps`);

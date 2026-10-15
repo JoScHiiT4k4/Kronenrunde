@@ -114,15 +114,15 @@ function treeNode(slug: string, phase: Phase, n: TreeNode, tz: string): Html {
     const y = META_H + i * ROW_H;
     return html`<g class="${cls.join(' ')}">
       <rect class="bk-stripe" x="0" y="${y}" width="3" height="${ROW_H}"/>
-      <text class="bk-t-name${team ? '' : ' bk-t-tbd'}" x="12" y="${y + 19}">${team ? team.short || team.name : 'offen'}</text>
-      ${mark === 'weiter' || mark === 'sieger' ? html`<text class="bk-t-tag" x="${BOX_W - 34}" y="${y + 18}" text-anchor="end">${mark === 'sieger' ? 'Sieger' : 'weiter'}</text>` : nothing}
-      <text class="bk-t-score" x="${BOX_W - 10}" y="${y + 19}" text-anchor="end">${o ? (wins ?? '') : ''}</text>
+      <text class="bk-t-name${team ? '' : ' bk-t-tbd'}" x="14" y="${y + ROW_H / 2 + 6}">${team ? team.short || team.name : 'offen'}</text>
+      ${mark === 'weiter' || mark === 'sieger' ? html`<text class="bk-t-tag" x="${BOX_W - 40}" y="${y + ROW_H / 2 + 5}" text-anchor="end">${mark === 'sieger' ? 'Sieger' : 'weiter'}</text>` : nothing}
+      <text class="bk-t-score" x="${BOX_W - 12}" y="${y + ROW_H / 2 + 6}" text-anchor="end">${o ? (wins ?? '') : ''}</text>
     </g>`;
   };
   const inner = html`<rect class="bk-box" width="${BOX_W}" height="${BOX_H}"/>
     <line class="bk-sep" x1="0" y1="${META_H + ROW_H}" x2="${BOX_W}" y2="${META_H + ROW_H}"/>
-    <text class="bk-t-meta" x="10" y="14">${m.scheduledAt ? formatDateTime(m.scheduledAt, tz) : 'Termin offen'}</text>
-    <text class="bk-t-meta bk-t-bo" x="${BOX_W - 10}" y="14" text-anchor="end">${m.status === 'live' ? 'läuft · ' : ''}Bo${m.bestOf}</text>
+    <text class="bk-t-meta" x="12" y="${META_H - 9}">${m.scheduledAt ? formatDateTime(m.scheduledAt, tz) : 'Termin offen'}</text>
+    <text class="bk-t-meta bk-t-bo" x="${BOX_W - 12}" y="${META_H - 9}" text-anchor="end">${m.status === 'live' ? 'läuft · ' : ''}Bo${m.bestOf}</text>
     ${row('a', m.teamA, m.winsA, 0)}${row('b', m.teamB, m.winsB, 1)}`;
   const label = m.teamA && m.teamB ? `${m.teamA.name} gegen ${m.teamB.name}${o ? ` – ${o.winner.name} gewinnt` : ''}` : 'Paarung noch offen';
   const cls = `bk-match${m.status === 'live' ? ' bk-live' : ''}`;

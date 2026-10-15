@@ -4,6 +4,7 @@
 import { stageLabel } from '../../domain/bracket.ts';
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
+import { formatBytes, formatUptime, percent, readSystemInfo } from '../system-info.ts';
 import { runSync, SYNC_LABELS } from '../abgleich.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
@@ -84,6 +85,7 @@ function resultSelect(m: MatchRow, name = 'ergebnis'): Html {
 const ADMIN_AREAS = [
   ['uebersicht', 'Übersicht'],
   ['nutzer', 'Nutzer'],
+  ['system', 'Server'],
   ['abgleich', 'Datenabgleich'],
   ['impressum', 'Impressum'],
   ['datenschutz', 'Datenschutz'],
@@ -103,6 +105,61 @@ function legalForm(ctx: Ctx, area: AdminArea, keys: LegalKey[], legal: Record<Le
     )}
     <button type="submit" class="btn btn-primary">Speichern</button>
   </form>
+</section>`;
+}
+
+/** Farbe nach Belegung: grün bis 70 %, gelb bis 90 %, darüber rot */
+const level = (p: number) => (p >= 90 ? 'hot' : p >= 70 ? 'warm' : 'ok');
+
+function gauge(label: string, p: number, detail: string, note?: string): Html {
+  return html`<div class="sys-card sys-${level(p)}">
+    <div class="sys-head"><span class="sys-label">${label}</span><span class="sys-pct">${p} %</span></div>
+    <svg class="sys-bar" viewBox="0 0 100 10" preserveAspectRatio="none" role="img" aria-label="${label}: ${p} Prozent belegt">
+      <rect class="sys-track" x="0" y="0" width="100" height="10"/><rect class="sys-fill" x="0" y="0" width="${p}" height="10"/>
+    </svg>
+    <div class="sys-detail">${detail}</div>
+    ${note ? html`<div class="sys-note">${note}</div>` : nothing}
+  </div>`;
+}
+
+async function systemPanel(ctx: Ctx): Promise<Html> {
+  const { db } = ctx.deps;
+  const sys = readSystemInfo();
+  const [dbSize, tables] = await Promise.all([
+    db.one<{ bytes: string }>('select pg_database_size(current_database())::text as bytes'),
+    db.query<{ name: string; bytes: string }>(
+      `select relname as name, pg_total_relation_size(c.oid)::text as bytes
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 6`,
+    ),
+  ]);
+  const dbBytes = Number(dbSize?.bytes ?? 0);
+  const maxTable = Math.max(1, ...tables.map((t) => Number(t.bytes)));
+  const load1 = sys.load ? Math.round((sys.load[0] / sys.cores) * 100) : null;
+  const temp = sys.temperature;
+  const tempPct = temp === null ? 0 : Math.min(100, Math.round((temp / 85) * 100));
+  return html`<section class="panel">
+  <h2>Server</h2>
+  <p class="muted">So ausgelastet ist der Raspberry Pi gerade. Die Seite zeigt den Stand beim Laden – zum Aktualisieren neu laden.</p>
+  <div class="sys-grid">
+    ${sys.disk ? gauge('Speicherplatz', percent(sys.disk), `${formatBytes(sys.disk.used)} von ${formatBytes(sys.disk.total)} belegt – ${formatBytes(sys.disk.total - sys.disk.used)} frei`) : nothing}
+    ${sys.memory ? gauge('Arbeitsspeicher', percent(sys.memory), `${formatBytes(sys.memory.used)} von ${formatBytes(sys.memory.total)} belegt`, sys.swap ? `Auslagerung: ${formatBytes(sys.swap.used)} von ${formatBytes(sys.swap.total)}` : undefined) : nothing}
+    ${load1 !== null && sys.load ? gauge('Prozessor', Math.min(100, load1), `Last ${sys.load[0].toFixed(2)} (1 Min.) · ${sys.load[1].toFixed(2)} (5 Min.) · ${sys.load[2].toFixed(2)} (15 Min.)`, `${sys.cores} Prozessorkerne – 100 % heißt: alle Kerne voll ausgelastet`) : nothing}
+    ${temp !== null ? gauge('Temperatur', tempPct, `${temp.toFixed(1).replace('.', ',')} °C`, 'Über 80 °C drosselt der Pi sich selbst.') : nothing}
+  </div>
+  <div class="sys-facts">
+    ${sys.uptimeSeconds !== null ? html`<div><span class="muted">Läuft seit</span><strong>${formatUptime(sys.uptimeSeconds)}</strong></div>` : nothing}
+    <div><span class="muted">Datenbank</span><strong>${formatBytes(dbBytes)}</strong></div>
+    ${sys.backupBytes !== null ? html`<div><span class="muted">Sicherungen</span><strong>${formatBytes(sys.backupBytes)} (${sys.backupCount})</strong></div>` : nothing}
+  </div>
+  <h3 class="small-title">Größte Tabellen der Datenbank</h3>
+  <ul class="sys-tables">
+    ${tables.map(
+      (t) => html`<li><span>${t.name}</span>
+      <svg class="sys-bar sys-bar-thin" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect class="sys-track" x="0" y="0" width="100" height="6"/><rect class="sys-fill" x="0" y="0" width="${Math.max(1, Math.round((Number(t.bytes) / maxTable) * 100))}" height="6"/></svg>
+      <span class="muted">${formatBytes(Number(t.bytes))}</span></li>`,
+    )}
+  </ul>
 </section>`;
 }
 
@@ -156,6 +213,8 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
     </tbody>
   </table>
 </section>`;
+  } else if (area === 'system') {
+    content = await systemPanel(ctx);
   } else if (area === 'abgleich') {
     const [syncRows, counts] = await Promise.all([
       db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),

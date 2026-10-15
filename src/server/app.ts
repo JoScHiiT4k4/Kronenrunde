@@ -5,6 +5,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
 import { loadHeaderTournament, type HeaderTournament } from './header-info.ts';
+import { loadSidebar, type Sidebar } from './sidebar.ts';
 import { csrfToken, csrfValid, loadSession, sessionCookieName, SESSION_DAYS, type User } from './auth.ts';
 import { type FetchJson, fetchJson } from './abgleich.ts';
 import type { Config } from './config.ts';
@@ -61,6 +62,8 @@ export interface Ctx {
   isAdmin: boolean;
   /** Turnier für Countdown/Livestream im Kopf (nur bei Seitenaufrufen gefüllt). */
   headerTournament: HeaderTournament | null;
+  /** Rangliste für die Seitenleiste rechts (nur bei Seitenaufrufen gefüllt). */
+  sidebar: Sidebar | null;
   now: Date;
 }
 
@@ -210,6 +213,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
       csrf: session ? csrfToken(config.secret, session.sessionId) : '',
       isAdmin: !!user && config.adminEmails.has(user.email.toLowerCase()),
       headerTournament: null,
+      sidebar: null,
       now: new Date(),
     };
 
@@ -220,6 +224,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     if (method === 'GET' && ctx.user) {
       const slug = /^\/r\/([^/]+)/.exec(path)?.[1] ?? null;
       ctx.headerTournament = await loadHeaderTournament(db, ctx.user.id, slug, ctx.now);
+      ctx.sidebar = await loadSidebar(db, ctx.user.id, slug);
     }
 
     if (method === 'POST') {
