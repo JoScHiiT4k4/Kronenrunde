@@ -6,7 +6,7 @@ import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
 import { existsSync, writeFileSync } from 'node:fs';
 import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, nasLevel, percent, readBackups, readSystemInfo } from '../system-info.ts';
-import { buildInfo, lastUpdateCheck } from '../version.ts';
+import { buildInfo, lastUpdateCheck, lastUpdateInstalled } from '../version.ts';
 import { clearChat } from './chat.ts';
 import { hideTestLeague, loadTestState, showTestLeague, syncTestLeague } from '../testspiel.ts';
 import { runSync, SYNC_LABELS } from '../abgleich.ts';
@@ -149,23 +149,22 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
   const tempPct = temp === null ? 0 : Math.min(100, Math.round((temp / 85) * 100));
   const build = buildInfo();
   const checked = lastUpdateCheck();
+  const installed = lastUpdateInstalled();
   const pending = existsSync(ctx.deps.config.updateRequestFile);
   const tz = ctx.deps.config.timeZone;
+  // Heute nur die Uhrzeit, sonst mit Datum
+  const day = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
+  const when = (d: Date) => (day(d) === day(ctx.now) ? html`um <strong>${formatTime(d, tz)} Uhr</strong>` : html`am <strong>${formatDateTime(d, tz)} Uhr</strong>`);
   return html`<section class="panel">
   <h2>Version &amp; Update</h2>
-  <p>Läuft: <strong>Version ${build.version}</strong>${build.commit ? html` (${build.commit})` : nothing}${build.committedAt ? html`, Stand ${formatDateTime(build.committedAt, tz)} Uhr` : nothing}.
-  ${checked ? html`Der Pi hat zuletzt um <strong>${formatTime(checked, tz)} Uhr</strong> nach Updates gesucht (alle 15 Minuten).` : html`<span class="muted">Die letzte Update-Prüfung ist noch nicht bekannt.</span>`}</p>
+  <p>Aktuelle Version: <strong>${build.version}</strong>.<br>
+  ${checked ? html`Letzte Updatesuche ${when(checked)}.` : html`<span class="muted">Letzte Updatesuche: noch nicht bekannt.</span>`}<br>
+  ${installed ? html`Letztes Update installiert ${when(installed)}.` : html`<span class="muted">Letztes Update installiert: noch nicht bekannt.</span>`}</p>
   ${pending ? html`<p class="notice notice-ok">Ein Update ist angefordert und wird gleich installiert.</p>` : nothing}
   <form method="post" action="/admin/update-erzwingen" class="stack">
     ${csrfField(ctx)}
-    <p class="muted">Holt sofort die neueste geprüfte Version von GitHub, ohne auf den nächsten 15-Minuten-Takt zu warten. Die Seite startet dabei kurz neu.</p>
     <button type="submit" class="btn">Jetzt aktualisieren</button>
   </form>
-</section>
-<section class="panel">
-  <h2>Chat</h2>
-  <p class="muted">Im Chat liegen aktuell ${chatCount} ${chatCount === 1 ? 'Nachricht' : 'Nachrichten'} (alle Tipprunden zusammen). Sie verschwinden nach 7 Tagen von selbst.</p>
-  ${postButton(ctx, '/admin/chat-leeren', 'Alle Chatverläufe leeren', { cls: 'btn btn-danger', confirm: 'Wirklich die Chatverläufe ALLER Tipprunden löschen? Das lässt sich nicht rückgängig machen.' })}
 </section>
 <section class="panel">
   <h2>Server</h2>
@@ -192,6 +191,11 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
       <span class="muted">${formatBytes(Number(t.bytes))}</span></li>`,
     )}
   </ul>
+</section>
+<section class="panel">
+  <h2>Chat</h2>
+  <p class="muted">Im Chat liegen aktuell ${chatCount} ${chatCount === 1 ? 'Nachricht' : 'Nachrichten'} (alle Tipprunden zusammen). Sie verschwinden nach 7 Tagen von selbst.</p>
+  ${postButton(ctx, '/admin/chat-leeren', 'Alle Chatverläufe leeren', { cls: 'btn btn-danger', confirm: 'Wirklich die Chatverläufe ALLER Tipprunden löschen? Das lässt sich nicht rückgängig machen.' })}
 </section>`;
 }
 

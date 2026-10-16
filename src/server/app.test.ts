@@ -1162,6 +1162,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const page = await admin.get('/admin?bereich=system');
     assert.match(page.text, /Jetzt aktualisieren/);
     assert.match(page.text, /Version &amp; Update/);
+    // Reihenfolge: Version & Update, Server, Chat; kurze Angaben statt langer Erklärung
+    const at = (h: string) => page.text.indexOf(`<h2>${h}</h2>`);
+    assert.ok(at('Version &amp; Update') > 0 && at('Version &amp; Update') < at('Server') && at('Server') < at('Chat'), 'Reihenfolge der Abschnitte');
+    assert.match(page.text, /Aktuelle Version: <strong>\d+\.\d+\.\d+<\/strong>\./);
+    assert.match(page.text, /Letzte Updatesuche/);
+    assert.match(page.text, /Letztes Update installiert/);
+    assert.doesNotMatch(page.text, /ohne auf den nächsten 15-Minuten-Takt/);
     const r = await admin.post('/admin/update-erzwingen');
     assert.equal(r.status, 303, r.text);
     assert.match(r.location ?? '', /hinweis=update-angefordert/);
