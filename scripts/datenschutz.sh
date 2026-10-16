@@ -11,6 +11,7 @@
 #   4. Autor und Committer jedes Commits – nur Noreply-Adressen
 #   5. Geheime Suchmuster aus DATENSCHUTZ_MUSTER (eine Zeile je Muster, z. B. echte E-Mail, IP, Nachname).
 #      Auf GitHub ist das ein Secret gleichen Namens – die Muster selbst stehen nie im Repository.
+#      Gesucht wird nach ganzen Wörtern (ein Nachname trifft nicht auf ein Wort, in dem er nur steckt).
 #      Gefundene Stellen werden nur mit Datei und Zeile gemeldet, nie mit Inhalt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -111,9 +112,9 @@ if [[ -n ${DATENSCHUTZ_MUSTER:-} ]]; then
   for f in "$mdir"/*; do
     [[ -e $f ]] || continue
     nr=${f##*/}
-    git grep -I -n -i -F -f "$f" "${revs[@]}" -- . 2>/dev/null |
+    git grep -I -n -i -w -F -f "$f" "${revs[@]}" -- . 2>/dev/null |
       awk -F: '{ key=$2 SUBSEP $3; if (!(key in seen)) { seen[key]=1; print $2 ":" $3 ":" substr($1,1,7) } }' >"$mdir/orte-$nr" || true
-    git log --format='%H%x09%an%x09%ae%x09%cn%x09%ce%x09%B%x00' "$range" | grep -z -i -F -f "$f" | tr '\0' '\n' |
+    git log --format='%H%x09%an%x09%ae%x09%cn%x09%ce%x09%B%x00' "$range" | grep -z -i -w -F -f "$f" | tr '\0' '\n' |
       grep -oE '^[0-9a-f]{40}' >"$mdir/commits-$nr" || true
     n_orte=$(grep -c . "$mdir/orte-$nr" || true)
     n_commits=$(grep -c . "$mdir/commits-$nr" || true)
