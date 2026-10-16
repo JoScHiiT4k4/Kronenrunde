@@ -1239,6 +1239,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(after.text, /<li class="bk-chip bk-out" title="MVK Esports">MVK/);
     assert.doesNotMatch(after.text, /<li class="bk-chip bk-out" title="Cloud9[^"]*">/, 'C9 hat erst eine Niederlage');
     assert.match(after.text, /bk-legend/);
+    // Der Baum steht außerhalb der Mittelspalte (eigene Zeile), Reiter und Texte bleiben in der Mittelspalte
+    assert.match(after.text, /<\/main>[^]*<div class="below"><div class="bracket bracket-tree"[^]*<svg class="bk-svg"/);
+    assert.doesNotMatch(after.text.slice(0, after.text.indexOf('</main>')), /<svg class="bk-svg"/);
 
     // Swiss: Runden stehen schon, die Paarungen sind noch offen
     const swiss = await admin.get(`${path}?turnier=${tid}&phase=swiss`);
