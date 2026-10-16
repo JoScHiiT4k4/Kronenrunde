@@ -596,8 +596,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /<td class="num hit">2<\/td>/);
     // Gewinnchance aus den Tipps: GEN–T1 je einer (50/50), G2–KC beide auf KC (100/0); offene Spiele zeigen nichts
     assert.equal((tips.text.match(/class="pct pct-[ab] pct-even"/g) ?? []).length, 2);
-    assert.match(tips.text, /class="pct pct-[ab] pct-up"[^>]*>100 %</);
-    assert.match(tips.text, /class="pct pct-[ab] pct-down"[^>]*>0 %</);
+    assert.match(tips.text, /class="pct pct-[ab] pct-up"[^>]*><span class="pct-num">100<\/span> %</);
+    assert.match(tips.text, /class="pct pct-[ab] pct-down"[^>]*><span class="pct-num">0<\/span> %</);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
     // Gewonnene Spiele je Team mit Spoilerschutz (GEN 3:1, G2–KC 1:2)
     assert.equal((tips.text.match(/<button type="button" class="score" data-spoiler/g) ?? []).length, 2, 'ein Block je Begegnung');

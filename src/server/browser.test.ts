@@ -18,6 +18,7 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
 import { importTournament, type TournamentData } from './daten.ts';
+import { hashPassword } from './auth.ts';
 import { createMailer } from './mail.ts';
 import { fakeRiot } from './testdaten/fake-riot.ts';
 
@@ -231,6 +232,105 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
         if (m.kurzX === null || m.langX === null) problems.push(`${where}: Zeile(n) nicht gefunden`);
         else if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
+        await page.close();
+      }
+    } finally {
+      await browser.close();
+    }
+    assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
+  });
+
+  test('%-Zeichen bei der Gewinnchance steht unabhängig von der Ziffernzahl (1/2/3-stellig) an derselben Stelle', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Prozent-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    const mkTeam = async (name: string) => (await db.one<{ id: string }>(`insert into teams (name, short_name, region) values ($1, $1, 'X') returning id`, [name]))!.id;
+    const [a1, a2, b1, b2] = await Promise.all([mkTeam('AA'), mkTeam('AB'), mkTeam('BA'), mkTeam('BB')]);
+    const addMatch = (a: string, b: string, at: Date) =>
+      db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, $4, 'finished') returning id`,
+        [tid, a, b, at],
+      );
+    const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
+    // Ein Spiel mit drei-/einstelligem Ergebnis (100 %/0 %), eins mit zweistelligem auf beiden Seiten (70 %/30 %) –
+    // nur reine Textausrichtung (ohne feste Breite für die Zahl) lässt das %-Zeichen hier an unterschiedlichen
+    // Stellen stehen, je nachdem wie viele Ziffern davor stehen.
+    const match100 = (await addMatch(a1, a2, hours(-2)))!.id;
+    const match70 = (await addMatch(b1, b2, hours(-3)))!.id;
+
+    const me = new Client();
+    await me.request('GET', '/anmelden');
+    assert.equal((await me.request('POST', '/anmelden', { email: 'admin@example.de', password: PASSWORT })).status, 303);
+    await me.request('GET', '/konto');
+    const created = await me.request('POST', '/neu', { name: 'Prozent-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+    assert.equal(created.status, 303, created.text);
+    const slug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+    const { id: leagueId } = (await db.one<{ id: string }>(`select id from leagues where slug = $1`, [slug]))!;
+
+    // 20 Mitspieler: beim ersten Spiel alle auf A (100 %/0 %), beim zweiten 14 auf A / 6 auf B (70 %/30 %)
+    const pwHash = await hashPassword(PASSWORT);
+    const voters: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      const { id } = (await db.one<{ id: string }>(
+        `insert into users (email, display_name, first_name, password_hash, password_changed_at) values ($1, $2, $3, $4, now()) returning id`,
+        [`prozent-v${i}@example.de`, `V${i}`, `V${i}`, pwHash],
+      ))!;
+      await db.run(`insert into league_members (league_id, user_id) values ($1, $2)`, [leagueId, id]);
+      voters.push(id);
+    }
+    await db.tx(async (q) => {
+      await q.exec(`set local app.bypass_lock = 'on'`);
+      for (let i = 0; i < 20; i++) {
+        await q.run(`insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins) values ($1, $2, $3, 'A', null, null)`, [leagueId, match100, voters[i]]);
+      }
+      for (let i = 0; i < 20; i++) {
+        await q.run(`insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins) values ($1, $2, $3, $4, null, null)`, [
+          leagueId,
+          match70,
+          voters[i],
+          i < 14 ? 'A' : 'B',
+        ]);
+      }
+    });
+
+    const { chromium } = playwright!;
+    const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+    const problems: string[] = [];
+    try {
+      const context = await browser.newContext({ locale: 'de-DE' });
+      await context.addCookies([...me.cookies].map(([name, value]) => ({ name, value, url: base })));
+      for (const width of [390, 1300]) {
+        const page = await context.newPage();
+        await page.setViewportSize({ width, height: 900 });
+        const where = `${width}px`;
+        await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
+        const r = await page.evaluate(
+          ({ id100, id70 }: { id100: string; id70: string }) => {
+            const percentX = (matchId: string, cls: string) => {
+              const span = document.querySelector(`#spiel-${matchId} .${cls}`);
+              const last = span?.lastChild;
+              if (!last || last.nodeType !== Node.TEXT_NODE || !last.textContent) return null;
+              const i = last.textContent.lastIndexOf('%');
+              if (i < 0) return null;
+              const range = document.createRange();
+              range.setStart(last, i);
+              range.setEnd(last, last.textContent.length);
+              return range.getBoundingClientRect().left;
+            };
+            return {
+              aFor100: percentX(id100, 'pct-a'),
+              bFor100: percentX(id100, 'pct-b'),
+              aFor70: percentX(id70, 'pct-a'),
+              bFor70: percentX(id70, 'pct-b'),
+            };
+          },
+          { id100: match100, id70: match70 },
+        );
+        if (r.aFor100 === null || r.bFor100 === null || r.aFor70 === null || r.bFor70 === null) problems.push(`${where}: %-Zeichen nicht gefunden`);
+        else {
+          if (Math.abs(r.aFor100 - r.aFor70) > 1) problems.push(`${where}: % links verschoben – 100 % bei ${r.aFor100}, 70 % bei ${r.aFor70}`);
+          if (Math.abs(r.bFor100 - r.bFor70) > 1) problems.push(`${where}: % rechts verschoben – 0 % bei ${r.bFor100}, 30 % bei ${r.bFor70}`);
+        }
         await page.close();
       }
     } finally {

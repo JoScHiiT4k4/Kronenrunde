@@ -340,11 +340,15 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
   // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind. Die Spanne
   // bleibt immer stehen (auch ohne Zahl), damit die Mitte (VS/Ergebnis) nicht je nach Tippschluss wandert.
+  // Die Zahl steht in einer eigenen, fest breiten Spanne (.pct-num): rechtsbündige Textausrichtung allein
+  // richtet nur das gesamte "Zahl %"-Textstück aus – bei unterschiedlicher Ziffernzahl (5 %, 86 %, 100 %)
+  // wandert das %-Zeichen dann je nach Zeile mit. Mit fester Breite bleibt das %-Zeichen immer an derselben
+  // Stelle, unabhängig davon, ob die Zahl ein-, zwei- oder dreistellig ist.
   const pct = (mine: number | undefined, other: number | undefined, side: 'a' | 'b') => {
     const known = shares && mine !== undefined && other !== undefined;
     const trend = known ? (mine! > other! ? ' pct-up' : mine! < other! ? ' pct-down' : ' pct-even') : '';
     const title = known ? raw(` title="${shares!.total} ${shares!.total === 1 ? 'Tipp' : 'Tipps'}"`) : nothing;
-    return html`<span class="pct pct-${side}${trend}"${title}>${known ? html`${mine} %` : nothing}</span>`;
+    return html`<span class="pct pct-${side}${trend}"${title}>${known ? html`<span class="pct-num">${mine}</span> %` : nothing}</span>`;
   };
   // Gewonnene Spiele je Team – mit Spoilerschutz: erst nach einem Klick sichtbar
   const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
