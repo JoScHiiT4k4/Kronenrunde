@@ -491,7 +491,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
-    assert.match(tips.text, /<summary>Tipps der Mitspieler<\/summary>[^]*?<td>Ben<\/td>/);
+    assert.match(tips.text, /<summary>Alle Tipps<\/summary>[^]*?<td>Ben<\/td>/);
     // Rangliste in der Seitenleiste, klickbar zur Rangliste
     assert.match(tips.text, new RegExp(`<a class="rank-stretch rank-title" href="/r/${slug}/rangliste">`));
 
