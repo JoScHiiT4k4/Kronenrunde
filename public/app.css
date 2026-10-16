@@ -1152,6 +1152,14 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .who-link { color: inherit; text-decoration: none; }
 .who-link:hover span { color: var(--gold-bright); text-decoration: underline; }
 
+/* Tippverlauf: Liniendiagramm der Punkteentwicklung */
+.history-chart { display: block; width: 100%; height: auto; max-height: 220px; }
+.history-area { fill: var(--gold); opacity: 0.12; stroke: none; }
+.history-line { fill: none; stroke: var(--gold-bright); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.history-dot { fill: var(--bg); stroke: var(--gold-bright); stroke-width: 2; }
+.history-dot:hover { fill: var(--gold-bright); }
+.history-range { display: flex; justify-content: space-between; margin: 4px 0 0; font-size: 0.8rem; }
+
 /* Handy: Menü von Spielleiter/Administrator am Rand des Kopfes ausrichten, nie über den Bildschirmrand hinaus */
 @media (max-width: 640px) {
   .role-switch { position: static; }

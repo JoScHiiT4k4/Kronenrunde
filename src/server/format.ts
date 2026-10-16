@@ -43,6 +43,12 @@ export function formatDayLong(d: Date, timeZone: string): string {
   return fmt(timeZone, { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
 }
 
+/** "15.10.2026" */
+export function formatDate(d: Date, timeZone: string): string {
+  const p = parts(d, timeZone);
+  return `${p.day}.${p.month}.${p.year}`;
+}
+
 /** Tag als Schlüssel zum Gruppieren: "2026-10-15" */
 export function dayKey(d: Date, timeZone: string): string {
   const p = parts(d, timeZone);

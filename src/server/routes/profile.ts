@@ -2,10 +2,12 @@
 
 import type { Ctx } from '../app.ts';
 import { computeBadges } from '../../domain/badges.ts';
+import { pointHistory } from '../../domain/history.ts';
 import { formatDateTime } from '../format.ts';
 import { html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, type Res, type Router } from '../http.ts';
 import { badgeGrid } from '../views/badges.ts';
+import { historyChart } from '../views/history-chart.ts';
 import { avatar, isOnline, layout, presenceDot, scaleBar } from '../views/layout.ts';
 import { isUuid, loginRedirect } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
@@ -33,6 +35,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const own = id === ctx.user.id;
   const badges = computeBadges({ ...standings.raw, userId: id, rank: row.rank, points: row.points });
   const earned = badges.filter((b) => b.level > 0).length;
+  const history = pointHistory({ ...standings.raw, userId: id, now: ctx.now });
 
   // Antworten auf die Sonderfragen: wie bei den anderen erst ab Start des Turniers (die eigenen immer)
   const sections = [];
@@ -77,6 +80,10 @@ async function profilePage(ctx: Ctx): Promise<Res> {
     ${tile(row.predictionsMade, row.predictionsMade === 1 ? 'Tipp abgegeben' : 'Tipps abgegeben')}
   </div>
   <p class="profile-scale">${scaleBar(row.points, standings.possible)}<small class="muted">Ausbeute von bisher ${standings.possible} möglichen Punkten</small></p>
+</section>
+<section class="panel">
+  <h2>Tippverlauf</h2>
+  ${historyChart(history, ctx.deps.config.timeZone)}
 </section>
 <section class="panel">
   <h2>Abzeichen <span class="progress">${earned} von ${badges.length}</span></h2>
