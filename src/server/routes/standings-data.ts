@@ -10,6 +10,8 @@ import { type League, leagueMatches, type PredictionRow, rulesOf, toDomainMatch,
 export interface StandingsData {
   rows: StandingRow[];
   avatarOf: Map<string, Date | null>;
+  /** Wann jeder zuletzt angemeldet eine Seite aufgerufen hat (für die Online-Anzeige) */
+  lastSeenOf: Map<string, Date | null>;
   finished: number;
   /** Bisher überhaupt mögliche Punkte (gewertete Spiele + Sonderfragen mit Lösung) */
   possible: number;
@@ -20,8 +22,8 @@ export interface StandingsData {
 
 export async function loadStandings(db: Queryable, league: Pick<League, 'id' | 'points_winner' | 'points_exact' | 'lock_mode'>): Promise<StandingsData> {
   const [members, matches, preds, questions, answers] = await Promise.all([
-    db.query<{ user_id: string; display_name: string; avatar_updated_at: Date | null }>(
-      `select u.id as user_id, u.display_name, u.avatar_updated_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1`,
+    db.query<{ user_id: string; display_name: string; avatar_updated_at: Date | null; last_seen_at: Date | null }>(
+      `select u.id as user_id, u.display_name, u.avatar_updated_at, u.last_seen_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1`,
       [league.id],
     ),
     leagueMatches(db, league.id),
@@ -49,6 +51,7 @@ export async function loadStandings(db: Queryable, league: Pick<League, 'id' | '
   return {
     rows,
     avatarOf: new Map(members.map((m) => [m.user_id, m.avatar_updated_at])),
+    lastSeenOf: new Map(members.map((m) => [m.user_id, m.last_seen_at])),
     finished: domainMatches.filter((m) => matchResult(m)).length,
     possible: possiblePoints(domainMatches, rules, bonusQuestions),
     hasBonus: questions.some((q) => q.correct_answers.length > 0),

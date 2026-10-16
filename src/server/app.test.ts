@@ -466,7 +466,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(status, { status: 'finished', wins_a: 1, wins_b: 2 });
 
     const table = await anna.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<span class="avatar-wrap">)?(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)(?:<span class="presence-dot[^"]*"[^>]*><\/span><\/span>)?<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
     const tips = await anna.get(`/r/${slug}/tippen`);
@@ -705,7 +705,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post(`/r/${slug}/verwalten/frage/${weg.id}`, { aktion: 'loeschen' });
     assert.equal((await db.one<{ n: number }>('select count(*)::int as n from bonus_questions'))!.n, 5);
     const table = await ben.get(`/r/${slug}/rangliste`);
-    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<span class="avatar-wrap">)?(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)(?:<span class="presence-dot[^"]*"[^>]*><\/span><\/span>)?<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Ben', '10'], ['2', 'Anna', '3']]);
   });
 

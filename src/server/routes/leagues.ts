@@ -12,7 +12,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, filterBar, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
@@ -850,7 +850,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
   const { db } = ctx.deps;
-  const { rows, avatarOf, finished, possible, hasBonus } = await loadStandings(db, league);
+  const { rows, avatarOf, lastSeenOf, finished, possible, hasBonus } = await loadStandings(db, league);
 
   const body = html`<section class="panel">
   <h1>Rangliste</h1>
@@ -869,7 +869,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
     ${rows.map(
       (r) => html`<tr data-item data-text="${r.displayName.toLowerCase()}" class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
-        <td><a class="who who-link" href="/r/${league.slug}/spieler/${r.userId}">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null)}<span>${r.displayName}</span></a>
+        <td><a class="who who-link" href="/r/${league.slug}/spieler/${r.userId}">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null, 'sm', isOnline(lastSeenOf.get(r.userId) ?? null, ctx.now))}<span>${r.displayName}</span></a>
           <span class="rk-sub">${scaleBar(r.points, possible)}<small>${r.correctWinners} Sieger · ${r.exactResults} exakt${hasBonus ? ` · ${r.bonusPoints} Sonder` : ''}</small></span></td>
         <td class="scale-col col-x">${scaleBar(r.points, possible)}</td>
         <td class="num col-x">${r.correctWinners}</td>
