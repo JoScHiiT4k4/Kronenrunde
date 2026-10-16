@@ -281,10 +281,11 @@ ${
     : nothing
 }
 ${current.kind === 'swiss' ? swissTable(current) : current.kind === 'doppel' || current.kind === 'ko' ? teamChips(current) : nothing}
-${rounds(league.slug, current, tz)}
 <p class="muted bk-hint">Tippe auf eine Begegnung, um das Spiel zu öffnen. Noch offene Paarungen füllen sich, sobald die Teams feststehen.</p>`
 }`;
-  return htmlResponse(layout(ctx, { title: `Turnierbaum – ${league.name}`, body, league: nav, wide: true }));
+  // Der Baum steht außerhalb der Mittelspalte und darf nach links und rechts ausbrechen
+  const below = current ? rounds(league.slug, current, tz) : undefined;
+  return htmlResponse(layout(ctx, { title: `Turnierbaum – ${league.name}`, body, league: nav, below }));
 }
 
 export function registerBracketRoutes(router: Router<Ctx>) {

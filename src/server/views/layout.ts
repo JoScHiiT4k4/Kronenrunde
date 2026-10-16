@@ -59,8 +59,8 @@ export interface PageOptions {
   title: string;
   body: Html;
   league?: LeagueNav;
-  /** Breitere Seite (z. B. für den Turnierbaum, der seitlich scrollt). */
-  wide?: boolean;
+  /** Breiter Inhalt unterhalb des Hauptinhalts (z. B. der Turnierbaum): Reiter und Text bleiben in der Mittelspalte, nur dieser Teil darf seitlich ausbrechen. */
+  below?: Html;
   /** Zusätzliche Fehlermeldung über dem Inhalt. */
   error?: string;
 }
@@ -94,15 +94,16 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn" title="Abmelden" aria-label="Abmelden">${ICON_LOGOUT}</button></form>`: html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
-<div class="page${o.wide ? ' page-wide' : ''}">
+<div class="page">
 <div class="ad ad-ghost${ctx.sidebar ? ' ad-ghost-wide' : ''}" aria-hidden="true"></div>
 ${o.league ? leagueNav(o.league) : nothing}
-<main class="main${o.wide ? ' main-wide' : ''}">
+<main class="main">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
 </main>
 ${rankBox(ctx)}
+${o.below ? html`<div class="below">${o.below}</div>` : nothing}
 </div>
 ${chatWidget(ctx)}
 <footer class="foot">

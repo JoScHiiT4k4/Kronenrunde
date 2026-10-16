@@ -216,11 +216,13 @@ p { margin: 0 0 0.9em; }
   --side: 160px;
 }
 .page:has(> .rank-side) { --side: 250px; }
-.page-wide { grid-template-columns: minmax(0, 1320px); }
 /* Reiter (nav) und Inhalt (main) liegen im selben Raster, also immer in derselben Spalte; Seitenspalten stehen in Zeile 2 */
 .page > .league-nav { grid-row: 1; grid-column: 1; }
 .page > .main { grid-row: 2; grid-column: 1; min-width: 0; padding: 20px 16px 32px; }
 .page > .ad { grid-row: 2; }
+/* Breiter Inhalt (Turnierbaum): eigene Zeile unter Inhalt und Seitenspalten, mittig und bis 1320px breit */
+.page > .below { grid-row: 3; grid-column: 1 / -1; justify-self: center; width: 100%; max-width: 1320px; min-width: 0; padding: 0 16px 32px; }
+@media (max-width: 919px) { .page > .below { width: 100vw; } }
 
 .foot {
   padding: 18px 16px max(18px, env(safe-area-inset-bottom));
@@ -1264,31 +1266,19 @@ td.bad { color: var(--red); }
 .match > .tips-fold:not([open]) { margin-top: 4px; }
 
 /* Spalten je Fensterbreite (Reiter und Inhalt bleiben immer in derselben Spalte):
-   ab 920px steht die Rangliste rechts neben dem Inhalt, ab 1140px zusätzlich ein Platzhalter links (Inhalt mittig),
-   Seiten mit breitem Inhalt (Turnierbaum) bekommen den Platzhalter links erst ab 1540px. Die Seitenspalten geben nach, der Inhalt behält seine Breite. */
+   ab 920px steht die Rangliste rechts neben dem Inhalt, ab 1140px zusätzlich ein Platzhalter links (Inhalt mittig).
+   Die Seitenspalten geben nach, der Inhalt behält seine Breite. */
 @media (min-width: 920px) and (max-width: 1139px) {
-  .page:not(.page-wide):has(> .rank-side) { grid-template-columns: minmax(0, 720px) 200px; }
-  .page:not(.page-wide) > .rank-side { display: block; grid-column: 2; }
-}
-@media (min-width: 920px) and (max-width: 1539px) {
-  .page-wide:has(> .rank-side) { grid-template-columns: minmax(0, 1320px) 210px; }
-  .page-wide > .rank-side { display: block; grid-column: 2; }
+  .page:has(> .rank-side) { grid-template-columns: minmax(0, 720px) 200px; }
+  .page > .rank-side { display: block; grid-column: 2; }
 }
 @media (min-width: 1140px) {
-  .page:not(.page-wide) { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
-  .page:not(.page-wide) > .ad { display: block; }
-  .page:not(.page-wide) > .ad-ghost { grid-column: 1; }
-  .page:not(.page-wide) > .league-nav,
-  .page:not(.page-wide) > .main { grid-column: 2; }
-  .page:not(.page-wide) > .ad:not(.ad-ghost) { grid-column: 3; }
-}
-@media (min-width: 1540px) {
-  .page-wide { grid-template-columns: minmax(190px, var(--side)) minmax(0, 1320px) minmax(190px, var(--side)); }
-  .page-wide > .ad { display: block; }
-  .page-wide > .ad-ghost { grid-column: 1; }
-  .page-wide > .league-nav,
-  .page-wide > .main { grid-column: 2; }
-  .page-wide > .ad:not(.ad-ghost) { grid-column: 3; }
+  .page { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
+  .page > .ad { display: block; }
+  .page > .ad-ghost { grid-column: 1; }
+  .page > .league-nav,
+  .page > .main { grid-column: 2; }
+  .page > .ad:not(.ad-ghost) { grid-column: 3; }
 }
 /* Mittlere Fenster (Reiter noch sichtbar, Inhalt schmaler als 720px): Reiter etwas enger, damit sie in einer Zeile bleiben */
 @media (min-width: 641px) and (max-width: 720px) {
