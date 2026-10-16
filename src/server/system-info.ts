@@ -66,8 +66,8 @@ export interface BackupFile {
   name: string;
   bytes: number;
   at: Date;
-  /** Automatisch vor einem Update angelegt */
-  beforeUpdate: boolean;
+  /** nacht = nächtlich um 4 Uhr, manuell = per Knopf im Administrator-Bereich, update = automatisch vor einem Update */
+  kind: 'nacht' | 'manuell' | 'update';
 }
 
 /** Vorhandene Sicherungen auf dem Pi, die neueste zuerst. */
@@ -75,9 +75,9 @@ export function readBackups(dir = '/var/backups/lol-tippspiel'): BackupFile[] {
   try {
     return readdirSync(dir)
       .filter((f) => f.startsWith('tippspiel-') && f.endsWith('.dump'))
-      .map((f) => {
+      .map((f): BackupFile => {
         const st = statSync(join(dir, f));
-        return { name: f, bytes: st.size, at: new Date(st.mtimeMs), beforeUpdate: f.includes('-vor-') };
+        return { name: f, bytes: st.size, at: new Date(st.mtimeMs), kind: f.includes('-vor-') ? 'update' : f.includes('-manuell') ? 'manuell' : 'nacht' };
       })
       .sort((a, b) => b.at.getTime() - a.at.getTime());
   } catch {

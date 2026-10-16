@@ -199,11 +199,25 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
 </section>`;
 }
 
+const BACKUP_TIMES = [['alle', 'Alle'], ['heute', 'Heute'], ['7', 'Letzte 7 Tage'], ['30', 'Letzte 30 Tage']] as const;
+const BACKUP_KINDS = [['alle', 'Alle'], ['nacht', 'Nächtlich'], ['manuell', 'Von Hand'], ['update', 'Vor einem Update']] as const;
+const KIND_LABEL = { nacht: 'Nächtlich', manuell: 'Von Hand', update: 'Vor einem Update' } as const;
+
 /** Reiter "Backup": Zustand der Sicherungen und ein Knopf für eine Sicherung von Hand. */
 function backupPanel(ctx: Ctx): Html {
   const tz = ctx.deps.config.timeZone;
   const sys = readSystemInfo(ctx.deps.config.backupDir);
   const files = readBackups(ctx.deps.config.backupDir);
+  // Filter (Adresse ?zeit=…&art=…): nur bekannte Werte, alles andere heißt "alle"
+  const zeit = BACKUP_TIMES.some(([k]) => k === ctx.query.get('zeit')) ? ctx.query.get('zeit')! : 'alle';
+  const art = BACKUP_KINDS.some(([k]) => k === ctx.query.get('art')) ? ctx.query.get('art')! : 'alle';
+  const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
+  const shown = files.filter((f) => {
+    if (art !== 'alle' && f.kind !== art) return false;
+    if (zeit === 'heute') return dayOf(f.at) === dayOf(ctx.now);
+    if (zeit === '7' || zeit === '30') return ctx.now.getTime() - f.at.getTime() <= Number(zeit) * 86_400_000;
+    return true;
+  });
   const pending = existsSync(ctx.deps.config.backupRequestFile);
   const level = backupLevel(sys.backupCount, sys.backupNewest, ctx.now);
   const ageHours = sys.backupNewest ? Math.floor((ctx.now.getTime() - sys.backupNewest.getTime()) / 3_600_000) : null;
@@ -221,13 +235,13 @@ function backupPanel(ctx: Ctx): Html {
         ? html`<div class="sys-fact-${nasLevel(sys.nas, ctx.now)}"><span class="muted">Kopie auf der MyCloud</span><strong>${sys.nas.ok ? 'in Ordnung' : 'fehlgeschlagen'}</strong>
       <small class="muted">${formatDateTime(sys.nas.at, tz)} Uhr${sys.nas.ok ? '' : ` · ${sys.nas.message}`}</small></div>`
         : html`<div><span class="muted">Kopie auf der MyCloud</span><strong>nicht eingerichtet</strong>
-      <small class="muted">Einrichten auf dem Pi mit „tippspiel nas-einrichten“</small></div>`
+      <small class="muted">Einrichten auf dem Pi mit „tippspiel nas-einrichten“; kopiert wird täglich um 7 Uhr</small></div>`
     }
   </div>
   ${pending ? html`<p class="notice notice-ok">Eine Sicherung ist angefordert und wird gleich gemacht.</p>` : nothing}
   <form method="post" action="/admin/backup-erstellen" class="stack">
     ${csrfField(ctx)}
-    <p class="muted">Sichert die Datenbank sofort, ohne auf die Nacht zu warten, und kopiert sie auf die MyCloud, falls eingerichtet. Die Seite läuft dabei ganz normal weiter.</p>
+    <p class="muted">Sichert die Datenbank sofort, ohne auf die Nacht zu warten. Die Seite läuft dabei ganz normal weiter. Auf die MyCloud kopiert wird täglich um 7 Uhr die neueste Sicherung.</p>
     <button type="submit" class="btn btn-primary">Jetzt sichern</button>
   </form>
 </section>
@@ -235,9 +249,23 @@ function backupPanel(ctx: Ctx): Html {
   <h2>Vorhandene Sicherungen</h2>
   ${
     files.length
-      ? html`<table class="table compact"><thead><tr><th>Zeitpunkt</th><th>Art</th><th class="num">Größe</th></tr></thead><tbody>
-    ${files.slice(0, 15).map((f) => html`<tr><td>${formatDateTime(f.at, tz)} Uhr</td><td>${f.beforeUpdate ? 'vor einem Update' : 'Sicherung'}</td><td class="num">${formatBytes(f.bytes)}</td></tr>`)}
-  </tbody></table>${files.length > 15 ? html`<p class="muted">Die ${files.length - 15} älteren Sicherungen stehen nur auf dem Pi (<code>tippspiel sicherungen</code>).</p>` : nothing}`
+      ? html`<form method="get" action="/admin" class="backup-filter" data-autosubmit>
+    <input type="hidden" name="bereich" value="backup">
+    <label><span class="muted">Zeitpunkt</span>
+      <select name="zeit">${BACKUP_TIMES.map(([k, label]) => html`<option value="${k}"${attr(k === zeit, 'selected')}>${label}</option>`)}</select></label>
+    <label><span class="muted">Art</span>
+      <select name="art">${BACKUP_KINDS.map(([k, label]) => html`<option value="${k}"${attr(k === art, 'selected')}>${label}</option>`)}</select></label>
+    <button type="submit" class="btn btn-quiet">Filtern</button>
+  </form>
+  <p class="muted backup-count">${shown.length === files.length ? `${files.length} ${files.length === 1 ? 'Sicherung' : 'Sicherungen'}` : `${shown.length} von ${files.length} Sicherungen`}${shown.length > 10 ? ' – die Liste lässt sich scrollen' : ''}</p>
+  ${
+    shown.length
+      ? html`<div class="backup-list" tabindex="0" role="region" aria-label="Vorhandene Sicherungen">
+    <table class="table compact"><thead><tr><th>Zeitpunkt</th><th>Art</th><th class="num">Größe</th></tr></thead><tbody>
+    ${shown.map((f) => html`<tr><td>${formatDateTime(f.at, tz)} Uhr</td><td>${KIND_LABEL[f.kind]}</td><td class="num">${formatBytes(f.bytes)}</td></tr>`)}
+  </tbody></table></div>`
+      : html`<p class="muted">Keine Sicherung passt zu diesem Filter.</p>`
+  }`
       : html`<p class="muted">Es gibt noch keine Sicherung.</p>`
   }
   <p class="muted">Zurückspielen geht nur auf dem Pi mit <code>tippspiel wiederherstellen</code>. Das ist Absicht, damit es nicht aus Versehen im Browser passiert.</p>

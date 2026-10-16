@@ -405,7 +405,7 @@ After=postgresql.service
 Type=oneshot
 Environment=HOME=/root
 ExecStartPre=/bin/rm -f /run/$SERVICE/sicherung-anfrage
-ExecStart=/usr/local/bin/tippspiel sicherung
+ExecStart=/usr/local/bin/tippspiel sicherung manuell
 EOF
 
 cat >/etc/systemd/system/$SERVICE-sicherung-jetzt.path <<EOF
@@ -420,9 +420,34 @@ Unit=$SERVICE-sicherung-jetzt.service
 WantedBy=multi-user.target
 EOF
 
+# Kopie der neuesten Sicherung auf den Heimnetz-Speicher (MyCloud): täglich um 7 Uhr; ohne eingerichteten Speicher tut sie nichts
+cat >/etc/systemd/system/$SERVICE-nas.service <<EOF
+[Unit]
+Description=LoL-Tippspiel: neueste Sicherung auf den Heimnetz-Speicher kopieren
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+ExecStart=/usr/local/bin/tippspiel nas-kopie
+EOF
+
+cat >/etc/systemd/system/$SERVICE-nas.timer <<EOF
+[Unit]
+Description=LoL-Tippspiel: Kopie auf die MyCloud, täglich um 7 Uhr
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+RandomizedDelaySec=120
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
 run systemctl daemon-reload
-run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
-run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
+run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-nas.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
+run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-nas.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
 run systemctl restart "$SERVICE.service"
 if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
   journalctl -u "$SERVICE" -n 20 --no-pager >&2 || true
@@ -430,7 +455,7 @@ if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
 fi
 ok "App läuft (startet automatisch nach jedem Neustart)"
 touch "$APP_DIR/.update-installed"   # die Server-Seite zeigt, wann zuletzt eine Version installiert wurde
-ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR"
+ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR (Kopie auf die MyCloud um 7 Uhr, falls eingerichtet)"
 ok "Automatische Updates alle 15 Minuten (nur auf GitHub geprüfte Versionen)"
 
 [[ $UPDATE == 1 ]] && exit 0
