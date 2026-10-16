@@ -31,6 +31,8 @@ export interface League {
   lock_mode: LockMode;
   /** Testspiel des Betreibers: nur Teilnehmer-Ansicht */
   is_test: boolean;
+  /** Alle Spiele der Turniere dieser Tipprunde sind gespielt (mindestens eines) – dann gibt es den Rückblick */
+  ended: boolean;
   /** Rolle des aktuellen Nutzers oder null (z. B. Admin ohne Mitgliedschaft). */
   role: 'owner' | 'admin' | 'member' | null;
 }
@@ -45,7 +47,9 @@ export interface LeagueAccess {
 /** Tipprunde laden. Nicht-Mitglieder sehen nichts (404), außer Admins mit allowAdmin. */
 export async function loadLeague(ctx: Ctx, slug: string, o: { allowAdmin?: boolean } = {}): Promise<LeagueAccess> {
   const league = await ctx.deps.db.one<League>(
-    `select l.id, l.name, l.slug, l.owner_id, l.invite_code, l.points_winner, l.points_exact, l.lock_mode, l.is_test, m.role
+    `select l.id, l.name, l.slug, l.owner_id, l.invite_code, l.points_winner, l.points_exact, l.lock_mode, l.is_test, m.role,
+            (exists (select 1 from matches x join league_tournaments lt on lt.tournament_id = x.tournament_id and lt.league_id = l.id where x.status = 'finished')
+             and not exists (select 1 from matches x join league_tournaments lt on lt.tournament_id = x.tournament_id and lt.league_id = l.id where x.status not in ('finished', 'cancelled'))) as ended
        from leagues l
        left join league_members m on m.league_id = l.id and m.user_id = $2
       where l.slug = $1`,

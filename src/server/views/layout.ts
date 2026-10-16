@@ -49,7 +49,9 @@ export interface LeagueNav {
   slug: string;
   name: string;
   canManage: boolean;
-  active: 'tippen' | 'alle-tipps' | 'turnierbaum' | 'statistiken' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
+  /** Rückblick-Reiter zeigen (Turnier ist zu Ende) */
+  recap?: boolean;
+  active: 'rueckblick' | 'tippen' | 'alle-tipps' | 'turnierbaum' | 'statistiken' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel';
 }
 
 export interface PageOptions {
@@ -290,13 +292,14 @@ function leagueNav(l: LeagueNav): Html {
     tab('alle-tipps', 'Alle Tipps'),
     tab('turnierbaum', 'Turnierbaum'),
     tab('statistiken', 'Statistiken'),
+    ...(l.recap ? [tab('rueckblick', 'Rückblick')] : []),
     ...(l.canManage ? [tab('verwalten', 'Verwalten')] : []),
   ];
   const link = (t: TabItem) => html`<a href="${t.href}"${t.current ? html` aria-current="page"` : nothing}>${t.label}</a>`;
   // Steht im selben Raster wie der Inhalt (.page), Reiter und Inhalt haben dadurch immer dieselbe Spalte
   return html`<nav class="league-nav" aria-label="${l.name}">
   <div class="league-name">${l.name}</div>
-  <div class="tabs">
+  <div class="tabs${items.length > 7 ? ' tabs-many' : ''}">
     ${items.map(link)}
   </div>
   ${mobileMenu('league-tabs', l.name, items, link)}
