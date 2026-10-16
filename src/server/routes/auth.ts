@@ -1,5 +1,6 @@
 // Anmelden (E-Mail + Passwort), Konto erstellen, Passwort vergessen/festlegen, Abmelden, Willkommen, Konto.
 
+import { encodeQr } from '../../domain/qrcode.ts';
 import type { Ctx } from '../app.ts';
 import {
   consumeLoginToken,
@@ -7,6 +8,7 @@ import {
   destroySession,
   findOrCreateUser,
   hashPassword,
+  loginBlocked,
   LOGIN_TOKEN_MINUTES,
   loginWithPassword,
   newToken,
@@ -14,6 +16,7 @@ import {
   PASSWORD_MAX,
   PASSWORD_MIN,
   passwordProblem,
+  recordLoginFailure,
   registrationAllowed,
   requestPasswordLink,
   safeNext,
@@ -24,10 +27,13 @@ import {
   verifyPassword,
 } from '../auth.ts';
 import { PgError } from '../db/index.ts';
+import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
 import { avatar, csrfField, layout, postButton, tabMenu } from '../views/layout.ts';
+import { qrSvg } from '../views/qr-svg.ts';
 import { leadLabel } from '../benachrichtigung.ts';
+import { generateBackupCodes, generateTotpSecret, hashBackupCode, totpProvisioningUri, totpValid } from '../totp.ts';
 import { loadVapid, validEndpoint } from '../webpush.ts';
 import { cleanFirstName, cleanName, FIRST_NAME_HELP, FIRST_NAME_PATTERN, intField, loginRedirect } from './common.ts';
 
@@ -157,6 +163,43 @@ function newPasswordForm(ctx: Ctx, o: { token: string; next: string; error?: str
   );
 }
 
+const TOTP_PENDING_MINUTES = 10;
+
+function twoFactorForm(ctx: Ctx, o: { token: string; error?: string }): Res {
+  return page(
+    ctx,
+    'Code aus der Authenticator-App',
+    html`<section class="panel narrow">
+  <h1>Code aus der Authenticator-App</h1>
+  <p>Gib den 6-stelligen Code aus deiner Authenticator-App ein, oder einen deiner Backup-Codes.</p>
+  <form method="post" action="/anmelden/2fa" class="stack">
+    ${csrfField(ctx)}
+    <input type="hidden" name="token" value="${o.token}">
+    <label class="field">
+      <span>Code</span>
+      <input type="text" name="code" required maxlength="20" inputmode="numeric" autocomplete="one-time-code" autofocus>
+    </label>
+    <button type="submit" class="btn btn-primary">Anmelden</button>
+  </form>
+</section>`,
+    o.error,
+  );
+}
+
+function invalidTwoFactorPage(ctx: Ctx): Res {
+  return htmlResponse(
+    layout(ctx, {
+      title: 'Nicht mehr gültig',
+      body: html`<section class="panel narrow">
+  <h1>Nicht mehr gültig</h1>
+  <p>Dieser Schritt ist abgelaufen oder wurde schon benutzt (er gilt nur ${TOTP_PENDING_MINUTES} Minuten). Bitte melde dich erneut an.</p>
+  <p><a class="btn btn-primary" href="/anmelden">Zum Anmelden</a></p>
+</section>`,
+    }),
+    400,
+  );
+}
+
 function invalidLinkPage(ctx: Ctx, next: string): Res {
   return htmlResponse(
     layout(ctx, {
@@ -198,7 +241,20 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     if (!password) return loginForm(ctx, { email, next, error: 'Bitte gib dein Passwort ein.' });
 
     const result = await loginWithPassword(ctx.deps.db, email, password.slice(0, PASSWORD_MAX), ctx.ip);
-    if (result.ok) return signIn(ctx, result.user.id, next);
+    if (result.ok) {
+      const { db } = ctx.deps;
+      const totpRow = await db.one<{ totp_enabled_at: Date | null }>('select totp_enabled_at from users where id = $1', [result.user.id]);
+      if (totpRow?.totp_enabled_at) {
+        const token = newToken();
+        await db.run(
+          `insert into totp_pending_logins (token_hash, user_id, next, expires_at) values ($1, $2, $3, now() + make_interval(mins => $4))`,
+          [hashToken(token), result.user.id, next, TOTP_PENDING_MINUTES],
+        );
+        await db.run(`delete from totp_pending_logins where expires_at < now()`);
+        return redirect(`/anmelden/2fa?token=${token}`);
+      }
+      return signIn(ctx, result.user.id, next);
+    }
     if (result.reason === 'blocked') {
       return loginForm(ctx, { email, next, error: 'Zu viele Fehlversuche. Warte 15 Minuten oder nutze „Passwort vergessen“.' });
     }
@@ -215,6 +271,42 @@ export function registerAuthRoutes(router: Router<Ctx>) {
 
   // Alte Anmelde-Links (vor der Umstellung auf Passwörter) führen zum Anmelden
   router.get('/anmelden/bestaetigen', async () => redirect('/anmelden'));
+
+  router.get('/anmelden/2fa', async (ctx) => {
+    const token = ctx.query.get('token') ?? '';
+    const pending = await ctx.deps.db.one(`select 1 from totp_pending_logins where token_hash = $1 and expires_at > now()`, [hashToken(token)]);
+    if (!pending) return invalidTwoFactorPage(ctx);
+    return twoFactorForm(ctx, { token });
+  });
+
+  router.post('/anmelden/2fa', async (ctx) => {
+    const { db } = ctx.deps;
+    const token = ctx.form.get('token') ?? '';
+    const code = (ctx.form.get('code') ?? '').trim();
+    const pending = await db.one<{ user_id: string; next: string }>(
+      `select user_id, next from totp_pending_logins where token_hash = $1 and expires_at > now()`,
+      [hashToken(token)],
+    );
+    if (!pending) return invalidTwoFactorPage(ctx);
+    const rateKey = `2fa:${pending.user_id}`;
+    if (await loginBlocked(db, rateKey, ctx.ip)) {
+      return twoFactorForm(ctx, { token, error: 'Zu viele Fehlversuche. Warte 15 Minuten und versuche es dann erneut.' });
+    }
+    const user = await db.one<{ totp_secret: string | null }>('select totp_secret from users where id = $1', [pending.user_id]);
+    const viaTotp = user?.totp_secret ? totpValid(user.totp_secret, code) : false;
+    const viaBackup = !viaTotp
+      ? await db.one(
+          `update totp_backup_codes set used_at = now() where user_id = $1 and code_hash = $2 and used_at is null returning 1`,
+          [pending.user_id, hashBackupCode(code)],
+        )
+      : null;
+    if (!viaTotp && !viaBackup) {
+      await recordLoginFailure(db, rateKey, ctx.ip);
+      return twoFactorForm(ctx, { token, error: 'Der Code stimmt nicht.' });
+    }
+    await db.run('delete from totp_pending_logins where token_hash = $1', [hashToken(token)]);
+    return signIn(ctx, pending.user_id, safeNext(pending.next));
+  });
 
   router.get('/registrieren', async (ctx) => {
     const next = safeNext(ctx.query.get('weiter'));
@@ -500,6 +592,72 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return redirect('/konto?bereich=sicherheit&hinweis=email-geaendert');
   });
 
+  async function checkCurrentPassword(ctx: Ctx): Promise<string | null> {
+    const row = await ctx.deps.db.one<{ password_hash: string | null }>('select password_hash from users where id = $1', [ctx.user!.id]);
+    if (row?.password_hash && !(await verifyPassword(ctx.form.get('current') ?? '', row.password_hash))) {
+      return 'Das Passwort stimmt nicht.';
+    }
+    return null;
+  }
+
+  router.post('/konto/2fa/einrichten', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const problem = await checkCurrentPassword(ctx);
+    if (problem) return accountPage(ctx, problem, 'sicherheit');
+    const secret = generateTotpSecret();
+    await ctx.deps.db.run('update users set totp_secret = $2, totp_enabled_at = null where id = $1', [ctx.user.id, secret]);
+    return accountPage(ctx, undefined, 'sicherheit');
+  });
+
+  router.post('/konto/2fa/abbrechen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run('update users set totp_secret = null where id = $1 and totp_enabled_at is null', [ctx.user.id]);
+    return redirect('/konto?bereich=sicherheit');
+  });
+
+  router.post('/konto/2fa/bestaetigen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { db } = ctx.deps;
+    const row = await db.one<{ totp_secret: string | null }>('select totp_secret from users where id = $1 and totp_enabled_at is null', [ctx.user.id]);
+    if (!row?.totp_secret) return accountPage(ctx, 'Bitte starte die Einrichtung noch einmal.', 'sicherheit');
+    const code = (ctx.form.get('code') ?? '').trim();
+    if (!totpValid(row.totp_secret, code)) return accountPage(ctx, 'Der Code stimmt nicht. Bitte erneut versuchen.', 'sicherheit');
+    const backupCodes = generateBackupCodes();
+    await db.tx(async (q) => {
+      await q.run('update users set totp_enabled_at = now() where id = $1', [ctx.user!.id]);
+      await q.run('delete from totp_backup_codes where user_id = $1', [ctx.user!.id]);
+      for (const c of backupCodes) await q.run('insert into totp_backup_codes (user_id, code_hash) values ($1, $2)', [ctx.user!.id, hashBackupCode(c)]);
+    });
+    return accountPage(ctx, undefined, 'sicherheit', backupCodes);
+  });
+
+  router.post('/konto/2fa/deaktivieren', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const problem = await checkCurrentPassword(ctx);
+    if (problem) return accountPage(ctx, problem, 'sicherheit');
+    const { db } = ctx.deps;
+    await db.tx(async (q) => {
+      await q.run('update users set totp_secret = null, totp_enabled_at = null where id = $1', [ctx.user!.id]);
+      await q.run('delete from totp_backup_codes where user_id = $1', [ctx.user!.id]);
+    });
+    return redirect('/konto?bereich=sicherheit&hinweis=2fa-deaktiviert');
+  });
+
+  router.post('/konto/2fa/backup-codes-neu', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const problem = await checkCurrentPassword(ctx);
+    if (problem) return accountPage(ctx, problem, 'sicherheit');
+    const { db } = ctx.deps;
+    const enabled = await db.one('select 1 from users where id = $1 and totp_enabled_at is not null', [ctx.user.id]);
+    if (!enabled) return accountPage(ctx, 'Zwei-Faktor-Authentifizierung ist nicht aktiv.', 'sicherheit');
+    const backupCodes = generateBackupCodes();
+    await db.tx(async (q) => {
+      await q.run('delete from totp_backup_codes where user_id = $1', [ctx.user!.id]);
+      for (const c of backupCodes) await q.run('insert into totp_backup_codes (user_id, code_hash) values ($1, $2)', [ctx.user!.id, hashBackupCode(c)]);
+    });
+    return accountPage(ctx, undefined, 'sicherheit', backupCodes);
+  });
+
   router.post('/konto/loeschen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     if (ctx.form.get('bestaetigt') !== 'ja') return accountPage(ctx, 'Bitte bestätige das Löschen mit dem Häkchen.', 'konto');
@@ -562,7 +720,7 @@ const ACCOUNT_AREAS = [
   ['konto', 'Konto'],
 ] as const;
 
-async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<Res> {
+async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBackupCodes?: string[]): Promise<Res> {
   const user = ctx.user!;
   const { db } = ctx.deps;
   const wanted = forced ?? ctx.query.get('bereich');
@@ -718,6 +876,19 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
 </section>`;
   } else if (area === 'sicherheit') {
     const hasPassword = !!(await db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
+    const totpRow = await db.one<{ totp_secret: string | null; totp_enabled_at: Date | null }>('select totp_secret, totp_enabled_at from users where id = $1', [user.id]);
+    const totpEnabled = !!totpRow?.totp_enabled_at;
+    const totpPending = !totpEnabled && !!totpRow?.totp_secret;
+    let totpQr: Html = nothing;
+    if (totpPending) {
+      try {
+        totpQr = html`<div class="qr-wrap">${qrSvg(encodeQr(totpProvisioningUri(totpRow!.totp_secret!, user.email, ctx.deps.config.appName)))}</div>`;
+      } catch {
+        // Bei einer sehr langen E-Mail-Adresse passt die otpauth://-URI nicht mehr in unseren
+        // QR-Encoder (Version 1–6) – dann geht's eben nur mit dem Schlüssel von Hand.
+        totpQr = html`<p class="notice notice-warn">Für deine E-Mail-Adresse lässt sich leider kein QR-Code erzeugen. Bitte gib den Schlüssel unten von Hand in deiner App ein.</p>`;
+      }
+    }
     content = html`<section class="panel">
   <h2>E-Mail-Adresse ändern</h2>
   <p class="muted">Aktuell: ${user.email}</p>
@@ -743,6 +914,57 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     <button type="submit" class="btn">Passwort speichern</button>
   </form>
   <p class="muted">Danach bist du auf allen anderen Geräten abgemeldet.</p>
+</section>
+<section class="panel">
+  <h2>Zwei-Faktor-Authentifizierung</h2>
+  ${
+    totpEnabled
+      ? html`<p class="muted">Aktiv seit ${formatDateTime(totpRow!.totp_enabled_at!, ctx.deps.config.timeZone)} Uhr. Bei der Anmeldung brauchst du danach zusätzlich einen Code aus deiner Authenticator-App.</p>
+  <details class="qr-details">
+    <summary>Backup-Codes neu erzeugen</summary>
+    <p class="muted">Für den Fall, dass die App mal nicht verfügbar ist. Die bisherigen Codes werden damit ungültig.</p>
+    <form method="post" action="/konto/2fa/backup-codes-neu" class="stack">
+      ${csrfField(ctx)}
+      ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
+      <button type="submit" class="btn btn-quiet">Neue Backup-Codes erzeugen</button>
+    </form>
+  </details>
+  <form method="post" action="/konto/2fa/deaktivieren" class="stack">
+    ${csrfField(ctx)}
+    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
+    <button type="submit" class="btn btn-quiet">Ausschalten</button>
+  </form>`
+      : totpPending
+        ? html`<p class="muted">Scanne den Code mit einer Authenticator-App (z. B. Google Authenticator, Aegis, 1Password) und bestätige mit dem angezeigten 6-stelligen Code.</p>
+  ${totpQr}
+  <p class="muted">Geht der Scan nicht? Schlüssel von Hand eingeben: <code>${totpRow!.totp_secret}</code></p>
+  <form method="post" action="/konto/2fa/bestaetigen" class="stack">
+    ${csrfField(ctx)}
+    <label class="field">
+      <span>6-stelliger Code aus der App</span>
+      <input type="text" name="code" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" autofocus>
+    </label>
+    <button type="submit" class="btn">Bestätigen und aktivieren</button>
+  </form>
+  <form method="post" action="/konto/2fa/abbrechen">
+    ${csrfField(ctx)}
+    <button type="submit" class="btn btn-quiet">Abbrechen</button>
+  </form>`
+        : html`<p class="muted">Schützt dein Konto zusätzlich mit einem Code aus einer Authenticator-App bei jeder Anmeldung.</p>
+  <form method="post" action="/konto/2fa/einrichten" class="stack">
+    ${csrfField(ctx)}
+    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
+    <button type="submit" class="btn">Einrichten</button>
+  </form>`
+  }
+  ${
+    freshBackupCodes
+      ? html`<div class="notice notice-ok backup-codes">
+    <p><strong>Deine Backup-Codes</strong> – jeder gilt einmal, falls die App mal nicht verfügbar ist. Jetzt notieren oder speichern, sie werden nicht noch einmal angezeigt:</p>
+    <ul class="backup-code-list">${freshBackupCodes.map((c) => html`<li><code>${c}</code></li>`)}</ul>
+  </div>`
+      : nothing
+  }
 </section>`;
   } else {
     content = html`<section class="panel" data-install-section hidden>
