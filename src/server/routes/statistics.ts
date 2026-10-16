@@ -49,7 +49,7 @@ async function statisticsPage(ctx: Ctx): Promise<Res> {
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
   const { db } = ctx.deps;
-  const nav = { slug: league.slug, name: league.name, canManage: access.canManage, active: 'statistiken' as const };
+  const nav = { slug: league.slug, name: league.name, canManage: access.canManage, recap: league.ended, active: 'statistiken' as const };
 
   const tournaments = await leagueTournaments(db, league.id);
   if (!tournaments.length) {

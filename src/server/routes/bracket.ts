@@ -225,7 +225,7 @@ async function bracketPage(ctx: Ctx): Promise<Res> {
   const { league } = access;
   const { db, config } = ctx.deps;
   const tz = config.timeZone;
-  const nav = { slug: league.slug, name: league.name, canManage: access.canManage, active: 'turnierbaum' as const };
+  const nav = { slug: league.slug, name: league.name, canManage: access.canManage, recap: league.ended, active: 'turnierbaum' as const };
 
   const tournaments = await leagueTournaments(db, league.id);
   if (!tournaments.length) {
