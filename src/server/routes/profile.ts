@@ -2,10 +2,11 @@
 
 import type { Ctx } from '../app.ts';
 import { computeBadges } from '../../domain/badges.ts';
+import { formatDateTime } from '../format.ts';
 import { html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, type Res, type Router } from '../http.ts';
 import { badgeGrid } from '../views/badges.ts';
-import { avatar, layout, scaleBar } from '../views/layout.ts';
+import { avatar, isOnline, layout, presenceDot, scaleBar } from '../views/layout.ts';
 import { isUuid, loginRedirect } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 import { loadStandings } from './standings-data.ts';
@@ -20,11 +21,12 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const id = ctx.params.userId;
   if (!isUuid(id)) throw new HttpError(404, 'Nicht gefunden.');
   // Nur Mitglieder dieser Tipprunde haben hier ein Profil
-  const person = await db.one<{ display_name: string; first_name: string | null; avatar_updated_at: Date | null }>(
-    `select u.display_name, u.first_name, u.avatar_updated_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 and lm.user_id = $2`,
+  const person = await db.one<{ display_name: string; first_name: string | null; avatar_updated_at: Date | null; last_seen_at: Date | null }>(
+    `select u.display_name, u.first_name, u.avatar_updated_at, u.last_seen_at from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 and lm.user_id = $2`,
     [league.id, id],
   );
   if (!person) throw new HttpError(404, 'Nicht gefunden.');
+  const online = isOnline(person.last_seen_at, ctx.now);
 
   const [standings, tournaments] = await Promise.all([loadStandings(db, league), leagueTournaments(db, league.id)]);
   const row = standings.rows.find((r) => r.userId === id)!;
@@ -52,10 +54,17 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const norm = (v: string) => v.trim().toLowerCase();
   const body = html`<p class="muted page-note"><a href="/r/${league.slug}/rangliste">← Zur Rangliste</a></p>
 <section class="panel profile-head">
-  ${avatar(id, person.display_name, person.avatar_updated_at, 'lg')}
+  ${avatar(id, person.display_name, person.avatar_updated_at, 'lg', online)}
   <div>
     <h1>${person.first_name && sameName ? person.first_name : person.display_name}</h1>
     <p class="muted">${person.first_name && !sameName ? html`${person.first_name} · ` : nothing}Mitglied in ${league.name}</p>
+    <p class="profile-presence">
+      ${presenceDot(online)}${online
+        ? html`Online`
+        : person.last_seen_at
+          ? html`Zuletzt online: ${formatDateTime(person.last_seen_at, ctx.deps.config.timeZone)} Uhr`
+          : html`Noch nicht online gewesen`}
+    </p>
   </div>
 </section>
 <section class="panel">

@@ -220,7 +220,7 @@ function rankBox(ctx: Ctx): Html {
         ${shown.map(
           (r) => html`<li class="rank-row${r.userId === ctx.user?.id ? ' me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium-${r.rank}` : ''}">
           <span class="rank-pos">${r.rank}</span>
-          <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null)}<a class="rank-n" href="/r/${s.slug}/spieler/${r.userId}">${r.displayName}</a></span>
+          <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null, 'sm', isOnline(s.lastSeenOf.get(r.userId) ?? null, ctx.now))}<a class="rank-n" href="/r/${s.slug}/spieler/${r.userId}">${r.displayName}</a></span>
           ${scaleBar(r.points, s.possible)}
           <span class="rank-pts">${r.points}</span>
         </li>`,
@@ -320,11 +320,25 @@ function leagueNav(l: LeagueNav): Html {
 </nav>`;
 }
 
-/** Kleines rundes Profilbild; ohne Bild der Anfangsbuchstabe. */
-export function avatar(userId: string, name: string, version: Date | null, size: 'sm' | 'lg' = 'sm'): Html {
-  return version
+/** Wie lange nach der letzten angemeldeten Anfrage noch „online“ angezeigt wird. */
+export const ONLINE_WINDOW_MS = 2 * 60_000;
+
+/** Gilt jemand gerade als online? (Punkt auf einer Zeit der letzten Anfrage, nicht auf einer echten Verbindung) */
+export function isOnline(lastSeenAt: Date | null, now: Date): boolean {
+  return !!lastSeenAt && now.getTime() - lastSeenAt.getTime() < ONLINE_WINDOW_MS;
+}
+
+/** Grüner Punkt (online) oder roter Punkt (offline). */
+export function presenceDot(online: boolean): Html {
+  return html`<span class="presence-dot ${online ? 'presence-on' : 'presence-off'}" title="${online ? 'Online' : 'Offline'}" aria-hidden="true"></span>`;
+}
+
+/** Kleines rundes Profilbild; ohne Bild der Anfangsbuchstabe. Mit `presence` zusätzlich ein grüner/roter Online-Punkt. */
+export function avatar(userId: string, name: string, version: Date | null, size: 'sm' | 'lg' = 'sm', presence?: boolean): Html {
+  const img = version
     ? html`<img class="avatar avatar-${size}" src="/avatar/${userId}?v=${String(version.getTime())}" alt="" width="${size === 'lg' ? 96 : 28}" height="${size === 'lg' ? 96 : 28}" loading="lazy">`
     : html`<span class="avatar avatar-${size} avatar-ph" aria-hidden="true">${[...name][0]?.toUpperCase() ?? '?'}</span>`;
+  return presence === undefined ? img : html`<span class="avatar-wrap">${img}${presenceDot(presence)}</span>`;
 }
 
 export function csrfField(ctx: Ctx): Html {

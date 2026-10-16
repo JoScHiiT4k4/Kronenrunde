@@ -207,6 +207,12 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     const cookieName = sessionCookieName(config);
     const session = await loadSession(db, cookies[cookieName]);
     const user = session?.user ?? null;
+    if (user) {
+      // Für die Online-Anzeige; nicht abwarten (würde jede Anfrage verzögern) und höchstens alle 30 Sekunden schreiben.
+      void db
+        .run(`update users set last_seen_at = now() where id = $1 and (last_seen_at is null or last_seen_at < now() - interval '30 seconds')`, [user.id])
+        .catch((err: unknown) => deps.log(`Fehler beim Speichern von last_seen_at: ${(err as Error)?.message ?? err}`));
+    }
 
     const ctx: Ctx = {
       deps,

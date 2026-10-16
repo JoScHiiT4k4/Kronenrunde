@@ -897,6 +897,13 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .who { display: flex; align-items: center; gap: 10px; }
 .avatar-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 12px 0 18px; }
 .avatar-edit > .stack { flex: 1 1 220px; }
+/* Online-Anzeige: grüner/roter Punkt, als Abzeichen am Profilbild und als Text im Spielerprofil */
+.avatar-wrap { position: relative; display: inline-flex; flex: none; }
+.presence-dot { position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--surface); background: var(--red); }
+.presence-dot.presence-on { background: var(--ok); }
+.avatar-lg + .presence-dot { width: 16px; height: 16px; border-width: 3px; }
+.profile-presence { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--muted); font-size: 0.92rem; }
+.profile-presence .presence-dot { position: static; border: none; width: 9px; height: 9px; }
 /* Umschalter Spielleiter / Administrator (nur Betreiber) */
 .role-switch { position: relative; }
 .role-switch summary {
@@ -997,6 +1004,7 @@ a.rank-box:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .rank-more { font-size: 0.82rem; color: var(--gold-text); }
 a.rank-box:hover .rank-more { color: var(--gold-bright); }
 .rank-box .avatar { width: 22px; height: 22px; font-size: 0.7rem; }
+.rank-box .presence-dot { width: 7px; height: 7px; border-width: 1.5px; }
 
 /* Grün/rote Skala: geholte Punkte im Verhältnis zu den möglichen */
 .scale { display: block; width: 100%; height: 7px; border-radius: 2px; overflow: hidden; }

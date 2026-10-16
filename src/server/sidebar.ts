@@ -9,6 +9,8 @@ export interface Sidebar {
   leagueName: string;
   rows: StandingRow[];
   avatarOf: Map<string, Date | null>;
+  /** Wann jeder zuletzt angemeldet eine Seite aufgerufen hat (für die Online-Anzeige) */
+  lastSeenOf: Map<string, Date | null>;
   possible: number;
   /** Chat stummgeschaltet (Standard) – false, wenn Push-Hinweise für Chat-Nachrichten an sind */
   chatMuted: boolean;
@@ -48,5 +50,16 @@ export async function loadSidebar(db: Db, userId: string, slug: string | null, i
     db.one<{ chat_push: boolean; spoiler_protection: boolean }>('select chat_push, spoiler_protection from notification_prefs where user_id = $1', [userId]),
     db.query<{ slug: string; name: string }>('select l.slug, l.name from leagues l join league_members m on m.league_id = l.id where m.user_id = $1 order by l.name', [userId]),
   ]);
-  return { slug: league.slug, leagueName: league.name, rows: s.rows, avatarOf: s.avatarOf, possible: s.possible, chatMuted: !prefs?.chat_push, leagues, isTest: league.is_test, spoilerProtection: prefs?.spoiler_protection ?? true };
+  return {
+    slug: league.slug,
+    leagueName: league.name,
+    rows: s.rows,
+    avatarOf: s.avatarOf,
+    lastSeenOf: s.lastSeenOf,
+    possible: s.possible,
+    chatMuted: !prefs?.chat_push,
+    leagues,
+    isTest: league.is_test,
+    spoilerProtection: prefs?.spoiler_protection ?? true,
+  };
 }
