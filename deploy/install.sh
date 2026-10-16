@@ -454,6 +454,7 @@ if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
   die "Die App startet nicht. Die Meldungen oben zeigen, warum."
 fi
 ok "App läuft (startet automatisch nach jedem Neustart)"
+touch "$APP_DIR/.update-installed"   # die Server-Seite zeigt, wann zuletzt eine Version installiert wurde
 ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR (Kopie auf die MyCloud um 7 Uhr, falls eingerichtet)"
 ok "Automatische Updates alle 15 Minuten (nur auf GitHub geprüfte Versionen)"
 

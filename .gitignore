@@ -5,4 +5,5 @@ node_modules
 *.log
 .DS_Store
 .update-check
+.update-installed
 browser-screenshots/

@@ -1,6 +1,7 @@
 // Welche Version läuft gerade, und wann hat der Pi zuletzt nach Updates geschaut?
 // Die Version kommt aus package.json und dem Git-Stand des Programmordners (Kurzform der Commit-Nummer + Datum).
-// Den Zeitpunkt der letzten Prüfung schreibt "tippspiel update --auto" (alle 15 Minuten) in die Datei .update-check.
+// Den Zeitpunkt der letzten Prüfung schreibt "tippspiel update --auto" (alle 15 Minuten) in die Datei .update-check,
+// den der letzten Installation deploy/install.sh in die Datei .update-installed.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -41,6 +42,15 @@ export function buildInfo(): BuildInfo {
 export function lastUpdateCheck(): Date | null {
   try {
     return statSync(join(root, '.update-check')).mtime;
+  } catch {
+    return null;
+  }
+}
+
+/** Zeitpunkt, zu dem zuletzt eine Version installiert wurde (Änderungszeit der Datei .update-installed) oder null. */
+export function lastUpdateInstalled(): Date | null {
+  try {
+    return statSync(join(root, '.update-installed')).mtime;
   } catch {
     return null;
   }
