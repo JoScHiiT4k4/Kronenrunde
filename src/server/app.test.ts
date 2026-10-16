@@ -475,6 +475,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Gewonnene Spiele je Team mit Spoilerschutz (GEN 3:1, G2–KC 1:2)
     assert.equal((tips.text.match(/<button type="button" class="score" data-spoiler/g) ?? []).length, 2, 'ein Block je Begegnung');
     assert.match(tips.text, /class="score-num">3<\/span>/);
+    assert.doesNotMatch(tips.text, /<summary><span>[^<]*<\/span><span class="pts/, 'keine Tagespunkte in der Kopfzeile');
+    // Spoilerschutz ist abschaltbar (Standard: an)
+    assert.match((await anna.get('/konto?bereich=anzeige')).text, /Spoilerschutz bei Ergebnissen/);
+    assert.match((await anna.post('/konto/anzeige', { spoiler: 'aus' })).location ?? '', /anzeige-gespeichert/);
+    const open = (await anna.get(`/r/${slug}/tippen`)).text;
+    assert.match(open, /class="score revealed plain"/);
+    assert.doesNotMatch(open, /data-spoiler/);
+    await anna.post('/konto/anzeige', { spoiler: 'an' });
     assert.doesNotMatch(tips.text, /class="match-foot"[^>]*>[^]*?Ergebnis:/, 'Ergebnis steht nur hinter dem Spoilerschutz');
     assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
@@ -625,7 +633,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Vor der Frist sieht man die Antworten der anderen nicht; Fortschritt zählt alle Teilnehmer, Fragen sind einklappbar
     const before = (await anna.get(`/r/${slug}/sonderfragen`)).text;
     assert.doesNotMatch(before, /chovy/);
-    assert.match(before, /\(\d\/\d+ Teilnehmer haben alle Fragen beantwortet\)/);
+    assert.match(before, /\(\d\/\d+ haben die Fragen beantwortet\)/);
     assert.match(before, /<details class="q-fold">/);
 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)

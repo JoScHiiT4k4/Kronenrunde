@@ -340,13 +340,15 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
   const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
   // Ein gemeinsamer Block: Ergebnis links, Schrägstrich, Ergebnis rechts – verdeckt mit durchgestrichenem Auge
   const EYE_OFF = html`<svg class="score-eye" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7c2 0 3.7.6 5.2 1.500M22 12s-3.6 7-10 7c-2 0-3.7-.6-5.2-1.5"/><path d="M9.5 9.500a3.5 3.5 0 0 0 5 5"/><path d="M3 3l18 18"/></svg>`;
+  const protect = ctx.sidebar?.spoilerProtection ?? true;
+  const slash = html`<svg class="score-slash" viewBox="0 0 12 28" width="12" height="28" aria-hidden="true"><path d="M10 2 2 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const score = hasScore
-    ? html`<button type="button" class="score" data-spoiler data-label="${shortA(m)} ${m.wins_a} zu ${m.wins_b} ${shortB(m)}" aria-label="Ergebnis anzeigen">
-        <span class="score-num">${m.wins_a}</span>
-        <svg class="score-slash" viewBox="0 0 12 28" width="12" height="28" aria-hidden="true"><path d="M10 2 2 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span class="score-num">${m.wins_b}</span>
+    ? protect
+      ? html`<button type="button" class="score" data-spoiler data-label="${shortA(m)} ${m.wins_a} zu ${m.wins_b} ${shortB(m)}" aria-label="Ergebnis anzeigen">
+        <span class="score-num">${m.wins_a}</span>${slash}<span class="score-num">${m.wins_b}</span>
         ${EYE_OFF}
       </button>`
+      : html`<span class="score revealed plain" role="img" aria-label="${shortA(m)} ${m.wins_a} zu ${m.wins_b} ${shortB(m)}"><span class="score-num">${m.wins_a}</span>${slash}<span class="score-num">${m.wins_b}</span></span>`
     : null;
   // Innen: Gewinnchance, in der Mitte „VS“ bzw. das verdeckte Ergebnis
   const teams = html`<div class="teams">
@@ -524,21 +526,6 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     </header>`;
   };
 
-  const dayPoints = (d: Matchday) => {
-    let total = 0;
-    let scored = false;
-    for (const m of d.matches) {
-      const p = own.get(m.id);
-      if (!p) continue;
-      const s = scorePrediction(toDomainPrediction(p), toDomainMatch(m), rulesOf(league));
-      if (s.points !== null) {
-        scored = true;
-        total += s.points;
-      }
-    }
-    return scored ? html`<span class="pts${total > 0 ? ' pts-hit' : ''}">+${total}</span>` : nothing;
-  };
-
   const tournamentNames = tournaments.length > 1 ? new Map(tournaments.map((t) => [t.id, t.name])) : null;
 
   const body = html`
@@ -585,7 +572,7 @@ ${
     ? html`<h2 class="section-title">Vorbei</h2>
   ${closedDays.map(
     (d, i) => html`<details class="day day-closed"${attr(i === 0, 'open')}>
-    <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span>${dayPoints(d)}</summary>
+    <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span></summary>
     ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m), foldOf(m)))}
   </details>`,
   )}`
@@ -943,7 +930,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
     // Wie viele Teilnehmer (von allen) alle Fragen dieses Turniers beantwortet haben
     const answered = new Set(answers.map((a) => `${a.user_id}:${a.question_id}`));
     const done = members.filter((mem) => qs.every((q) => answered.has(`${mem.user_id}:${q.id}`))).length;
-    const status = progress(done, members.length, 'Teilnehmer haben alle Fragen beantwortet', true);
+    const status = progress(done, members.length, 'haben die Fragen beantwortet', true);
     if (!closed) {
       return html`<section class="panel">
   <h2>${t.name} ${status}</h2>
