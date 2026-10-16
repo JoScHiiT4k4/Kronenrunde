@@ -1228,3 +1228,5 @@ td.bad { color: var(--red); }
 .q-done { color: var(--ok); }
 .q-todo { color: var(--red); }
 .question-result > :not(summary) { margin-left: 0; }
+.score.plain { cursor: default; }
+.score.plain:hover { border-color: #26384a; }

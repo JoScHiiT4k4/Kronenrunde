@@ -16,6 +16,8 @@ export interface Sidebar {
   leagues: { slug: string; name: string }[];
   /** Das Testspiel des Betreibers: dort gibt es nur die Teilnehmer-Ansicht */
   isTest: boolean;
+  /** Ergebnisse hinter dem Spoilerschutz verdecken (Standard) */
+  spoilerProtection: boolean;
 }
 
 interface LeagueRow {
@@ -38,8 +40,8 @@ export async function loadSidebar(db: Db, userId: string, slug: string | null): 
   if (!league) return null;
   const [s, prefs, leagues] = await Promise.all([
     loadStandings(db, league),
-    db.one<{ chat_push: boolean }>('select chat_push from notification_prefs where user_id = $1', [userId]),
+    db.one<{ chat_push: boolean; spoiler_protection: boolean }>('select chat_push, spoiler_protection from notification_prefs where user_id = $1', [userId]),
     db.query<{ slug: string; name: string }>('select l.slug, l.name from leagues l join league_members m on m.league_id = l.id where m.user_id = $1 order by l.name', [userId]),
   ]);
-  return { slug: league.slug, leagueName: league.name, rows: s.rows, avatarOf: s.avatarOf, possible: s.possible, chatMuted: !prefs?.chat_push, leagues, isTest: league.is_test };
+  return { slug: league.slug, leagueName: league.name, rows: s.rows, avatarOf: s.avatarOf, possible: s.possible, chatMuted: !prefs?.chat_push, leagues, isTest: league.is_test, spoilerProtection: prefs?.spoiler_protection ?? true };
 }

@@ -14,6 +14,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'aenderung-angefragt': { text: 'Deine Änderung ist angefragt. Sie gilt, sobald dein Spielleiter sie bestätigt.', kind: 'ok' },
   'anfrage-zurueckgezogen': { text: 'Deine Anfrage ist zurückgezogen.', kind: 'ok' },
   'chat-geleert': { text: 'Der Chatverlauf ist gelöscht.', kind: 'ok' },
+  'anzeige-gespeichert': { text: 'Deine Anzeige-Einstellung ist gespeichert.', kind: 'ok' },
   'chat-gespeichert': { text: 'Deine Chat-Einstellungen sind gespeichert.', kind: 'ok' },
   'name-gespeichert': { text: 'Dein Name ist gespeichert.', kind: 'ok' },
   'passwort-gespeichert': { text: 'Dein neues Passwort ist gespeichert. Auf anderen Geräten meldest du dich damit neu an.', kind: 'ok' },

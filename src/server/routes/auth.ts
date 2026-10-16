@@ -401,6 +401,16 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return redirect('/konto?bereich=chat&hinweis=chat-gespeichert');
   });
 
+  router.post('/konto/anzeige', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run(
+      `insert into notification_prefs (user_id, spoiler_protection) values ($1, $2)
+       on conflict (user_id) do update set spoiler_protection = $2, updated_at = now()`,
+      [ctx.user.id, ctx.form.get('spoiler') !== 'aus'],
+    );
+    return redirect('/konto?bereich=anzeige&hinweis=anzeige-gespeichert');
+  });
+
   // Chat laut/stumm (Lautsprecher im Chat); gleicht sich mit der Einstellung unter Benachrichtigungen ab
   router.post('/konto/chat-stumm', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
@@ -547,6 +557,7 @@ const ACCOUNT_AREAS = [
   ['profil', 'Profil'],
   ['benachrichtigungen', 'Benachrichtigungen'],
   ['chat', 'Chat'],
+  ['anzeige', 'Anzeige'],
   ['sicherheit', 'E-Mail & Passwort'],
   ['konto', 'Konto'],
 ] as const;
@@ -671,6 +682,21 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
       <legend>Schimpfwörter</legend>
       <label class="check"><input type="radio" name="filter" value="an"${prefs.chat_filter ? html` checked` : nothing}> Mit Sternen ausblenden <small class="muted">(Standard)</small></label>
       <label class="check"><input type="radio" name="filter" value="aus"${prefs.chat_filter ? nothing : html` checked`}> Anzeigen</label>
+    </fieldset>
+    <button type="submit" class="btn">Speichern</button>
+  </form>
+</section>`;
+  } else if (area === 'anzeige') {
+    const prefs = await db.one<{ spoiler_protection: boolean }>('select spoiler_protection from notification_prefs where user_id = $1', [user.id]);
+    const on = prefs?.spoiler_protection ?? true;
+    content = html`<section class="panel">
+  <h2>Anzeige</h2>
+  <form method="post" action="/konto/anzeige" class="stack">
+    ${csrfField(ctx)}
+    <fieldset class="field lead-field">
+      <legend>Spoilerschutz bei Ergebnissen</legend>
+      <label class="check"><input type="radio" name="spoiler" value="an"${on ? html` checked` : nothing}> An: Ergebnisse sind verdeckt, bis du sie antippst <small class="muted">(Standard)</small></label>
+      <label class="check"><input type="radio" name="spoiler" value="aus"${on ? nothing : html` checked`}> Aus: Ergebnisse immer sichtbar</label>
     </fieldset>
     <button type="submit" class="btn">Speichern</button>
   </form>
