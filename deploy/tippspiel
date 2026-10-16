@@ -68,8 +68,7 @@ backup() {
   find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*-vor-*.dump' -printf '%T@ %p\n' | sort -rn |
     tail -n +$((KEEP_EXTRA_BACKUPS + 1)) | cut -d' ' -f2- | xargs -r rm -f
   ok "Gesichert: $file ($(du -h "$file" | cut -f1))"
-  # Nächtliche und von Hand gemachte Sicherungen zusätzlich auf den Heimnetz-Speicher kopieren (nie mit Fehler beenden)
-  if [[ -z $label ]]; then nas_copy "$file" || true; fi
+  # Die Kopie auf den Heimnetz-Speicher macht ein eigener Zeitplan um 7 Uhr (tippspiel nas-kopie)
 }
 
 # ---- Kopie auf den Heimnetz-Speicher (z. B. WD MyCloud) per NFS ----
@@ -204,7 +203,7 @@ case "${1:-hilfe}" in
     ;;
 
   sicherung | backup)
-    backup
+    backup "${2:-}"   # z. B. "tippspiel sicherung manuell" (der Knopf im Administrator-Bereich); ohne Angabe: normale Sicherung
     ;;
 
   sicherungen | backups)
@@ -242,8 +241,16 @@ case "${1:-hilfe}" in
     nas_umount
     last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
     [[ -n $last ]] || { backup; exit; }
-    nas_copy "$last" && ok "Eingerichtet. Ab jetzt wird jede nächtliche Sicherung auch auf die MyCloud kopiert." ||
+    nas_copy "$last" && ok "Eingerichtet. Ab jetzt wird die neueste Sicherung täglich um 7 Uhr auf die MyCloud kopiert." ||
       die "Das Kopieren klappt noch nicht. Ist NFS an der MyCloud eingeschaltet und darf der Pi (seine IP) auf den Ordner schreiben? Dann den Befehl wiederholen."
+    ;;
+
+  nas-kopie)
+    # Vom Zeitplan täglich um 7 Uhr aufgerufen: die neueste Sicherung auf die MyCloud kopieren (ohne Ausgabe, wenn nichts eingerichtet ist)
+    [[ -f $NAS_CONF ]] || exit 0
+    last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+    [[ -n $last ]] || { warn "Es gibt noch keine Sicherung zum Kopieren."; exit 0; }
+    nas_copy "$last" || exit 1
     ;;
 
   nas-test)
@@ -333,7 +340,7 @@ LoL-Tippspiel – Befehle:
   tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
   tippspiel sicherungen             Vorhandene Sicherungen anzeigen
   tippspiel nas-einrichten          Sicherungen zusätzlich auf die MyCloud kopieren (per NFS; fragt nach der Adresse)
-  tippspiel nas-test                Kopie der neuesten Sicherung auf die MyCloud jetzt versuchen
+  tippspiel nas-test                Kopie der neuesten Sicherung auf die MyCloud jetzt versuchen (sonst täglich um 7 Uhr)
   tippspiel nas-entfernen           Kopie auf die MyCloud wieder ausschalten
   tippspiel wiederherstellen <Datei>  Daten aus einer Sicherung zurückholen
   tippspiel adresse                 Internet-Adresse der App anzeigen

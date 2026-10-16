@@ -1186,15 +1186,36 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const recent = new Date(Date.now() - 2 * 3_600_000);
     writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_040000.dump'), 'x'.repeat(2048));
     writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-10-15_120000-vor-update.dump'), 'y'.repeat(1024));
+    writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_100000-manuell.dump'), 'z'.repeat(512));
+    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_100000-manuell.dump'), new Date(recent.getTime() - 600_000), new Date(recent.getTime() - 600_000));
+    const old = new Date(Date.now() - 40 * 86_400_000);
+    writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-09-06_040000.dump'), 'o'.repeat(256));
+    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-09-06_040000.dump'), old, old);
     utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_040000.dump'), recent, recent);
-    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-15_120000-vor-update.dump'), new Date(recent.getTime() - 3_600_000), new Date(recent.getTime() - 3_600_000));
+    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-15_120000-vor-update.dump'), new Date(recent.getTime() - 3 * 86_400_000), new Date(recent.getTime() - 3 * 86_400_000));
     writeFileSync(join(BACKUP_DIR, '.nas-status'), `ok\t${new Date().toISOString()}\ttippspiel-2026-10-16_040000.dump\n`);
     const filled = await admin.get('/admin?bereich=backup');
     assert.match(filled.text, /sys-fact-ok"><span class="muted">Letzte Sicherung/);
     assert.match(filled.text, /vor 2 Std\./);
-    assert.match(filled.text, /vor einem Update/);
-    assert.match(filled.text, /<strong>2 \(3,0 KB\)<\/strong>|<strong>2 \(3 KB\)<\/strong>/);
+    assert.match(filled.text, /<td>Vor einem Update<\/td>/);
+    assert.match(filled.text, /<td>Nächtlich<\/td>/);
+    assert.match(filled.text, /<td>Von Hand<\/td>/);
+    assert.match(filled.text, /täglich um 7 Uhr/);
+    assert.match(filled.text, /<strong>4 \(3,8 KB\)<\/strong>/);
     assert.match(filled.text, /Kopie auf der MyCloud<\/span><strong>in Ordnung/);
+
+    // Filter: Zeitpunkt und Art (unbekannte Werte zählen als "alle")
+    const rows = (t: string) => (t.match(/<tr><td>[^<]*Uhr<\/td>/g) ?? []).length;
+    assert.equal(rows(filled.text), 4);
+    assert.match(filled.text, /<div class="backup-list"/);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&zeit=30')).text), 3, 'letzte 30 Tage: ohne die 40 Tage alte');
+    const upd = await admin.get('/admin?bereich=backup&art=update');
+    assert.equal(rows(upd.text), 1);
+    assert.match(upd.text, /1 von 4 Sicherungen/);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&art=manuell&zeit=7')).text), 1);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&art=nacht&zeit=30')).text), 1);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&art=quatsch&zeit=xyz')).text), 4);
+    assert.match((await admin.get('/admin?bereich=backup&art=update&zeit=heute')).text.replace(/\s+/g, ' '), /Keine Sicherung passt zu diesem Filter/);
 
     // Knopf: legt nur die Anfrage-Datei ab (die Sicherung selbst macht der Pi), nur mit Formularschutz und nur für den Betreiber
     assert.ok(!existsSync(BACKUP_FILE));

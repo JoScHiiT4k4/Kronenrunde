@@ -329,3 +329,10 @@ document.addEventListener('click', (e) => {
   const shown = btn.classList.toggle('revealed');
   btn.setAttribute('aria-label', shown ? btn.dataset.label + ' – Ergebnis verdecken' : 'Ergebnis anzeigen');
 });
+
+// Filterformulare mit data-autosubmit: sofort absenden, sobald eine Auswahl geändert wird (ohne JavaScript bleibt der Knopf "Filtern")
+document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
+  form.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => form.submit()));
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.hidden = true;
+});
