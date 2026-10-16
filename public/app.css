@@ -975,10 +975,14 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 
 /* Gewinnchance aus den Tipps: so groß wie der Team-Name und auf gleicher Höhe, nicht zu nah am VS/Ergebnis */
 .pct-a { text-align: right; }
-.pct { font-family: var(--font-display); font-size: 1em; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; white-space: nowrap; }
+.pct { font-family: var(--font-display); font-size: 1em; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pct-up { color: #3ddc84; }
 .pct-down { color: #ff6b6b; }
 .pct-even { color: var(--muted); }
+/* Die Zahl bekommt eine feste Breite (für die größtmögliche Zahl "100"), rechtsbündig darin: so steht
+   das %-Zeichen bei jeder Zeile an derselben Stelle, egal ob die Zahl ein-, zwei- oder dreistellig ist –
+   reine Textausrichtung allein richtet sonst nur den ganzen "Zahl %"-Block aus, nicht das %-Zeichen selbst. */
+.pct-num { display: inline-block; width: 3ch; text-align: right; }
 
 /* Anzahl der Tipps je Begegnung und Versions-Fußnote */
 .match-meta .tipped { color: var(--muted); }
