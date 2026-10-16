@@ -1234,3 +1234,17 @@ td.bad { color: var(--red); }
 /* Spielkarte mit aufklappbaren Tipps: unten weniger Luft unter "Tipps der Mitspieler" */
 .match:has(> .tips-fold:last-child) { padding-bottom: 8px; }
 .match > .tips-fold:not([open]) { margin-top: 4px; }
+
+/* Breite Bildschirme: Inhalt behält seine 720px, die Seitenspalten (Platzhalter/Rangliste/Werbung) geben nach.
+   So rutscht in keiner Fensterbreite ein Reiter (z. B. "Verwalten") in eine zweite Zeile. */
+@media (min-width: 1140px) {
+  .page:not(.page-wide) > .main { flex-shrink: 0; }
+  .page:not(.page-wide) > .ad { flex: 0 1 160px; min-width: 120px; }
+  .page:not(.page-wide) > .ad-ghost-wide,
+  .page:not(.page-wide) > .ad-right.rank-side { width: auto; flex: 0 1 250px; min-width: 190px; }
+}
+/* Mittlere Fenster (Reiter noch sichtbar, Inhalt schmaler als 720px): Reiter etwas enger, damit sie in einer Zeile bleiben */
+@media (min-width: 641px) and (max-width: 720px) {
+  .tabs { gap: 0; }
+  .tabs a { padding-left: 5px; padding-right: 5px; font-size: 0.95rem; }
+}

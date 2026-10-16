@@ -4,7 +4,7 @@
 //   Play-In (doppeltes K.o.): feste Struktur aus den Rundennamen (Upper/Lower Bracket Semifinal/Final, Final)
 // Passt eine Phase in keines der Muster, gibt layoutTree null zurück und die Seite zeigt einfache Spalten.
 
-import { type BracketMatch, type Phase } from './bracket.ts';
+import { type BracketMatch, outcome, type Phase } from './bracket.ts';
 
 export const BOX_W = 250;
 export const BOX_H = 92;
@@ -43,6 +43,19 @@ export interface TreeLayout {
   nodes: TreeNode[];
   edges: TreeEdge[];
   titles: TreeTitle[];
+}
+
+/**
+ * In welche Teamzeile des Folgespiels läuft die Linie? In die Zeile, in der das Team tatsächlich steht
+ * (Sieger bzw. Verlierer des Spiels davor); steht es noch nicht fest, gilt die Standardzeile.
+ */
+function rowOf(from: TreeNode, to: TreeNode, kind: 'win' | 'lose', dflt: 0 | 1): 0 | 1 {
+  const o = outcome(from.match);
+  if (!o) return dflt;
+  const id = (kind === 'win' ? o.winner : o.loser).id;
+  if (to.match.teamA?.id === id) return 0;
+  if (to.match.teamB?.id === id) return 1;
+  return dflt;
 }
 
 const colX = (c: number) => LEFT + c * (BOX_W + COL_GAP);
@@ -94,7 +107,13 @@ function koTree(phase: Phase): TreeLayout | null {
   }
   if (cols.length < 2) return null;
   const edges: TreeEdge[] = [];
-  for (let c = 1; c < cols.length; c++) for (const [i, n] of cols[c].entries()) edges.push(win(cols[c - 1][2 * i], n, 0), win(cols[c - 1][2 * i + 1], n, 1));
+  for (let c = 1; c < cols.length; c++) for (const [i, n] of cols[c].entries()) {
+    const [p1, p2] = [cols[c - 1][2 * i], cols[c - 1][2 * i + 1]];
+    const r1 = rowOf(p1, n, 'win', 0);
+    const r2 = rowOf(p2, n, 'win', 1);
+    // Beide Linien in dieselbe Zeile (Daten noch unklar) → die zweite nimmt die andere
+    edges.push(win(p1, n, r1), win(p2, n, r2 === r1 ? (r1 === 0 ? 1 : 0) : r2));
+  }
   const titles = rounds.map((r, c) => ({ text: r.name, x: colX(c), y: cols[c][0].y - 10 }));
   return finish(cols.flat(), edges, titles, cols.length);
 }
@@ -119,11 +138,11 @@ function doubleTree(phase: Phase): TreeLayout | null {
 
   const edges: TreeEdge[] = [];
   for (const [i, n] of usN.entries()) {
-    edges.push(win(n, ufN, i === 0 ? 0 : 1));
-    // Linien kreuzen sich nicht: das obere Spiel läuft außen und tritt unten ein, das untere innen und tritt oben ein
-    edges.push(loseGutter(n, lsN, us.length - 1 - i, i === 0 ? 1 : 0));
+    // Sieger ins Upper Bracket Final, Verlierer ins Lower Bracket Semifinal – jeweils in die Zeile, in der das Team steht
+    edges.push(win(n, ufN, rowOf(n, ufN, 'win', i === 0 ? 0 : 1)));
+    edges.push(loseGutter(n, lsN, us.length - 1 - i, rowOf(n, lsN, 'lose', i === 0 ? 1 : 0)));
   }
-  edges.push(win(lsN, lfN, 0), loseDown(ufN, lfN), win(ufN, fN, 0), win(lfN, fN, 1));
+  edges.push(win(lsN, lfN, rowOf(lsN, lfN, 'win', 0)), loseDown(ufN, lfN), win(ufN, fN, rowOf(ufN, fN, 'win', 0)), win(lfN, fN, rowOf(lfN, fN, 'win', 1)));
 
   const titles: TreeTitle[] = [
     { text: 'Upper Bracket Semifinal', x: colX(0), y: usN[0].y - 10 },

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { layoutTree } from './bracket-layout.ts';
+import { BOX_H, BOX_W, layoutTree, META_H, ROW_H } from './bracket-layout.ts';
 import { type BracketMatch, type BracketTeam, buildPhases, currentPhase, markFor, phaseKind, phaseOf, roundOf, stageLabel } from './bracket.ts';
 
 const team = (id: string): BracketTeam => ({ id, name: `Team ${id}`, short: id });
@@ -190,6 +190,31 @@ test('Baum: Play-In – Upper und Lower Bracket mit gestrichelten Verlierer-Lini
   const at = (m: BracketMatch) => t.nodes.find((n) => n.match === m)!;
   assert.ok(at(ms[2]).y > at(ms[1]).y, 'Lower Bracket unter dem Upper Bracket');
   assert.equal(at(ms[3]).y, (at(ms[0]).y + at(ms[1]).y) / 2);
+});
+
+test('Baum: Linien enden in der Zeile, in der das Team wirklich steht (Sieger oben, Verlierer unten)', () => {
+  n = 0;
+  const ms = [
+    match('Play-In: oberes Halbfinale', 0, 'KC', 'C9', '3-1'), // KC gewinnt, C9 verliert
+    match('Play-In: oberes Halbfinale', 0, 'FUR', 'MVK', '0-3'), // MVK gewinnt, FUR verliert
+    match('Play-In: unteres Halbfinale', 1, 'C9', 'FUR'), // Verlierer: C9 oben, FUR unten (Standard wäre andersherum)
+    match('Play-In: oberes Finale', 2, 'MVK', 'KC'), // Sieger: MVK oben, KC unten (Standard wäre andersherum)
+    match('Play-In: unteres Finale', 3, null, null),
+    match('Play-In: Finale', 4, null, null),
+  ];
+  const t = layoutTree(buildPhases(ms)[0])!;
+  const at = (m: BracketMatch) => t.nodes.find((x) => x.match === m)!;
+  const rowY = (m: BracketMatch, row: 0 | 1) => at(m).y + META_H + ROW_H / 2 + row * ROW_H;
+  // Linien der Halbfinals: Anfang liegt auf Höhe des Quellspiels; Ende (letzte V-Koordinate) = Zielzeile
+  const endY = (from: BracketMatch, kind: 'win' | 'lose') => {
+    const startX = kind === 'win' ? at(from).x + BOX_W + 4 : at(from).x - 4;
+    const e = t.edges.find((x) => x.kind === kind && x.d.startsWith(`M${startX},${at(from).y + BOX_H / 2} `))!;
+    return Number(/V([\d.]+)/.exec(e.d)![1]);
+  };
+  assert.equal(endY(ms[0], 'lose'), rowY(ms[2], 0), 'C9 steht oben im Lower Bracket Semifinal');
+  assert.equal(endY(ms[1], 'lose'), rowY(ms[2], 1), 'FUR steht unten');
+  assert.equal(endY(ms[0], 'win'), rowY(ms[3], 1), 'KC steht unten im Upper Bracket Final');
+  assert.equal(endY(ms[1], 'win'), rowY(ms[3], 0), 'MVK steht oben');
 });
 
 test('Baum: unbekannte Struktur → keine Baum-Ansicht', () => {
