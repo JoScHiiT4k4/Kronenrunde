@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, levelOf, parseLoadavg, parseMeminfo, percent } from './system-info.ts';
+import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, levelOf, nasLevel, parseLoadavg, parseMeminfo, parseNasStatus, percent } from './system-info.ts';
 
 test('meminfo: belegt = gesamt minus verfügbar, Swap nur wenn vorhanden', () => {
   const t = 'MemTotal:        4000000 kB\nMemFree:          100000 kB\nMemAvailable:    3000000 kB\nSwapTotal:        200000 kB\nSwapFree:         150000 kB\n';
@@ -48,4 +48,19 @@ test('Datenbank: rot, wenn der freie Platz nicht für drei Kopien reicht', () =>
   assert.equal(databaseLevel(1 * GB, 10 * GB), 'ok');
   assert.equal(databaseLevel(1 * GB, 5 * GB), 'warm');
   assert.equal(databaseLevel(1 * GB, 2 * GB), 'hot');
+});
+
+test('MyCloud: Statusdatei lesen; rot bei Fehler oder wenn die letzte Kopie zu alt ist', () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  assert.equal(parseNasStatus(null), null);
+  assert.equal(parseNasStatus('kaputt'), null);
+  assert.equal(parseNasStatus('ok\tkeine-zeit\tx'), null);
+  const fresh = parseNasStatus('ok\t2026-10-16T04:00:05Z\ttippspiel-2026.dump\n')!;
+  assert.deepEqual([fresh.ok, fresh.message], [true, 'tippspiel-2026.dump']);
+  assert.equal(nasLevel(fresh, now), 'ok');
+  assert.equal(nasLevel(parseNasStatus('ok\t2026-10-15T00:00:00Z\tx')!, now), 'warm'); // 36 Std.
+  assert.equal(nasLevel(parseNasStatus('ok\t2026-10-14T00:00:00Z\tx')!, now), 'hot'); // 60 Std.
+  const failed = parseNasStatus('fehler\t2026-10-16T04:00:05Z\tMyCloud nicht erreichbar')!;
+  assert.equal(failed.ok, false);
+  assert.equal(nasLevel(failed, now), 'hot');
 });
