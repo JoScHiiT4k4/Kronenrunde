@@ -142,7 +142,19 @@ p { margin: 0 0 0.9em; }
 .top-nav a:hover { color: var(--gold-bright); }
 
 .league-nav {
-  padding: 0;
+  position: relative;
+  isolation: isolate;
+  padding: 16px 16px 0;
+}
+/* Hintergrund und Linie laufen über die ganze Fensterbreite, der Inhalt bleibt in der Spalte */
+.league-nav::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: -100vw;
+  right: -100vw;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, rgb(12 25 38 / 0%), rgb(12 25 38 / 90%));
 }
@@ -152,9 +164,6 @@ p { margin: 0 0 0.9em; }
   font-weight: 700;
   letter-spacing: 0.03em;
 }
-/* Reiter-Leiste hat dieselben Spalten wie der Inhalt (Platzhalter + .main), so springt nichts auseinander */
-.nav-page { align-items: flex-start; }
-.nav-main.main { padding: 16px 16px 0; }
 .tabs {
   display: flex;
   gap: 4px;
@@ -188,15 +197,23 @@ p { margin: 0 0 0.9em; }
 
 /* ---------- Inhalt ---------- */
 
-.page { flex: 1; display: flex; justify-content: center; align-items: flex-start; gap: 20px; min-width: 0; }
-.main {
-  flex: 0 1 720px;
-  width: 100%;
+.page {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 720px);
+  justify-content: center;
+  align-items: start;
+  column-gap: 20px;
   min-width: 0;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 20px 16px 32px;
+  overflow-x: clip;
+  --side: 160px;
 }
+.page:has(> .rank-side) { --side: 250px; }
+.page-wide { grid-template-columns: minmax(0, 1320px); }
+/* Reiter (nav) und Inhalt (main) liegen im selben Raster, also immer in derselben Spalte; Seitenspalten stehen in Zeile 2 */
+.page > .league-nav { grid-row: 1; grid-column: 1; }
+.page > .main { grid-row: 2; grid-column: 1; min-width: 0; padding: 20px 16px 32px; }
+.page > .ad { grid-row: 2; }
 
 .foot {
   padding: 18px 16px max(18px, env(safe-area-inset-bottom));
@@ -697,7 +714,6 @@ details > summary > span:first-of-type:not(:only-child) { flex: 1; }
 }
 
 /* ---------- Turnierbaum ---------- */
-.main-wide { flex-basis: 1320px; max-width: 1320px; }
 .bk-title { margin: 0 0 10px; font-size: 1.4rem; }
 .bk-note { margin: 0 0 10px; color: var(--muted); font-size: 0.92rem; }
 .bk-hint { margin: 4px 0 0; font-size: 0.88rem; }
@@ -800,7 +816,7 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 .bracket-tree { display: block; }
 .bk-svg { display: block; max-width: none; font-family: inherit; }
 /* Am PC füllt der Baum die Breite aus; kleine Bildschirme scrollen seitlich */
-@media (min-width: 900px) { .bracket-tree .bk-svg { width: 100%; height: auto; max-width: 1300px; } }
+@media (min-width: 940px) and (max-width: 1139px) { .bracket-tree .bk-svg { width: 100%; height: auto; max-width: 1300px; } }
 .bk-box { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
 a.bk-match:hover .bk-box { stroke: var(--gold); }
 a.bk-match:focus-visible { outline: none; }
@@ -844,7 +860,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 }
 
 /* Werbeflächen links und rechts (nur auf breiten Bildschirmen) */
-.ad { display: none; align-self: stretch; flex: none; width: 160px; padding-top: 20px; }
+.ad { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
 .ad-box {
   position: sticky;
   top: 16px;
@@ -857,8 +873,6 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
   clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
 }
 .ad-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
-@media (min-width: 1140px) { .page:not(.page-wide) > .ad { display: block; } }
-@media (min-width: 1540px) { .page-wide > .ad { display: block; } }
 /* Überschrift über einer Liste von Einstellungen (z. B. Sonderfragen) */
 .small-title { margin: 20px 0 6px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
 /* Abmelden oben rechts */
@@ -943,7 +957,6 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .tips-fold[open] summary { margin-bottom: 8px; }
 
 /* Rangliste in der rechten Seitenleiste (ersetzt die Werbefläche rechts) */
-.ad-right.rank-side { width: 250px; }
 .rank-box {
   position: sticky;
   top: 16px;
@@ -1027,7 +1040,6 @@ a.rank-box:hover .rank-more { color: var(--gold-bright); }
 
 /* Linke Spalte (früher Werbung): unsichtbarer Platzhalter, damit der Inhalt mittig bleibt */
 .ad-ghost { visibility: hidden; }
-.ad-ghost-wide { width: 250px; }
 
 /* Rangliste auf dem Handy: Nebenspalten ausblenden, Ausbeute und Zahlen unter den Namen */
 .rk-sub { display: none; }
@@ -1235,13 +1247,28 @@ td.bad { color: var(--red); }
 .match:has(> .tips-fold:last-child) { padding-bottom: 8px; }
 .match > .tips-fold:not([open]) { margin-top: 4px; }
 
-/* Breite Bildschirme: Inhalt behält seine 720px, die Seitenspalten (Platzhalter/Rangliste/Werbung) geben nach.
-   So rutscht in keiner Fensterbreite ein Reiter (z. B. "Verwalten") in eine zweite Zeile. */
+/* Spalten je Fensterbreite (Reiter und Inhalt bleiben immer in derselben Spalte):
+   ab 940px steht die Rangliste rechts neben dem Inhalt, ab 1140px zusätzlich ein Platzhalter links (Inhalt mittig),
+   Seiten mit breitem Inhalt (Turnierbaum) erst ab 1540px. Die Seitenspalten geben nach, der Inhalt behält seine Breite. */
+@media (min-width: 940px) and (max-width: 1139px) {
+  .page:not(.page-wide):has(> .rank-side) { grid-template-columns: minmax(0, 720px) 200px; }
+  .page:not(.page-wide) > .rank-side { display: block; grid-column: 2; }
+}
 @media (min-width: 1140px) {
-  .page:not(.page-wide) > .main { flex-shrink: 0; }
-  .page:not(.page-wide) > .ad { flex: 0 1 160px; min-width: 120px; }
-  .page:not(.page-wide) > .ad-ghost-wide,
-  .page:not(.page-wide) > .ad-right.rank-side { width: auto; flex: 0 1 250px; min-width: 190px; }
+  .page:not(.page-wide) { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
+  .page:not(.page-wide) > .ad { display: block; }
+  .page:not(.page-wide) > .ad-ghost { grid-column: 1; }
+  .page:not(.page-wide) > .league-nav,
+  .page:not(.page-wide) > .main { grid-column: 2; }
+  .page:not(.page-wide) > .ad:not(.ad-ghost) { grid-column: 3; }
+}
+@media (min-width: 1540px) {
+  .page-wide { grid-template-columns: minmax(190px, var(--side)) minmax(0, 1320px) minmax(190px, var(--side)); }
+  .page-wide > .ad { display: block; }
+  .page-wide > .ad-ghost { grid-column: 1; }
+  .page-wide > .league-nav,
+  .page-wide > .main { grid-column: 2; }
+  .page-wide > .ad:not(.ad-ghost) { grid-column: 3; }
 }
 /* Mittlere Fenster (Reiter noch sichtbar, Inhalt schmaler als 720px): Reiter etwas enger, damit sie in einer Zeile bleiben */
 @media (min-width: 641px) and (max-width: 720px) {
