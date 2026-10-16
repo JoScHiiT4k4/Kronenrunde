@@ -100,31 +100,38 @@ if [[ -n ${DATENSCHUTZ_MUSTER:-} ]]; then
     [[ -z $m ]] && continue
     nr=$((nr + 1))
     if ((${#m} < 4)); then
-      hinweis "Muster Nr. $nr ist kürzer als 4 Zeichen und wird übersprungen (sonst Fehlalarme). Im Secret die echte Angabe eintragen, keine Bezeichnung wie 'IP'."
+      hinweis "Muster Nr. $nr ist kürzer als 4 Zeichen und wird übersprungen (sonst Fehlalarme). Im Secret die Angabe selbst eintragen (z. B. die Adresse), nicht ihre Bezeichnung."
       continue
     fi
     printf '%s\n' "$m" >"$mdir/$nr"
   done <<<"$DATENSCHUTZ_MUSTER"
 
+  # Erst für alle Muster suchen und die Übersicht ausgeben …
+  treffer_muster=()
   for f in "$mdir"/*; do
     [[ -e $f ]] || continue
     nr=${f##*/}
-    orte=$(git grep -I -n -i -F -f "$f" "${revs[@]}" -- . 2>/dev/null |
-      awk -F: '{ key=$2 SUBSEP $3; if (!(key in seen)) { seen[key]=1; print $2 ":" $3 ":" substr($1,1,7) } }' || true)
-    commits=$(git log --format='%H%x09%an%x09%ae%x09%cn%x09%ce%x09%B%x00' "$range" | grep -z -i -F -f "$f" | tr '\0' '\n' | grep -oE '^[0-9a-f]{40}' || true)
-    n_orte=$(grep -c . <<<"$orte" || true)
-    n_commits=$(grep -c . <<<"$commits" || true)
+    git grep -I -n -i -F -f "$f" "${revs[@]}" -- . 2>/dev/null |
+      awk -F: '{ key=$2 SUBSEP $3; if (!(key in seen)) { seen[key]=1; print $2 ":" $3 ":" substr($1,1,7) } }' >"$mdir/orte-$nr" || true
+    git log --format='%H%x09%an%x09%ae%x09%cn%x09%ce%x09%B%x00' "$range" | grep -z -i -F -f "$f" | tr '\0' '\n' |
+      grep -oE '^[0-9a-f]{40}' >"$mdir/commits-$nr" || true
+    n_orte=$(grep -c . "$mdir/orte-$nr" || true)
+    n_commits=$(grep -c . "$mdir/commits-$nr" || true)
     ((n_orte + n_commits > 0)) || continue
     melde "Muster Nr. $nr" 0 "Muster Nr. $nr aus DATENSCHUTZ_MUSTER: $n_orte Stelle(n) in Dateien, $n_commits Commit(s)"
     fehler=$((fehler + n_orte + n_commits - 1))
-    # Einzelne Stellen: höchstens 20 je Muster anzeigen
+    treffer_muster+=("$nr")
+  done
+  # … dann die einzelnen Stellen, höchstens 20 je Muster
+  for nr in "${treffer_muster[@]}"; do
     while IFS=: read -r datei zeile rev; do
-      [[ -n $datei ]] && zeige "$datei" "$zeile" "Muster Nr. $nr (Commit $rev)"
-    done < <(head -n 20 <<<"$orte")
+      zeige "$datei" "$zeile" "Muster Nr. $nr (Commit $rev)"
+    done < <(head -n 20 "$mdir/orte-$nr")
     while read -r hash; do
-      [[ -n $hash ]] && zeige "Commit ${hash:0:7}" 0 "Commit-Text oder -Autor enthält Muster Nr. $nr"
-    done < <(head -n 20 <<<"$commits")
-    ((n_orte > 20)) && echo "  … und $((n_orte - 20)) weitere Stelle(n) mit Muster Nr. $nr"
+      zeige "Commit ${hash:0:7}" 0 "Commit-Text oder -Autor enthält Muster Nr. $nr"
+    done < <(head -n 20 "$mdir/commits-$nr")
+    n_orte=$(grep -c . "$mdir/orte-$nr" || true)
+    if ((n_orte > 20)); then echo "  … und $((n_orte - 20)) weitere Stelle(n) mit Muster Nr. $nr"; fi
   done
 else
   echo "Hinweis: DATENSCHUTZ_MUSTER ist nicht gesetzt – die geheimen Suchmuster werden übersprungen."
