@@ -3,6 +3,7 @@
 import { roundOf, stageLabel } from '../../domain/bracket.ts';
 import { isBonusCorrect } from '../../domain/bonus.ts';
 import { buildIcs } from '../../domain/ics.ts';
+import { userByCalendarToken } from '../auth.ts';
 import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
 import { type Shares, winShares } from '../../domain/shares.ts';
@@ -596,11 +597,22 @@ ${
   return htmlResponse(layout(ctx, { title: `Tippen – ${league.name}`, body, league: leagueNav(access, 'tippen') }));
 }
 
-/** Spielplan als .ics-Datei (Kalender-Abo/-Import), ein Termin je Spiel mit bekannten Teams und Termin. */
-async function calendarExport(ctx: Ctx): Promise<Res> {
-  if (!ctx.user) return loginRedirect(ctx);
-  const { league } = await loadLeague(ctx, ctx.params.slug);
+/**
+ * Live-Kalender-Abo (RFC 5545, login-frei über einen persönlichen Token): Kalender-Apps rufen
+ * diese Adresse von sich aus immer wieder ab, daher sind hier auch neu bekannt gewordene Spiele
+ * automatisch mit dabei – anders als bei einer einmal heruntergeladenen Datei. Ein Termin je Spiel
+ * mit bekannten Teams und Termin; unbekannte (z. B. noch offene Turnierbaum-Paarungen) fehlen so
+ * lange, bis sie feststehen, erscheinen dann aber beim nächsten automatischen Abruf von selbst.
+ */
+async function calendarFeed(ctx: Ctx): Promise<Res> {
   const { db, config } = ctx.deps;
+  const user = await userByCalendarToken(db, ctx.params.token);
+  if (!user) throw new HttpError(404, 'Dieser Kalender-Link ist ungültig oder wurde zurückgezogen.');
+  const league = await db.one<{ id: string; slug: string; name: string }>(
+    `select l.id, l.slug, l.name from leagues l join league_members m on m.league_id = l.id where l.slug = $1 and m.user_id = $2`,
+    [ctx.params.slug, user.id],
+  );
+  if (!league) throw new HttpError(404, 'Diese Tipprunde gibt es nicht, oder du bist kein Mitglied mehr.');
   const matches = await leagueMatches(db, league.id);
   const ics = buildIcs({
     calendarName: `${league.name} – ${config.appName}`,
@@ -612,7 +624,7 @@ async function calendarExport(ctx: Ctx): Promise<Res> {
   });
   return {
     status: 200,
-    headers: { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `attachment; filename="${league.slug}.ics"`, 'cache-control': 'no-store' },
+    headers: { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `inline; filename="${league.slug}.ics"`, 'cache-control': 'public, max-age=1800' },
     body: ics,
   };
 }
@@ -1167,7 +1179,7 @@ export function registerLeagueRoutes(router: Router<Ctx>) {
   router.post('/beitreten/:code', join);
   router.get('/r/:slug', async (ctx) => redirect(`/r/${encodeURIComponent(ctx.params.slug)}/tippen`));
   router.get('/r/:slug/tippen', tipsPage);
-  router.get('/r/:slug/kalender.ics', calendarExport);
+  router.get('/r/:slug/kalender/:token/spielplan.ics', calendarFeed);
   router.post('/r/:slug/tippen', saveTips);
   router.get('/r/:slug/spiel/:id', matchPage);
   router.get('/r/:slug/alle-tipps', allTipsPage);

@@ -125,6 +125,31 @@ export function newToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+/**
+ * Persönlicher Token fürs Live-Kalender-Abo: steht (anders als Sitzungs-/Reset-Token) im Klartext
+ * in der Datenbank und wird direkt als Schlüssel benutzt – er muss login-frei abrufbar sein, damit
+ * Kalender-Apps den Spielplan selbst regelmäßig neu holen können. Wirkt wie der Link selbst als
+ * Geheimnis, genau wie Google Kalenders "private iCal-Adresse". Wird bei erstem Bedarf angelegt.
+ */
+export async function calendarToken(db: Db, userId: string): Promise<string> {
+  const row = await db.one<{ calendar_token: string | null }>('select calendar_token from users where id = $1', [userId]);
+  if (row?.calendar_token) return row.calendar_token;
+  const token = newToken();
+  await db.run('update users set calendar_token = $2 where id = $1', [userId, token]);
+  return token;
+}
+
+/** Setzt den Token zurück (neuer Link, alter funktioniert danach nicht mehr). */
+export async function resetCalendarToken(db: Db, userId: string): Promise<void> {
+  await db.run('update users set calendar_token = $2 where id = $1', [userId, newToken()]);
+}
+
+/** Nutzer anhand des Kalender-Tokens (für die login-freie Abo-URL). */
+export async function userByCalendarToken(db: Db, token: string): Promise<{ id: string } | null> {
+  if (!token) return null;
+  return db.one<{ id: string }>('select id from users where calendar_token = $1', [token]);
+}
+
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('base64url');
 }
