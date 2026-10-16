@@ -192,6 +192,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal(r.status, 200);
     assert.match(r.text, /Tippt die Worlds zusammen/);
     assert.match(r.headers.get('content-security-policy') ?? '', /default-src 'self'/);
+    assert.match(r.headers.get('content-security-policy') ?? '', /img-src 'self' data: blob:/); // blob: fürs Teilen-Bild (SVG→PNG im Browser)
     assert.equal(r.headers.get('x-frame-options'), 'DENY');
     const css = /href="(\/static\/app\.css\?v=[0-9a-f]+)"/.exec(r.text)![1];
     const c = await stranger.get(css);
@@ -939,6 +940,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(prof.text, /Anna-Lena/);
     assert.match(prof.text, /class="profile-rank">\(\d+\. Platz\)<\/span>/);
     assert.match(prof.text, /Sonderfragen/);
+    assert.match(prof.text, new RegExp(`data-share-card data-filename="${slug}-ergebnis"[^>]*>Ergebnis teilen`));
+    const shareSvg = await ben.get(`/r/${slug}/spieler/${annaId}/teilen.svg`);
+    assert.equal(shareSvg.status, 200);
+    assert.match(shareSvg.headers.get('content-type') ?? '', /image\/svg\+xml/);
+    assert.match(shareSvg.text, /<svg[^>]* width="1080" height="1080"/); // Breite/Höhe nötig, damit der Browser sie beim Rastern zu PNG kennt
     assert.equal((await stranger.get(`/r/${slug}/spieler/${annaId}`)).status, 404, 'Fremde ohne Mitgliedschaft');
     assert.equal((await new Client().get(`/r/${slug}/spieler/${annaId}`)).status, 303, 'ohne Anmeldung');
     assert.equal((await ben.get(`/r/${slug}/spieler/${randomUUID()}`)).status, 404);

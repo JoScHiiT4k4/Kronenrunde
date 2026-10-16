@@ -70,7 +70,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
           : html`Noch nicht online gewesen`}
     </p>
   </div>
-  <a class="btn btn-quiet profile-share" href="/r/${league.slug}/spieler/${id}/teilen.svg" download="${league.slug}-ergebnis.svg">Ergebnis teilen</a>
+  <a class="btn btn-quiet profile-share" href="/r/${league.slug}/spieler/${id}/teilen.svg" download="${league.slug}-ergebnis.svg" data-share-card data-filename="${league.slug}-ergebnis">Ergebnis teilen</a>
 </section>
 <section class="panel">
   <h2>Bisheriger Stand</h2>

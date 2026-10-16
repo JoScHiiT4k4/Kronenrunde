@@ -203,7 +203,7 @@ export function isSameOrigin(headers: IncomingHttpHeaders, appUrl: string): bool
 
 const SECURITY_HEADERS: Record<string, string> = {
   'content-security-policy':
-    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; " +
+    "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; " +
     "form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'same-origin',
