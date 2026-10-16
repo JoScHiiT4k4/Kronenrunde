@@ -2,7 +2,7 @@
 
 import type { Ctx } from '../app.ts';
 import { computeBadges } from '../../domain/badges.ts';
-import { pointHistory } from '../../domain/history.ts';
+import { averageHistoryAt, pointHistory } from '../../domain/history.ts';
 import { formatDate, formatDateTime } from '../format.ts';
 import { html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, type Res, type Router } from '../http.ts';
@@ -37,6 +37,10 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const badges = computeBadges({ ...standings.raw, userId: id, rank: row.rank, points: row.points });
   const earned = badges.filter((b) => b.level > 0).length;
   const history = pointHistory({ ...standings.raw, userId: id, now: ctx.now });
+  const historyAverage =
+    history.length >= 2 && standings.raw.members.length > 1
+      ? averageHistoryAt({ ...standings.raw, now: ctx.now }, [new Date(history[0].at.getTime() - 1), ...history.map((s) => s.at)])
+      : null;
 
   // Antworten auf die Sonderfragen: wie bei den anderen erst ab Start des Turniers (die eigenen immer)
   const sections = [];
@@ -85,7 +89,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
 </section>
 <section class="panel">
   <h2>Tippverlauf</h2>
-  ${historyChart(history, ctx.deps.config.timeZone)}
+  ${historyChart(history, historyAverage, ctx.deps.config.timeZone)}
 </section>
 <section class="panel">
   <h2>Abzeichen <span class="progress">${earned} von ${badges.length}</span></h2>

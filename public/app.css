@@ -1161,13 +1161,26 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .who-link { color: inherit; text-decoration: none; }
 .who-link:hover span { color: var(--gold-bright); text-decoration: underline; }
 
-/* Tippverlauf: Liniendiagramm der Punkteentwicklung */
+/* Tippverlauf: Liniendiagramm der Punkteentwicklung, mit Rundenschnitt und je Tipp eingefärbten Punkten */
 .history-chart { display: block; width: 100%; height: auto; max-height: 220px; }
 .history-area { fill: var(--gold); opacity: 0.12; stroke: none; }
 .history-line { fill: none; stroke: var(--gold-bright); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.history-avg-line { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; stroke-linecap: round; }
 .history-dot { fill: var(--bg); stroke: var(--gold-bright); stroke-width: 2; }
 .history-dot:hover { fill: var(--gold-bright); }
+.history-dot-exact { color: var(--ok); }
+.history-dot-winner { color: var(--gold-bright); }
+.history-dot-miss { color: var(--red); }
+.history-dot-bonus { color: var(--muted); }
+.history-dot.history-dot-exact, .history-dot.history-dot-winner, .history-dot.history-dot-miss, .history-dot.history-dot-bonus { stroke: currentColor; }
+.history-dot.history-dot-exact:hover, .history-dot.history-dot-winner:hover, .history-dot.history-dot-miss:hover, .history-dot.history-dot-bonus:hover { fill: currentColor; }
 .history-range { display: flex; justify-content: space-between; margin: 4px 0 0; font-size: 0.8rem; }
+.history-comparison { margin: 0 0 8px; font-size: 0.92rem; }
+.history-comparison strong { font-weight: 700; }
+.history-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 0; font-size: 0.78rem; }
+.history-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.history-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.history-legend i.history-avg-swatch { background: none; border-top: 2px dashed var(--muted); width: 12px; height: 0; border-radius: 0; }
 
 /* Handy: Menü von Spielleiter/Administrator am Rand des Kopfes ausrichten, nie über den Bildschirmrand hinaus */
 @media (max-width: 640px) {
