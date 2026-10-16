@@ -173,8 +173,9 @@ case "${1:-hilfe}" in
       [[ $auto == 1 ]] || ok "Schon die neueste geprüfte Version ($(git log -1 --format=%h))."
       exit 0
     fi
-    echo "Neu seit der letzten Version:"
-    git log --format='  • %s' "$old..$new" | head -n 20
+    echo "Neu seit der letzten Version ($(git rev-list --count "$old..$new") Änderungen, die neuesten 20):"
+    # Kein "| head": mit pipefail bricht das Skript sonst still ab, sobald es mehr als 20 sind
+    git log -n 20 --format='  • %s' "$old..$new"
     backup vor-update
     git reset -q --hard "$new"
     if bash "$APP_DIR/deploy/install.sh" --update && healthy; then
