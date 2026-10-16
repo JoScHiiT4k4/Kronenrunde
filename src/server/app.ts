@@ -31,6 +31,7 @@ import { registerAuthRoutes } from './routes/auth.ts';
 import { registerBracketRoutes } from './routes/bracket.ts';
 import { registerChatRoutes } from './routes/chat.ts';
 import { registerProfileRoutes } from './routes/profile.ts';
+import { registerRecapRoutes } from './routes/recap.ts';
 import { registerStatisticsRoutes } from './routes/statistics.ts';
 import { registerLegalRoutes } from './routes/legal.ts';
 import { registerLeagueRoutes } from './routes/leagues.ts';
@@ -129,6 +130,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
   registerBracketRoutes(router);
   registerStatisticsRoutes(router);
   registerProfileRoutes(router);
+  registerRecapRoutes(router);
   registerChatRoutes(router);
   registerManageRoutes(router);
   registerAdminRoutes(router);

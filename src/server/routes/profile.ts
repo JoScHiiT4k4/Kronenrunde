@@ -93,7 +93,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
       : html`<p class="muted">Diese Tipprunde hat noch kein Turnier.</p>`
   }
 </section>`;
-  return htmlResponse(layout(ctx, { title: `Profil – ${person.display_name}`, body, league: { slug: league.slug, name: league.name, canManage: access.canManage, active: 'rangliste' } }));
+  return htmlResponse(layout(ctx, { title: `Profil – ${person.display_name}`, body, league: { slug: league.slug, name: league.name, canManage: access.canManage, recap: league.ended, active: 'rangliste' } }));
 }
 
 export function registerProfileRoutes(router: Router<Ctx>) {

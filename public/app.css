@@ -183,6 +183,13 @@ p { margin: 0 0 0.9em; }
 }
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-current="page"] { color: var(--gold-bright); border-bottom-color: var(--gold); }
+/* Acht Reiter (Rückblick und Verwalten): etwas kompakter, damit sie am PC in einer Zeile bleiben */
+.tabs-many { gap: 2px; }
+.tabs-many a { padding-left: 5px; padding-right: 5px; font-size: 0.9rem; }
+@media (min-width: 641px) and (max-width: 1000px) {
+  .tabs-many { gap: 0; }
+  .tabs-many a { padding-left: 4px; padding-right: 4px; font-size: 0.84rem; }
+}
 @media (max-width: 420px) {
   .tabs { gap: 0; }
   .tabs a { padding-left: 6px; padding-right: 6px; font-size: 0.95rem; }
@@ -1307,3 +1314,35 @@ td.bad { color: var(--red); }
 .badge-card.badge-l2 .badge-tier { color: #e3e9f1; }
 .badge-card.badge-l3 .badge-tier { color: var(--gold-bright); }
 @media (max-width: 520px) { .badge-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Rückblick am Turnierende ---------- */
+.rc-winner { text-align: center; }
+.rc-crown { margin: 6px 0 0; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.rc-champion { margin: 4px 0; font-family: var(--font-display); font-size: clamp(1.8rem, 6vw, 2.6rem); color: var(--gold-bright); overflow-wrap: anywhere; }
+.rc-highlights { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; text-align: left; }
+.rc-highlights li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+.rc-highlights strong { font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+.rc-highlights span { font-weight: 700; overflow-wrap: anywhere; }
+.rc-cards { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rc-card { padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); min-width: 0; }
+.rc-card.rc-first { border-color: var(--gold); }
+.rc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rc-rank { font-family: var(--font-display); font-size: 1.4rem; color: var(--gold-bright); min-width: 2ch; }
+.rc-head .who { flex: 1 1 140px; min-width: 0; font-weight: 700; }
+.rc-points { margin-left: auto; white-space: nowrap; }
+.rc-points strong { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.rc-sub { margin: 4px 0 0; font-size: 0.85rem; }
+.rc-facts { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rc-facts li { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: baseline; font-size: 0.92rem; }
+.rc-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.rc-what { min-width: 0; overflow-wrap: anywhere; }
+.rc-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0 0; }
+.rc-badges .badge-icon { width: 34px; height: 34px; }
+@media (max-width: 520px) {
+  .rc-facts li { grid-template-columns: 1fr; gap: 0; }
+}
+
+/* Schmale PC-Fenster mit acht Reitern: noch etwas enger (steht nach den allgemeinen Regeln für mittlere Fenster) */
+@media (min-width: 641px) and (max-width: 700px) {
+  .tabs.tabs-many a { padding-left: 3px; padding-right: 3px; font-size: 0.8rem; }
+}
