@@ -16,7 +16,7 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
-import { runSync } from './abgleich.ts';
+import { matchdayRunning, runSync } from './abgleich.ts';
 import { importTournament, type TournamentData } from './daten.ts';
 import { fakeRiot, lolesports, worldsSchedule } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
@@ -1563,5 +1563,75 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(stats.text, /Tipps der Runde/);
     // Unbekannte Phase → die aktuelle wird gezeigt
     assert.equal((await admin.get(`${path}?turnier=${tid}&phase=gibt-es-nicht`)).status, 200);
+  });
+
+  test('matchdayRunning: lolesports-Turniere mit offenem Spieltag werden erkannt, bis das letzte Ergebnis da ist', async () => {
+    // Eigenes, isoliertes Turnier mit lolesports-Quelle (nur solche zählen für den Datenabgleich-Takt)
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, source, starts_on, ends_on) values ('Abgleich-Testturnier', 'lolesports:test', current_date - 1, current_date + 1) returning id`,
+    ))!;
+    const addMatch = (at: Date) =>
+      db.one<{ id: string }>(`insert into matches (tournament_id, best_of, scheduled_at, status) values ($1, 1, $2, 'scheduled') returning id`, [tid, at]);
+    try {
+      // Unabhängig von anderen Turnieren: "läuft" wird immer wahr, sobald ein eigenes Spiel ohne Ergebnis
+      // begonnen hat, und kehrt danach zum Ausgangszustand zurück (ob andere Turniere gerade laufen oder nicht).
+      const baseline = await matchdayRunning(db);
+
+      // Erstes Spiel des Spieltags vor einer Stunde angepfiffen, zweites folgt in 30 Minuten – noch kein Ergebnis
+      const m1 = (await addMatch(hours(-1)))!.id;
+      const m2 = (await addMatch(hours(0.5)))!.id;
+      assert.equal(await matchdayRunning(db), true, 'Spieltag hat begonnen, Ergebnisse fehlen noch');
+
+      // Erstes Spiel ist entschieden, zweites noch offen -> der Spieltag "läuft" weiterhin
+      await db.run(`update matches set wins_a = 1, wins_b = 0, status = 'finished' where id = $1`, [m1]);
+      assert.equal(await matchdayRunning(db), true, 'ein Ergebnis fehlt noch');
+
+      // Auch das zweite Ergebnis steht fest -> der Spieltag ist fertig, Ausgangszustand wiederhergestellt
+      await db.run(`update matches set wins_a = 1, wins_b = 0, status = 'finished' where id = $1`, [m2]);
+      assert.equal(await matchdayRunning(db), baseline, 'beide Ergebnisse stehen fest');
+
+      // Ein Spieltag, der erst in der Zukunft beginnt, zählt noch nicht als "läuft"
+      await db.run(`update matches set wins_a = null, wins_b = null, status = 'scheduled', scheduled_at = $2 where id = $1`, [m1, hours(3)]);
+      await db.run(`update matches set scheduled_at = $2 where id = $1`, [m2, hours(3.5)]);
+      assert.equal(await matchdayRunning(db), baseline, 'der Spieltag hat noch nicht begonnen');
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+    }
+  });
+
+  test('Tippen: am aktuellen Spieltag steht das Laufende/als Nächstes Kommende oben, Gespieltes darunter (neueste zuerst)', async () => {
+    // Eigenes, isoliertes Turnier und eigene Runde, damit die Reihenfolge nicht von anderen Tests abhängt
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Reihenfolge-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    const addMatch = (a: string, b: string, at: Date, opts: { status?: string; winsA?: number; winsB?: number } = {}) =>
+      db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status, wins_a, wins_b)
+         values ($1, $2, $3, 1, $4, $5, $6, $7) returning id`,
+        [tid, team[a], team[b], at, opts.status ?? 'scheduled', opts.winsA ?? null, opts.winsB ?? null],
+      );
+    try {
+      // Derselbe Spieltag: GEN–T1 vor zwei Stunden entschieden, G2–KC läuft seit 10 Minuten, T1–KC startet in einer Stunde
+      const done = (await addMatch('GEN', 'T1', hours(-2), { status: 'finished', winsA: 1, winsB: 0 }))!.id;
+      const live = (await addMatch('G2', 'KC', hours(-1 / 6), { status: 'live' }))!.id;
+      const next = (await addMatch('T1', 'KC', hours(1)))!.id;
+
+      const gastgeber = new Client();
+      await gastgeber.login('reihenfolge-admin@example.de', 'Reihenfolge');
+      const created = await gastgeber.post('/neu', { name: 'Reihenfolge-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+      assert.equal(created.status, 303, created.text);
+      const rslug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+      const page = await gastgeber.get(`/r/${rslug}/tippen`);
+      assert.equal(page.status, 200);
+      const order = [live, next, done]
+        .map((id) => ({ id, i: page.text.indexOf(`id="spiel-${id}"`) }))
+        .sort((a, b) => a.i - b.i)
+        .map((x) => x.id);
+      // Laufendes und bevorstehendes Spiel zuerst (zeitlich aufsteigend), bereits gespielte danach (neueste zuerst)
+      assert.deepEqual(order, [live, next, done]);
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+    }
   });
 });

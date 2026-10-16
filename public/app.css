@@ -470,7 +470,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   line-height: 1.15;
   margin-bottom: 12px;
 }
-.teams .mid { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.teams .mid { display: inline-flex; align-items: center; justify-content: center; gap: 16px; }
 /* Ergebnis mit Spoilerschutz: ein Block, Zahl – Schrägstrich – Zahl; verdeckt zeigt er ein durchgestrichenes Auge */
 .score {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -957,9 +957,9 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .sub-tabs:has(> a:nth-child(8)) a { padding: 7px 8px; font-size: 0.9rem; }
 @media (min-width: 641px) and (max-width: 700px) { .sub-tabs:has(> a:nth-child(8)) a { padding: 7px 5px; font-size: 0.85rem; } }
 
-/* Gewinnchance aus den Tipps */
+/* Gewinnchance aus den Tipps: so groß wie der Team-Name und auf gleicher Höhe, nicht zu nah am VS/Ergebnis */
 .pct-a { text-align: right; }
-.pct { font-family: var(--font-body); font-size: 0.85em; font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+.pct { font-family: var(--font-display); font-size: 1em; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; white-space: nowrap; }
 .pct-up { color: #3ddc84; }
 .pct-down { color: #ff6b6b; }
 .pct-even { color: var(--muted); }
@@ -1287,8 +1287,8 @@ td.bad { color: var(--red); }
 .foot .foot-role .role-switch { position: relative; display: inline-block; }
 .foot .foot-role .role-menu { top: auto; bottom: calc(100% + 6px); left: 50%; right: auto; transform: translateX(-50%); text-align: left; }
 @media (max-width: 420px) {
-  .teams .mid { gap: 4px; }
-  .teams .pct { font-size: 0.72em; }
+  .teams .mid { gap: 8px; }
+  .teams .pct { font-size: 0.9em; }
   .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
 }
 

@@ -4,8 +4,9 @@
 // - Champions: Data Dragon, Riots offizielle, frei nutzbare Datenquelle (deutsche Namen).
 // - Spieler:   lolesports.com (inoffizielle Schnittstelle der Seite – kann sich ändern; siehe docs/ARCHITEKTUR.md).
 //
-// Läuft in der App (DATENABGLEICH, in Produktion an): Spielplan alle 10 Minuten (an Spieltagen alle 2), der Rest alle 6 Stunden;
-// außerdem auf Knopfdruck im Admin-Bereich und mit  tippspiel abgleich.
+// Läuft in der App (DATENABGLEICH, in Produktion an): Spielplan alle 10 Minuten, vom Anstoß des ersten Spiels
+// eines Spieltags bis zum Ergebnis des letzten alle 5 Minuten (Tageswechsel innerhalb eines Spieltags egal),
+// der Rest alle 6 Stunden; außerdem auf Knopfdruck im Admin-Bereich und mit  tippspiel abgleich.
 // Einträge aus dem Admin-Bereich werden nie überschrieben; Fehler werden gemeldet, vorhandene Daten bleiben stehen.
 
 import type { Db } from './db/index.ts';
@@ -398,21 +399,26 @@ export async function runSync(db: Db, get: FetchJson = fetchJson, only: 'alle' |
   return results;
 }
 
-/** Läuft gerade ein Spieltag eines abgeglichenen Turniers (oder beginnt bald)? Dann wird öfter nachgesehen. */
+/**
+ * Läuft gerade ein Spieltag eines abgeglichenen Turniers – vom Anstoß des ersten Spiels bis das Ergebnis
+ * des letzten Spiels da ist? Ein Tageswechsel mitten im Spieltag spielt keine Rolle, da matchday_starts_at
+ * (siehe refresh_matchdays) rein über den zeitlichen Abstand der Spiele gebildet wird, nicht über das Datum.
+ * Eine Notbremse (höchstens 2 Tage zurück) verhindert Dauerpolling, falls ein Ergebnis dauerhaft fehlt.
+ */
 export async function matchdayRunning(db: Db): Promise<boolean> {
   const row = await db.one<{ busy: boolean }>(
     `select exists (
        select 1 from matches m join tournaments t on t.id = m.tournament_id
-        where t.source like 'lolesports:%' and m.status in ('scheduled', 'live') and m.wins_a is null
-          and m.scheduled_at between now() - interval '12 hours' and now() + interval '30 minutes'
+        where t.source like 'lolesports:%' and m.status <> 'cancelled' and m.wins_a is null
+          and m.matchday_starts_at between now() - interval '2 days' and now()
      ) as busy`,
   );
   return !!row?.busy;
 }
 
 /**
- * Abgleich kurz nach dem Start; Paarungen/Ergebnisse alle 10 Minuten, an laufenden Spieltagen alle 2 Minuten
- * (damit der Tippschluss "automatisch" rechtzeitig greift); Champions und Kader alle 6 Stunden.
+ * Abgleich kurz nach dem Start; Paarungen/Ergebnisse alle 10 Minuten, an laufenden Spieltagen
+ * (ab Anstoß des ersten Spiels bis zum Ergebnis des letzten) alle 5 Minuten; Champions und Kader alle 6 Stunden.
  * Ins Protokoll kommt nur, was sich geändert hat oder schiefging.
  */
 export function startSyncSchedule(db: Db, log: (msg: string) => void, get: FetchJson = fetchJson): () => void {
@@ -426,7 +432,9 @@ export function startSyncSchedule(db: Db, log: (msg: string) => void, get: Fetch
     try {
       const now = Date.now();
       const full = now - lastFull >= 6 * 3_600_000;
-      const due = full || now - lastQuick >= 10 * 60_000 || (await matchdayRunning(db).catch(() => false));
+      const busy = await matchdayRunning(db).catch(() => false);
+      const quickEvery = busy ? 5 * 60_000 : 10 * 60_000;
+      const due = full || now - lastQuick >= quickEvery;
       if (!due) return;
       const results = await runSync(db, get, full ? 'alle' : 'haeufig');
       if (full) lastFull = now;
@@ -439,7 +447,9 @@ export function startSyncSchedule(db: Db, log: (msg: string) => void, get: Fetch
     }
   };
   const first = setTimeout(tick, 20_000);
-  const every = setInterval(tick, 2 * 60_000);
+  // Minütlich nachsehen, ob der 5- bzw. 10-Minuten-Takt fällig ist – so greift der 5-Minuten-Takt an
+  // Spieltagen genau, statt nur alle 2 Minuten aufgerundet zu werden.
+  const every = setInterval(tick, 60_000);
   first.unref();
   every.unref();
   return () => {
