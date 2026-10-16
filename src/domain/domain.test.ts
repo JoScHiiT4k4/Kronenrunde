@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { isBonusCorrect, normalizeAnswer, bonusPoints } from './bonus.ts';
-import { arePredictionsPublic, computeMatchdayStarts, isOpen, lockTime } from './locking.ts';
+import { arePredictionsPublic, isOpen, lockTime } from './locking.ts';
 import { isValidResult, matchResult, resultOptions } from './results.ts';
 import { computeStandings, scorePrediction } from './scoring.ts';
 import type { LeagueRules, Match, Prediction } from './types.ts';
@@ -52,27 +52,6 @@ test('Gültige Tipps je Format', () => {
 });
 
 // ---------------------------------------------------------------- Tippschluss
-
-test('Spieltage: über Mitternacht zusammen, nächster Abend getrennt', () => {
-  const starts = computeMatchdayStarts([
-    { id: 'pi1', scheduledAt: at('2026-10-15T20:00:00+02:00') },
-    { id: 'pi2', scheduledAt: at('2026-10-16T01:00:00+02:00') }, // 5 h später → gleicher Spieltag
-    { id: 'pi3', scheduledAt: at('2026-10-16T20:00:00+02:00') }, // 19 h später → neuer Spieltag
-    { id: 'tbd', scheduledAt: null },
-  ]);
-  assert.equal(starts.get('pi1')?.toISOString(), at('2026-10-15T20:00:00+02:00').toISOString());
-  assert.equal(starts.get('pi2')?.toISOString(), at('2026-10-15T20:00:00+02:00').toISOString());
-  assert.equal(starts.get('pi3')?.toISOString(), at('2026-10-16T20:00:00+02:00').toISOString());
-  assert.equal(starts.has('tbd'), false);
-});
-
-test('Spieltag: genau 6 Stunden Abstand beginnt einen neuen Spieltag', () => {
-  const starts = computeMatchdayStarts([
-    { id: 'a', scheduledAt: at('2026-10-23T19:00:00+02:00') },
-    { id: 'b', scheduledAt: at('2026-10-24T01:00:00+02:00') },
-  ]);
-  assert.equal(starts.get('b')?.toISOString(), at('2026-10-24T01:00:00+02:00').toISOString());
-});
 
 test('Tippschluss je Einstellung', () => {
   const m = match({

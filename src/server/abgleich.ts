@@ -14,7 +14,7 @@ export type FetchJson = (url: string, headers?: Record<string, string>) => Promi
 
 export const fetchJson: FetchJson = async (url, headers = {}) => {
   const res = await fetch(url, {
-    headers: { accept: 'application/json', 'user-agent': 'LoL-Tippspiel (Fan-Projekt)', ...headers },
+    headers: { accept: 'application/json', 'user-agent': 'Kronenrunde (Fan-Projekt)', ...headers },
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`${new URL(url).host}: HTTP ${res.status}`);

@@ -62,7 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!['console', 'memory', 'smtp', 'brevo', 'resend'].includes(mode)) throw new Error(`Unbekannter MAIL_MODE: ${mode}`);
 
   return {
-    appName: env.APP_NAME ?? 'LoL-Tippspiel',
+    appName: env.APP_NAME ?? 'Kronenrunde',
     appUrl,
     port,
     host: env.HOST?.trim() || undefined,
@@ -86,7 +86,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mail: {
       mode,
       from: (env.MAIL_FROM || (mode === 'smtp' ? env.SMTP_USER : '') || '').trim(),
-      fromName: env.MAIL_FROM_NAME ?? env.APP_NAME ?? 'LoL-Tippspiel',
+      fromName: env.MAIL_FROM_NAME ?? env.APP_NAME ?? 'Kronenrunde',
       apiKey: env.MAIL_API_KEY ?? '',
       smtp: {
         host: env.SMTP_HOST || 'smtp.gmail.com',

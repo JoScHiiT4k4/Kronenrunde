@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installiert das LoL-Tippspiel auf einem Raspberry Pi oder Debian-/Ubuntu-PC.
+# Installiert die Kronenrunde auf einem Raspberry Pi oder Debian-/Ubuntu-PC.
 #
 #   sudo bash deploy/install.sh
 #
@@ -26,8 +26,8 @@ DB_USER=tippspiel
 BACKUP_DIR=/var/backups/lol-tippspiel
 NODE_MAJOR=24
 DEFAULT_PORT=3000
-TS_HOSTNAME=lol-tippspiel
-DEFAULT_REPO=git@github.com:JoScHiiT4k4/LoL-Tippspiel.git
+TS_HOSTNAME=kronenrunde   # nur bei der Erst-Einrichtung; bestehende Adressen bleiben
+DEFAULT_REPO=https://github.com/JoScHiiT4k4/kronenrunde.git
 LOG=/var/log/lol-tippspiel-install.log
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -117,7 +117,7 @@ chmod 600 "$LOG"
 if [[ $UPDATE == 1 ]]; then
   [[ -f $ENV_FILE ]] || die "Noch nicht installiert. Bitte zuerst:  sudo bash $APP_DIR/deploy/install.sh"
 else
-  printf '\n\033[1mLoL-Tippspiel – Installation\033[0m\n'
+  printf '\n\033[1mKronenrunde – Installation\033[0m\n'
 fi
 
 # --- Fragen (nur bei der ersten Installation) --------------------------------
@@ -203,10 +203,10 @@ if [[ ! -d $APP_DIR/.git ]]; then
   if [[ $REPO == git@* || $REPO == ssh://* ]]; then
     # Privates Repository: den Zugangs-Schlüssel aus Schritt 2 der Anleitung übernehmen
     KEY=''
-    for k in "${DEPLOY_KEY:-}" "/home/${SUDO_USER:-nobody}/.ssh/lol-tippspiel" /root/.ssh/lol-tippspiel; do
+    for k in "${DEPLOY_KEY:-}" "/home/${SUDO_USER:-nobody}/.ssh/kronenrunde" "/home/${SUDO_USER:-nobody}/.ssh/lol-tippspiel" /root/.ssh/kronenrunde /root/.ssh/lol-tippspiel; do
       [[ -n $k && -f $k ]] && KEY=$k && break
     done
-    [[ -n $KEY ]] || die "Zugangs-Schlüssel ~/.ssh/lol-tippspiel nicht gefunden (Anleitung, Schritt 2)."
+    [[ -n $KEY ]] || die "Zugangs-Schlüssel ~/.ssh/kronenrunde nicht gefunden (Anleitung, Schritt 2)."
     install -m 600 "$KEY" "$CONF_DIR/deploy_key"
     [[ -f $KEY.pub ]] && install -m 644 "$KEY.pub" "$CONF_DIR/deploy_key.pub"
     run env GIT_SSH_COMMAND="$GIT_SSH" git clone -q "$REPO" "$APP_DIR"
@@ -232,7 +232,7 @@ if [[ ! -f $ENV_FILE ]]; then
   [[ $APP_PORT == "$DEFAULT_PORT" ]] || note "Port $DEFAULT_PORT ist von einem anderen Programm belegt – die App nimmt Port $APP_PORT."
   umask 027
   cat >"$ENV_FILE" <<EOF
-# Einstellungen für das LoL-Tippspiel (angelegt von deploy/install.sh am $(date +%d.%m.%Y)).
+# Einstellungen für die Kronenrunde (angelegt von deploy/install.sh am $(date +%d.%m.%Y)).
 # Ändern mit:  tippspiel einstellungen   (startet die App danach neu)
 
 DATABASE_URL=postgres://$DB_USER:$DB_PASS@127.0.0.1:5432/$DB_NAME
@@ -246,7 +246,7 @@ ADMIN_EMAILS=$ADMIN_EMAIL
 
 # Anmelde-Mails über Gmail (App-Passwort: https://myaccount.google.com/apppasswords)
 MAIL_MODE=$([[ -n $GMAIL ]] && echo smtp || echo console)
-MAIL_FROM_NAME=LoL-Tippspiel
+MAIL_FROM_NAME=Kronenrunde
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_USER=$GMAIL
@@ -257,6 +257,11 @@ TRUST_PROXY=1
 EOF
   umask 022
   ok "Einstellungen angelegt"
+fi
+# Neuer Name (Okt. 2026): den alten Standard-Absendernamen ersetzen – selbst gewählte Namen bleiben
+if grep -qE '^(MAIL_FROM_NAME|APP_NAME)=LoL-Tippspiel$' "$ENV_FILE"; then
+  sed -i -E 's/^(MAIL_FROM_NAME|APP_NAME)=LoL-Tippspiel$/\1=Kronenrunde/' "$ENV_FILE"
+  ok "Name in den Einstellungen auf „Kronenrunde“ geändert"
 fi
 chown root:"$SERVICE_USER" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
@@ -279,7 +284,7 @@ ok "Datenbank '$DB_NAME' bereit"
 install -d -m 750 -o root -g "$SERVICE_USER" "$BACKUP_DIR"
 cat >/etc/systemd/system/$SERVICE.service <<EOF
 [Unit]
-Description=LoL-Tippspiel
+Description=Kronenrunde
 After=network-online.target postgresql.service
 Wants=network-online.target postgresql.service
 
@@ -322,7 +327,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-sicherung.service <<EOF
 [Unit]
-Description=LoL-Tippspiel: Sicherung der Datenbank
+Description=Kronenrunde: Sicherung der Datenbank
 After=postgresql.service
 
 [Service]
@@ -332,7 +337,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-sicherung.timer <<EOF
 [Unit]
-Description=LoL-Tippspiel: tägliche Sicherung
+Description=Kronenrunde: tägliche Sicherung
 
 [Timer]
 OnCalendar=*-*-* 04:00
@@ -346,7 +351,7 @@ EOF
 # Automatische Updates: einmal täglich um 08:00 nach einer neuen, auf GitHub geprüften Version schauen
 cat >/etc/systemd/system/$SERVICE-update.service <<EOF
 [Unit]
-Description=LoL-Tippspiel: neue geprüfte Version von GitHub holen
+Description=Kronenrunde: neue geprüfte Version von GitHub holen
 After=network-online.target postgresql.service
 Wants=network-online.target
 
@@ -358,7 +363,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-update.timer <<EOF
 [Unit]
-Description=LoL-Tippspiel: täglich um 08:00 nach Updates schauen
+Description=Kronenrunde: täglich um 08:00 nach Updates schauen
 
 [Timer]
 OnCalendar=*-*-* 08:00:00
@@ -372,7 +377,7 @@ EOF
 # Update sofort: Der Administrator legt im Browser eine Anfrage-Datei ab, systemd startet daraufhin das Update (als root)
 cat >/etc/systemd/system/$SERVICE-update-jetzt.service <<EOF
 [Unit]
-Description=LoL-Tippspiel: Update sofort (im Administrator-Bereich angefordert)
+Description=Kronenrunde: Update sofort (im Administrator-Bereich angefordert)
 After=network-online.target postgresql.service
 Wants=network-online.target
 
@@ -385,7 +390,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-update-jetzt.path <<EOF
 [Unit]
-Description=LoL-Tippspiel: wartet auf die Update-Anfrage aus dem Administrator-Bereich
+Description=Kronenrunde: wartet auf die Update-Anfrage aus dem Administrator-Bereich
 
 [Path]
 PathExists=/run/$SERVICE/update-anfrage
@@ -398,7 +403,7 @@ EOF
 # Sicherung sofort: wie beim Update legt der Administrator eine Anfrage-Datei ab, systemd startet daraufhin die Sicherung (als root)
 cat >/etc/systemd/system/$SERVICE-sicherung-jetzt.service <<EOF
 [Unit]
-Description=LoL-Tippspiel: Sicherung sofort (im Administrator-Bereich angefordert)
+Description=Kronenrunde: Sicherung sofort (im Administrator-Bereich angefordert)
 After=postgresql.service
 
 [Service]
@@ -410,7 +415,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-sicherung-jetzt.path <<EOF
 [Unit]
-Description=LoL-Tippspiel: wartet auf die Sicherungs-Anfrage aus dem Administrator-Bereich
+Description=Kronenrunde: wartet auf die Sicherungs-Anfrage aus dem Administrator-Bereich
 
 [Path]
 PathExists=/run/$SERVICE/sicherung-anfrage
@@ -423,7 +428,7 @@ EOF
 # Kopie der neuesten Sicherung auf den Heimnetz-Speicher (MyCloud): täglich um 7 Uhr; ohne eingerichteten Speicher tut sie nichts
 cat >/etc/systemd/system/$SERVICE-nas.service <<EOF
 [Unit]
-Description=LoL-Tippspiel: neueste Sicherung auf den Heimnetz-Speicher kopieren
+Description=Kronenrunde: neueste Sicherung auf den Heimnetz-Speicher kopieren
 After=network-online.target
 
 [Service]
@@ -434,7 +439,7 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-nas.timer <<EOF
 [Unit]
-Description=LoL-Tippspiel: Kopie auf die MyCloud, täglich um 7 Uhr
+Description=Kronenrunde: Kopie auf die MyCloud, täglich um 7 Uhr
 
 [Timer]
 OnCalendar=*-*-* 07:00:00
@@ -554,7 +559,9 @@ cat <<EOF
     tippspiel sicherung       Datenbank jetzt sichern
 
 EOF
-if [[ -n ${SUDO_USER:-} && -d /home/$SUDO_USER/lol-tippspiel && $SRC_DIR == "/home/$SUDO_USER/lol-tippspiel" ]]; then
-  note "Den Ordner ~/lol-tippspiel brauchst du nicht mehr:  rm -rf ~/lol-tippspiel"
-  echo
-fi
+for ordner in kronenrunde lol-tippspiel; do
+  if [[ -n ${SUDO_USER:-} && -d /home/$SUDO_USER/$ordner && $SRC_DIR == "/home/$SUDO_USER/$ordner" ]]; then
+    note "Den Ordner ~/$ordner brauchst du nicht mehr:  rm -rf ~/$ordner"
+    echo
+  fi
+done

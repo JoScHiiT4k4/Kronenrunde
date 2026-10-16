@@ -4,23 +4,23 @@ name: Installation
 # (Debian mit systemd im Container; der echte Pi hat arm64, hier ist es amd64 – sonst gleich).
 # Tailscale wird übersprungen, weil dafür eine Anmeldung nötig ist.
 
+# Nur, wenn sich etwas an der Installation ändert – und nur im PR (nach dem Merge nicht noch einmal dasselbe).
+# Der Rest der App wird schon von "Tests" gestartet und geprüft. Von Hand: Actions → Installation → Run workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'deploy/**'
-      - 'db/migrations/**'
-      - 'src/server/**'
-      - 'package.json'
-      - '.github/workflows/installation.yml'
   pull_request:
     paths:
       - 'deploy/**'
       - 'db/migrations/**'
-      - 'src/server/**'
       - 'package.json'
+      - 'src/server/main.ts'
+      - 'src/server/cli.ts'
+      - 'src/server/config.ts'
       - '.github/workflows/installation.yml'
   workflow_dispatch:
+
+concurrency:
+  group: installation-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   installation:

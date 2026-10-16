@@ -30,7 +30,3 @@ export const ANSWER_TYPE_LABELS: Record<AnswerType, string> = {
   choice: 'Aus eigener Liste',
   text: 'Freitext',
 };
-
-export function catalogQuestion(key: string): CatalogQuestion | undefined {
-  return QUESTION_CATALOG.find((q) => q.key === key);
-}

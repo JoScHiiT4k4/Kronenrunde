@@ -72,8 +72,6 @@ export interface Ctx {
   now: Date;
 }
 
-export type Handler = (ctx: Ctx) => Promise<Res>;
-
 interface StaticFile {
   body: Buffer;
   type: string;

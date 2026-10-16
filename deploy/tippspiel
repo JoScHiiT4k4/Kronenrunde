@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verwaltung des LoL-Tippspiels auf dem eigenen Server (eingerichtet von deploy/install.sh).
+# Verwaltung der Kronenrunde auf dem eigenen Server (eingerichtet von deploy/install.sh).
 # Übersicht:  tippspiel hilfe
 set -euo pipefail
 
@@ -343,7 +343,7 @@ esac
 
 usage() {
     cat <<EOF
-LoL-Tippspiel – Befehle:
+Kronenrunde – Befehle:
 
   tippspiel status                  Läuft alles? Adresse, Version, letzte Sicherung
   tippspiel update                  Neueste geprüfte Version von GitHub installieren (läuft auch automatisch

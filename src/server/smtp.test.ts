@@ -145,9 +145,9 @@ function fakeServer(opts: FakeOptions): Promise<{ server: Server; port: number; 
 
 const message = {
   from: 'tipp@gmail.com',
-  fromName: 'LoL-Tippspiel',
+  fromName: 'Kronenrunde',
   to: 'anna@example.de',
-  subject: 'Dein Anmelde-Link für LoL-Tippspiel – Grüße',
+  subject: 'Dein Anmelde-Link für Kronenrunde – Grüße',
   text: 'Hallo!\n.\nLink: https://x.ts.net/anmelden/bestaetigen?token=abc',
   html: '<p>Hallo Ä</p>',
 };
@@ -170,7 +170,7 @@ test('SMTP: Kopfzeilen mit Umlauten und Nachricht im richtigen Format', () => {
   assert.equal(decoded, long);
 
   const raw = buildMessage(message, new Date('2026-10-15T18:00:00Z'));
-  assert.match(raw, /^From: "LoL-Tippspiel" <tipp@gmail\.com>\r\n/);
+  assert.match(raw, /^From: "Kronenrunde" <tipp@gmail\.com>\r\n/);
   assert.match(raw, /\r\nDate: Thu, 15 Oct 2026 18:00:00 \+0000\r\n/);
   assert.match(raw, /\r\nSubject: =\?UTF-8\?B\?/);
   for (const line of raw.split('\r\n')) assert.ok(line.length <= 78, `Zeile zu lang: ${line}`);

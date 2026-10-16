@@ -1,10 +1,10 @@
 {
-  "name": "lol-tippspiel",
+  "name": "kronenrunde",
   "version": "0.26.1",
   "private": true,
   "license": "UNLICENSED",
   "author": "JoScHiiT4k4 (https://github.com/JoScHiiT4k4)",
-  "description": "Tippspiel-Web-App für League-of-Legends-Turniere",
+  "description": "Kronenrunde – Tippspiel-Web-App für E-Sport-Turniere",
   "type": "module",
   "engines": {
     "node": ">=22.6"

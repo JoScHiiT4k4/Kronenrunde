@@ -1,5 +1,5 @@
 -- =====================================================================
--- LoL-Tippspiel – Grundgerüst der Datenbank (PostgreSQL 15+)
+-- Kronenrunde – Grundgerüst der Datenbank (PostgreSQL 15+)
 --
 -- Läuft unverändert auf Supabase (Cloud) und auf einem eigenen Server
 -- (Raspberry Pi / PC mit Docker). Keine anbieterspezifischen Funktionen.

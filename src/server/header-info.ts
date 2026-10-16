@@ -53,12 +53,6 @@ export function orderTournaments(rows: Row[], now: Date): Row[] {
   return [...live, ...running, ...upcoming];
 }
 
-/** Wählt das passende Turnier (ohne Spieltag-Zustand): laufendes Spiel, sonst begonnenes, sonst das nächste anstehende. */
-export function pickTournament(rows: Row[], now: Date): HeaderTournament | null {
-  const first = orderTournaments(rows, now)[0];
-  return first ? make(first, now, null) : null;
-}
-
 function make(r: Row, now: Date, state: { live: boolean; next: Date | null } | null): HeaderTournament {
   const running = r.starts_at <= now;
   return { name: r.name, startsAt: r.starts_at, live: running ? (state?.live ?? r.live) : false, running, nextStart: running ? (state?.next ?? null) : null };

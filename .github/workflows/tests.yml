@@ -5,8 +5,35 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # von Hand starten (Actions → Tests → Run workflow)
+
+# Neuer Push auf denselben PR bricht den alten, noch laufenden Durchgang ab
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Keine privaten Daten (E-Mail-Adressen, Heimnetz-IPs, Namen …) in Dateien oder Commits – siehe scripts/datenschutz.sh.
+  # Eigene geheime Suchmuster: Settings → Secrets and variables → Actions → Secret DATENSCHUTZ_MUSTER (eine Zeile je Muster).
+  datenschutz:
+    name: Datenschutz (keine privaten Daten)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Dateien und Commits prüfen
+        env:
+          DATENSCHUTZ_MUSTER: ${{ secrets.DATENSCHUTZ_MUSTER }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # PR: nur die neuen Commits; Push auf main: seit dem letzten Stand; sonst alles
+          if [[ -n $BASE ]]; then range="$BASE..HEAD"
+          elif [[ -n $BEFORE && $BEFORE != 0000000000000000000000000000000000000000 ]] && git cat-file -e "$BEFORE" 2>/dev/null; then range="$BEFORE..HEAD"
+          else range=HEAD; fi
+          bash scripts/datenschutz.sh "$range"
+
   logik:
     name: Logik und Typen (Node ${{ matrix.node }})
     runs-on: ubuntu-24.04
@@ -106,8 +133,8 @@ jobs:
   # Nur von dort holt sich der Raspberry Pi automatisch neue Versionen (tippspiel update).
   freigeben:
     name: Als geprüft freigeben (Zweig stabil)
-    needs: [logik, datenbank]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [datenschutz, logik, datenbank]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

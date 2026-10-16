@@ -28,6 +28,7 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
 | Betrieb | systemd-Dienst mit Schutz-Einstellungen, App lauscht nur auf 127.0.0.1; nächtliche Sicherung (14 Stück); automatische Sicherheits-Updates; `tippspiel update` sichert vorher und geht bei Startproblemen automatisch zurück | Wenig Pflege, nichts Wichtiges geht verloren |
 | E-Mail | Ohne eigene Domain: **Gmail per SMTP** mit App-Passwort (`MAIL_MODE=smtp`, bis 500 Empfänger/Tag). Mit eigener Domain später: Brevo oder Resend | Brevo schreibt Gmail-Absender auf `@brevosend.com` um, das landet eher im Spam. Eigener SMTP-Client ohne Zusatzpakete (`src/server/smtp.ts`), Passwort nur verschlüsselt |
 | Turnierbaum | Reiter „Turnierbaum“ (`routes/bracket.ts`, Logik in `src/domain/bracket.ts`): Phasen und Runden ergeben sich aus den Abschnittsnamen (`Play-In: oberes Halbfinale` → Phase „Play-In“, Runde „Upper Bracket Semifinal“; Viertelfinale/Halbfinale/Finale → „Knockout Stage“; angezeigt werden englische Begriffe). Wer ausgeschieden ist, wird **aus den Ergebnissen berechnet**, nicht gespeichert: Swiss 3 Siege = weiter / 3 Niederlagen = raus, Play-In Double Elimination (2 Niederlagen oder Final verloren = raus), Knockout Stage jede Niederlage. Andere Phasen: keine Markierung | Keine zusätzliche Pflege und kein neues Datenbankfeld; stimmt automatisch, sobald der Abgleich Ergebnisse einträgt. Die Datenbank kennt nicht, welches Spiel in welches weiterführt – deshalb ergeben sich die Linien aus der Reihenfolge (K.-o.: Spiel 1+2 → Spiel 1 der nächsten Runde …) bzw. den Rundennamen (Play-In); `src/domain/bracket-layout.ts`. Passt eine Phase in kein Muster, zeigt die Seite einfache Spalten. Andere Turnierformate brauchen eine Regel in `phaseKind()` |
+| Datenschutz im Repository | Öffentliches Repository ohne private Daten: Prüfung `scripts/datenschutz.sh` in jeder CI (E-Mail-Adressen, Heimnetz-IPs, Tailscale-Namen, Autor-Adressen, geheime Suchmuster aus dem Secret `DATENSCHUTZ_MUSTER`); Commits nur mit Noreply-Adressen | Öffentlich sind Actions kostenlos; was einmal gepusht ist, bleibt sonst in der Historie |
 | Geld verdienen | Vorbereitet: Werbeflächen, Cookie-Banner (zertifiziert, IAB TCF), Premium (`users.premium_until`) | Später ohne Umbau einschaltbar |
 
 ## Hinweise für später
@@ -37,7 +38,9 @@ zuletzt als App im Play Store / App Store – **ohne Neubau** zwischen den Stufe
   - Keine Riot-Logos, -Marken, -Schriften oder Spielgrafiken; das Design nutzt nur eigene Formen und freie Schriften.
   - **Domain und App-Name**: „League of Legends“ ist als Marke eingetragen (u. a. EU Nr. 008243487), „LoL“ allein
     offenbar nicht (nur „LOL ESPORTS“ in den USA angemeldet) – gilt aber als Abkürzung der Marke. Riot verbietet
-    seine Marken in Fan-Domains. Für Stufe 2 daher am sichersten ein neutraler Name ohne LoL/League; vorher prüfen (TMview).
+    seine Marken in Fan-Domains. Deshalb heißt die App seit Okt. 2026 **Kronenrunde** (vorher „LoL-Tippspiel“); Domains kronenrunde.de/.com waren
+    frei, das Markenregister (TMview, Klassen 9/41/42) vor dem Start prüfen. Noch alt: Ordner/Dienst `lol-tippspiel` auf dem
+    Pi und die Tailscale-Adresse `lol-tippspiel.….ts.net` – eigener Schritt, weil sich dabei die Adresse für alle ändert.
   - Werbung („passiv“) ist erlaubt, Paywalls/Crowdfunding nur mit Lizenz; keine Wetten oder Geldeinsätze.
   - App Store / Play Store nur mit Lizenz oder registriertem API-Key – vor Stufe 3 bei Riot anfragen.
 - **Datenquelle lolesports.com**: Die Seite nutzt eine inoffizielle, nicht dokumentierte Schnittstelle

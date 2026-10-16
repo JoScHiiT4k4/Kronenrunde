@@ -1,6 +1,7 @@
-# LoL-Tippspiel
+# Kronenrunde
 
-Tippspiel-Web-App für League-of-Legends-Turniere – erst für die private Runde, später öffentlich und als App.
+Tippspiel-Web-App für E-Sport-Turniere, zuerst League of Legends – erst für die private Runde, später öffentlich und als App.
+(Früher „LoL-Tippspiel“.)
 
 ## Stand
 
@@ -49,8 +50,8 @@ Danach gibt es den Befehl `tippspiel` (`tippspiel hilfe`), z. B. `tippspiel upda
 Nötig: **Node.js 22** (oder neuer) und **PostgreSQL 15** (oder neuer). Zusatzpakete braucht die App keine.
 
 ```bash
-git clone https://github.com/JoScHiiT4k4/LoL-Tippspiel.git
-cd lol-tippspiel
+git clone https://github.com/JoScHiiT4k4/kronenrunde.git
+cd kronenrunde
 cp .env.example .env        # dann .env öffnen: DATABASE_URL und ADMIN_EMAILS eintragen
 npm run db:seed             # optional: Beispieldaten Worlds 2026 (nur einmal ausführen)
 npm start                   # App läuft dann auf http://localhost:3000
@@ -70,7 +71,9 @@ Die Datenbank wird beim Start automatisch auf den neuesten Stand gebracht (`npm 
 
 ## Tests
 
-Bei jeder Änderung laufen auf GitHub automatisch alle Tests (Reiter **Actions**).
+Bei jeder Änderung laufen auf GitHub automatisch alle Tests (Reiter **Actions**), dazu die **Datenschutz-Prüfung**:
+Sie schlägt Alarm, wenn echte E-Mail-Adressen, Heimnetz-IPs oder private Autor-Adressen in Dateien oder Commits auftauchen
+(`bash scripts/datenschutz.sh`, eigene geheime Suchmuster über das Secret `DATENSCHUTZ_MUSTER`).
 
 Lokal:
 

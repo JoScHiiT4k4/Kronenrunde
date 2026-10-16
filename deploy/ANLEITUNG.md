@@ -1,10 +1,10 @@
-# Tippspiel auf dem Raspberry Pi einrichten
+# Kronenrunde auf dem Raspberry Pi einrichten
 
 Dauer: etwa 45 Minuten, davon viel Warten. Du brauchst den Raspberry Pi 4 mit Netzteil,
 eine microSD-Karte (ab 16 GB), deinen PC und dein Handy.
 
 Am Ende läuft die App bei dir zu Hause und ist im Internet unter einer Adresse wie
-`https://lol-tippspiel.tail1234.ts.net` erreichbar. Kosten: keine.
+`https://kronenrunde.tail1234.ts.net` erreichbar. Kosten: keine.
 
 ---
 
@@ -49,30 +49,19 @@ Ab jetzt tippst du alle Befehle in dieses Fenster. **Einfügen** geht dort mit *
 
 ---
 
-## 2. Zugang zum Code (GitHub)
+## 2. Code holen (GitHub)
 
-Dein Repository ist privat. Der Pi bekommt deshalb einen eigenen Schlüssel, mit dem er den Code nur **lesen** darf.
+Das Repository ist öffentlich, der Pi braucht dafür keinen Schlüssel. Auf dem Pi:
 
-1. Auf dem Pi:
+```
+sudo apt-get install -y git
+git clone https://github.com/JoScHiiT4k4/kronenrunde.git ~/kronenrunde
+```
 
-   ```
-   sudo apt-get install -y git
-   mkdir -p ~/.ssh && chmod 700 ~/.ssh
-   ssh-keygen -t ed25519 -N "" -C "raspberry-pi" -f ~/.ssh/lol-tippspiel
-   cat ~/.ssh/lol-tippspiel.pub
-   ```
-
-2. Die letzte Zeile (beginnt mit `ssh-ed25519`) mit der Maus markieren und mit **Rechtsklick** kopieren.
-3. Im Browser öffnen: <https://github.com/JoScHiiT4k4/LoL-Tippspiel/settings/keys/new>
-   - **Title:** `Raspberry Pi`
-   - **Key:** einfügen (Strg+V)
-   - **Allow write access:** *nicht* ankreuzen
-   - **Add key** klicken
-4. Auf dem Pi den Code holen:
-
-   ```
-   git clone -c core.sshCommand="ssh -i ~/.ssh/lol-tippspiel -o StrictHostKeyChecking=accept-new" git@github.com:JoScHiiT4k4/LoL-Tippspiel.git ~/lol-tippspiel
-   ```
+> Nur falls das Repository wieder privat wird: auf dem Pi mit `ssh-keygen -t ed25519 -N "" -f ~/.ssh/kronenrunde`
+> einen Schlüssel erzeugen, den Inhalt von `~/.ssh/kronenrunde.pub` auf GitHub unter
+> *Settings → Deploy keys → Add deploy key* eintragen (ohne Schreibrecht) und mit
+> `git clone -c core.sshCommand="ssh -i ~/.ssh/kronenrunde" git@github.com:JoScHiiT4k4/kronenrunde.git ~/kronenrunde` holen.
 
 ---
 
@@ -96,7 +85,7 @@ Die App verschickt Mails (z. B. bei „Passwort vergessen“) über ein Gmail-Ko
 Auf dem Pi:
 
 ```
-sudo bash ~/lol-tippspiel/deploy/install.sh
+sudo bash ~/kronenrunde/deploy/install.sh
 ```
 
 Das Skript fragt nach:
@@ -112,7 +101,7 @@ Danach läuft es etwa 5 bis 10 Minuten. Zweimal brauchst du das Handy:
    Danach geht es auf dem Pi von selbst weiter.
 2. Eventuell erscheint ein zweiter Link zum Freischalten von **Funnel**. Öffnen und bestätigen.
 
-Am Ende steht **„Fertig! Deine App: https://lol-tippspiel.….ts.net“**, und du bekommst eine Test-Mail.
+Am Ende steht **„Fertig! Deine App: https://kronenrunde.….ts.net“**, und du bekommst eine Test-Mail.
 
 ---
 
@@ -156,12 +145,28 @@ Der Befehl fragt nach der NFS-Adresse (z. B. `nfs://192.168.1.50/nfs/Sicherung`)
 
 ---
 
+## Umzug vom alten Repository „LoL-Tippspiel“ (einmalig)
+
+Wer die App noch aus dem alten Repository installiert hat, stellt den Pi so auf das neue um (Daten und Einstellungen bleiben):
+
+```
+sudo git -C /opt/lol-tippspiel remote set-url origin https://github.com/JoScHiiT4k4/kronenrunde.git
+sudo git -C /opt/lol-tippspiel config --unset core.sshCommand
+sudo tippspiel update
+sudo tippspiel webhook-einrichten
+```
+
+Der letzte Befehl zeigt Adresse und Geheimnis für den Webhook – im **neuen** Repository unter
+*Settings → Webhooks → Add webhook* eintragen. Den alten Zugangs-Schlüssel braucht der Pi danach nicht mehr.
+Ordner und Dienst heißen auf dem Pi vorerst weiter `lol-tippspiel`.
+
+---
+
 ## Wenn etwas nicht klappt
 
 | Problem | Lösung |
 |---|---|
-| `Permission denied (publickey)` in Schritt 2 | Schlüssel bei GitHub eingetragen? Schritt 2.2 und 2.3 wiederholen. |
 | Test-Mail kommt nicht an | Spam-Ordner prüfen. Sonst `tippspiel einstellungen` → Zeilen `SMTP_USER` und `SMTP_PASSWORD` prüfen, speichern mit Strg+O, Enter, Strg+X. Dann `tippspiel mail-test deine@mail.de` |
 | Seite lädt nicht | `tippspiel status`. Ist der Pi an und im Internet? Beim allerersten Mal kann es bis zu 10 Minuten dauern. |
 | Irgendetwas anderes | `tippspiel protokoll` zeigt die Meldungen der App. Die kannst du mir schicken. |
-| Installation bricht ab | Einfach `sudo bash ~/lol-tippspiel/deploy/install.sh` noch einmal starten. Bereits Erledigtes bleibt erhalten. |
+| Installation bricht ab | Einfach `sudo bash ~/kronenrunde/deploy/install.sh` noch einmal starten. Bereits Erledigtes bleibt erhalten. |
