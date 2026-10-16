@@ -13,6 +13,12 @@ export interface HistoryStep {
   total: number;
   /** Kurzbeschreibung, z. B. "Gen.G vs T1" oder "Sonderfragen". */
   label: string;
+  /** "spiel" (einzelner Tipp) oder "sonderfragen" (gesammelter Schritt); bestimmt, welche der beiden Felder unten gefüllt sind. */
+  kind: 'spiel' | 'sonderfragen';
+  /** Nur bei kind "spiel": Sieger richtig getippt? */
+  correctWinner?: boolean;
+  /** Nur bei kind "spiel": auch das genaue Ergebnis richtig getippt? */
+  exact?: boolean;
 }
 
 /**
@@ -31,14 +37,21 @@ export function pointHistory(o: {
 }): HistoryStep[] {
   const ownPrediction = new Map(o.predictions.filter((p) => p.userId === o.userId).map((p) => [p.matchId, p]));
 
-  const steps: { at: Date; gained: number; label: string }[] = [];
+  const steps: Omit<HistoryStep, 'total'>[] = [];
   for (const match of o.matches) {
     if (!match.scheduledAt) continue;
     const prediction = ownPrediction.get(match.id);
     if (!prediction) continue;
     const score = scorePrediction(prediction, match, o.rules);
     if (score.points === null) continue;
-    steps.push({ at: match.scheduledAt, gained: score.points, label: `${match.teamA ?? '?'} vs ${match.teamB ?? '?'}` });
+    steps.push({
+      at: match.scheduledAt,
+      gained: score.points,
+      label: `${match.teamA ?? '?'} vs ${match.teamB ?? '?'}`,
+      kind: 'spiel',
+      correctWinner: score.correctWinner,
+      exact: score.exact,
+    });
   }
 
   let bonusTotal = 0;
@@ -49,7 +62,7 @@ export function pointHistory(o: {
     const points = bonusPoints(answer.answer, question);
     if (points) bonusTotal += points;
   }
-  if (bonusTotal > 0) steps.push({ at: o.now, gained: bonusTotal, label: 'Sonderfragen' });
+  if (bonusTotal > 0) steps.push({ at: o.now, gained: bonusTotal, label: 'Sonderfragen', kind: 'sonderfragen' });
 
   steps.sort((a, b) => a.at.getTime() - b.at.getTime());
 
@@ -57,5 +70,37 @@ export function pointHistory(o: {
   return steps.map((s) => {
     total += s.gained;
     return { ...s, total };
+  });
+}
+
+/**
+ * Für jeden angegebenen Zeitpunkt: Durchschnittliche Gesamtpunktzahl aller Mitglieder zu diesem
+ * Zeitpunkt (Rundenschnitt) – zum Einzeichnen neben dem eigenen Verlauf, damit sich ablesen lässt,
+ * ob man gerade über oder unter dem Schnitt liegt.
+ */
+export function averageHistoryAt(
+  o: {
+    members: { userId: string }[];
+    matches: Match[];
+    predictions: Prediction[];
+    rules: LeagueRules;
+    bonusQuestions?: BonusQuestion[];
+    bonusAnswers?: BonusAnswer[];
+    now: Date;
+  },
+  timestamps: Date[],
+): number[] {
+  if (o.members.length === 0) return timestamps.map(() => 0);
+  const perMember = o.members.map((m) => pointHistory({ ...o, userId: m.userId }));
+  return timestamps.map((t) => {
+    const sum = perMember.reduce((acc, steps) => {
+      let total = 0;
+      for (const s of steps) {
+        if (s.at.getTime() > t.getTime()) break;
+        total = s.total;
+      }
+      return acc + total;
+    }, 0);
+    return sum / perMember.length;
   });
 }
