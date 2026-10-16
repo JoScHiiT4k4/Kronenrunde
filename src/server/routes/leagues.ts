@@ -2,6 +2,7 @@
 
 import { roundOf, stageLabel } from '../../domain/bracket.ts';
 import { isBonusCorrect } from '../../domain/bonus.ts';
+import { buildIcs } from '../../domain/ics.ts';
 import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
 import { type Shares, winShares } from '../../domain/shares.ts';
@@ -553,6 +554,7 @@ ${
       ? emptyState('Für dieses Turnier sind noch keine Spiele eingetragen.')
       : nothing
 }
+${matches.some((m) => m.team_a && m.team_b && m.scheduled_at) ? html`<p class="muted page-note"><a href="/r/${league.slug}/kalender.ics">Spielplan als Kalender exportieren (.ics)</a></p>` : nothing}
 ${phaseTabs}
 ${
   openDays.length || unscheduled.length
@@ -593,6 +595,27 @@ ${
     : nothing
 }`;
   return htmlResponse(layout(ctx, { title: `Tippen – ${league.name}`, body, league: leagueNav(access, 'tippen') }));
+}
+
+/** Spielplan als .ics-Datei (Kalender-Abo/-Import), ein Termin je Spiel mit bekannten Teams und Termin. */
+async function calendarExport(ctx: Ctx): Promise<Res> {
+  if (!ctx.user) return loginRedirect(ctx);
+  const { league } = await loadLeague(ctx, ctx.params.slug);
+  const { db, config } = ctx.deps;
+  const matches = await leagueMatches(db, league.id);
+  const ics = buildIcs({
+    calendarName: `${league.name} – ${config.appName}`,
+    now: ctx.now,
+    matchUrl: (id) => `${config.appUrl}/r/${league.slug}/spiel/${id}`,
+    matches: matches
+      .filter((m) => m.team_a && m.team_b && m.scheduled_at)
+      .map((m) => ({ id: m.id, teamA: shortA(m), teamB: shortB(m), bestOf: m.best_of, scheduledAt: m.scheduled_at!, stage: m.stage, tournament: m.tournament })),
+  });
+  return {
+    status: 200,
+    headers: { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `attachment; filename="${league.slug}.ics"`, 'cache-control': 'no-store' },
+    body: ics,
+  };
 }
 
 async function saveTips(ctx: Ctx): Promise<Res> {
@@ -1145,6 +1168,7 @@ export function registerLeagueRoutes(router: Router<Ctx>) {
   router.post('/beitreten/:code', join);
   router.get('/r/:slug', async (ctx) => redirect(`/r/${encodeURIComponent(ctx.params.slug)}/tippen`));
   router.get('/r/:slug/tippen', tipsPage);
+  router.get('/r/:slug/kalender.ics', calendarExport);
   router.post('/r/:slug/tippen', saveTips);
   router.get('/r/:slug/spiel/:id', matchPage);
   router.get('/r/:slug/alle-tipps', allTipsPage);
