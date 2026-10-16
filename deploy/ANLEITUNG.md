@@ -140,6 +140,8 @@ Alle Befehle: `tippspiel hilfe`. Eventuell fragt der Pi dabei nach deinem Pi-Pas
 
 Die Datenbank wird jede Nacht gesichert (die letzten 14 Sicherungen bleiben), und Sicherheits-Updates für den Pi laufen automatisch.
 
+Im Administrator-Bereich zeigt der Reiter **Backup**, wann zuletzt gesichert wurde, und hat einen Knopf **Jetzt sichern** für eine Sicherung von Hand.
+
 ### Sicherung zusätzlich auf die MyCloud
 
 Die Sicherungen liegen sonst nur auf der SD-Karte des Pi. Damit sie einen Defekt der Karte überstehen, kann jede nächtliche Sicherung zusätzlich per **NFS** auf einen Speicher im Heimnetz kopiert werden, zum Beispiel auf die WD MyCloud.

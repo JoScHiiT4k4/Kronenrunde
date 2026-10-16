@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -131,6 +131,8 @@ async function postponeTournament(tid: string): Promise<() => Promise<void>> {
 }
 
 const UPDATE_FILE = join(tmpdir(), `tippspiel-update-anfrage-${process.pid}`);
+const BACKUP_FILE = join(tmpdir(), `tippspiel-sicherung-anfrage-${process.pid}`);
+const BACKUP_DIR = join(tmpdir(), `tippspiel-sicherungen-${process.pid}`);
 
 describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht gesetzt' }, () => {
   before(async () => {
@@ -150,6 +152,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       MAIL_MODE: 'memory',
       APP_SECRET: 'test-geheimnis',
       UPDATE_REQUEST_FILE: UPDATE_FILE,
+      BACKUP_REQUEST_FILE: BACKUP_FILE,
+      BACKUP_DIR,
     });
     mailer = createMailer(config);
     const app = createApp({
@@ -1164,6 +1168,43 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.ok(existsSync(UPDATE_FILE));
     assert.match((await admin.get('/admin?bereich=system')).text, /Ein Update ist angefordert/);
     rmSync(UPDATE_FILE, { force: true });
+  });
+
+  test('Administrator: Reiter Backup mit Status, Liste und Knopf für eine Sicherung', async () => {
+    rmSync(BACKUP_FILE, { force: true });
+    rmSync(BACKUP_DIR, { recursive: true, force: true });
+    assert.equal((await new Client().get('/admin?bereich=backup')).status, 303, 'ohne Anmeldung');
+    const empty = await admin.get('/admin?bereich=backup');
+    assert.equal(empty.status, 200);
+    assert.match(empty.text, /<a href="\/admin\?bereich=backup"[^>]*>Backup<\/a>/);
+    assert.match(empty.text, /sys-fact-hot"><span class="muted">Letzte Sicherung<\/span>\s*<strong>noch keine/, 'ohne Sicherung rot');
+    assert.match(empty.text, /Es gibt noch keine Sicherung\./);
+    assert.match(empty.text, /nicht eingerichtet/, 'MyCloud noch nicht eingerichtet');
+
+    // Zwei Sicherungen auf dem Pi (eine vom Update) und eine erfolgreiche MyCloud-Kopie
+    mkdirSync(BACKUP_DIR, { recursive: true });
+    const recent = new Date(Date.now() - 2 * 3_600_000);
+    writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_040000.dump'), 'x'.repeat(2048));
+    writeFileSync(join(BACKUP_DIR, 'tippspiel-2026-10-15_120000-vor-update.dump'), 'y'.repeat(1024));
+    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-16_040000.dump'), recent, recent);
+    utimesSync(join(BACKUP_DIR, 'tippspiel-2026-10-15_120000-vor-update.dump'), new Date(recent.getTime() - 3_600_000), new Date(recent.getTime() - 3_600_000));
+    writeFileSync(join(BACKUP_DIR, '.nas-status'), `ok\t${new Date().toISOString()}\ttippspiel-2026-10-16_040000.dump\n`);
+    const filled = await admin.get('/admin?bereich=backup');
+    assert.match(filled.text, /sys-fact-ok"><span class="muted">Letzte Sicherung/);
+    assert.match(filled.text, /vor 2 Std\./);
+    assert.match(filled.text, /vor einem Update/);
+    assert.match(filled.text, /<strong>2 \(3,0 KB\)<\/strong>|<strong>2 \(3 KB\)<\/strong>/);
+    assert.match(filled.text, /Kopie auf der MyCloud<\/span><strong>in Ordnung/);
+
+    // Knopf: legt nur die Anfrage-Datei ab (die Sicherung selbst macht der Pi), nur mit Formularschutz und nur für den Betreiber
+    assert.ok(!existsSync(BACKUP_FILE));
+    const r = await admin.post('/admin/backup-erstellen');
+    assert.equal(r.status, 303, r.text);
+    assert.match(r.location ?? '', /bereich=backup&hinweis=backup-angefordert/);
+    assert.ok(existsSync(BACKUP_FILE));
+    assert.match((await admin.get('/admin?bereich=backup')).text, /Eine Sicherung ist angefordert/);
+    rmSync(BACKUP_FILE, { force: true });
+    rmSync(BACKUP_DIR, { recursive: true, force: true });
   });
 
   test('Seitenende: Umschalter Spielleiter/Administrator nur für den Betreiber', async () => {

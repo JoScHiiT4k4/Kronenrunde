@@ -9,6 +9,7 @@ import { buildInfo } from '../version.ts';
 /** Kurze Hinweise nach einer Aktion (?hinweis=…). Nur feste Texte – nichts aus der Adresse wird angezeigt. */
 const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   abgemeldet: { text: 'Du bist abgemeldet.', kind: 'ok' },
+  'backup-angefordert': { text: 'Sicherung angefordert. Sie ist in wenigen Sekunden fertig – danach die Seite neu laden.', kind: 'ok' },
   'update-angefordert': { text: 'Update angefordert. In ein bis zwei Minuten ist die neue Version da – danach die Seite neu laden.', kind: 'ok' },
   'benachrichtigung-gespeichert': { text: 'Deine Benachrichtigungen sind gespeichert.', kind: 'ok' },
   'aenderung-angefragt': { text: 'Deine Änderung ist angefragt. Sie gilt, sobald dein Spielleiter sie bestätigt.', kind: 'ok' },

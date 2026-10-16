@@ -947,6 +947,10 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .sub-tabs a { padding: 7px 14px; color: var(--muted); text-decoration: none; border: 1px solid var(--frame); font-weight: 600; }
 .sub-tabs a:hover { color: var(--gold-bright); }
 .sub-tabs a[aria-current] { color: var(--gold-bright); border-color: var(--gold); background: rgb(200 170 110 / 10%); }
+/* Acht Bereiche (Administrator): etwas kompakter, damit sie am PC in einer Zeile bleiben */
+.sub-tabs:has(> a:nth-child(8)) { gap: 4px; }
+.sub-tabs:has(> a:nth-child(8)) a { padding: 7px 8px; font-size: 0.9rem; }
+@media (min-width: 641px) and (max-width: 700px) { .sub-tabs:has(> a:nth-child(8)) a { padding: 7px 5px; font-size: 0.85rem; } }
 
 /* Gewinnchance aus den Tipps */
 .pct-a { text-align: right; }

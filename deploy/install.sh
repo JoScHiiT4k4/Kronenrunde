@@ -395,9 +395,34 @@ Unit=$SERVICE-update-jetzt.service
 WantedBy=multi-user.target
 EOF
 
+# Sicherung sofort: wie beim Update legt der Administrator eine Anfrage-Datei ab, systemd startet daraufhin die Sicherung (als root)
+cat >/etc/systemd/system/$SERVICE-sicherung-jetzt.service <<EOF
+[Unit]
+Description=LoL-Tippspiel: Sicherung sofort (im Administrator-Bereich angefordert)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+Environment=HOME=/root
+ExecStartPre=/bin/rm -f /run/$SERVICE/sicherung-anfrage
+ExecStart=/usr/local/bin/tippspiel sicherung
+EOF
+
+cat >/etc/systemd/system/$SERVICE-sicherung-jetzt.path <<EOF
+[Unit]
+Description=LoL-Tippspiel: wartet auf die Sicherungs-Anfrage aus dem Administrator-Bereich
+
+[Path]
+PathExists=/run/$SERVICE/sicherung-anfrage
+Unit=$SERVICE-sicherung-jetzt.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 run systemctl daemon-reload
-run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path"
-run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path"
+run systemctl enable "$SERVICE.service" "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
+run systemctl start "$SERVICE-sicherung.timer" "$SERVICE-update.timer" "$SERVICE-update-jetzt.path" "$SERVICE-sicherung-jetzt.path"
 run systemctl restart "$SERVICE.service"
 if ! wait_healthy "http://127.0.0.1:$PORT/gesund"; then
   journalctl -u "$SERVICE" -n 20 --no-pager >&2 || true
