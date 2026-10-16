@@ -469,6 +469,13 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const beforeLock = (m: MatchRow) => m.status !== 'finished' && (lockTime(toDomainMatch(m), league.lock_mode)?.getTime() ?? 0) > ctx.now.getTime();
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const isDone = (m: MatchRow) => m.status === 'finished' || m.status === 'cancelled';
+  // Am aktuellen (noch offenen) Spieltag: das Laufende/als Nächstes Kommende immer oben, bereits
+  // gespielte Begegnungen darunter, neueste zuerst. Vergangene Spieltage bleiben unangetastet.
+  const orderCurrentDay = (ms: MatchRow[]): MatchRow[] => [
+    ...ms.filter((m) => !isDone(m)).sort((a, b) => time(a) - time(b)),
+    ...ms.filter(isDone).sort((a, b) => time(b) - time(a)),
+  ];
 
   // Phasen (Play-In, Swiss, …) in zeitlicher Reihenfolge; angezeigt wird immer eine davon
   const phases: { slug: string; name: string; first: number; matches: MatchRow[]; missing: number }[] = [];
@@ -566,7 +573,7 @@ ${
     (d) => html`<section class="day">
     ${dayHeader(d, false)}
     ${tournamentNames ? html`<p class="muted">${tournamentNames.get(d.matches[0].tournament_id)}</p>` : nothing}
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), sharesOf(m), tippedOf(m), foldOf(m)))}
+    ${orderCurrentDay(d.matches).map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), sharesOf(m), tippedOf(m), foldOf(m)))}
   </section>`,
   )}
   ${unscheduled.map(
