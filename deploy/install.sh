@@ -276,7 +276,7 @@ runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -d "$DB_NAME" \
 ok "Datenbank '$DB_NAME' bereit"
 
 # --- 5. Dienst und tägliche Sicherung ------------------------------------------
-install -d -m 700 "$BACKUP_DIR"
+install -d -m 750 -o root -g "$SERVICE_USER" "$BACKUP_DIR"
 cat >/etc/systemd/system/$SERVICE.service <<EOF
 [Unit]
 Description=LoL-Tippspiel

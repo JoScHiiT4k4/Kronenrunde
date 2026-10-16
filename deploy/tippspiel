@@ -11,6 +11,13 @@ DB_NAME=tippspiel
 BACKUP_DIR=/var/backups/lol-tippspiel
 KEEP_BACKUPS=14        # nächtliche Sicherungen
 KEEP_EXTRA_BACKUPS=10  # Sicherungen vor Updates, Datenimporten usw.
+KEEP_NAS=30            # Kopien auf dem Heimnetz-Speicher (MyCloud)
+CONF_DIR=/etc/lol-tippspiel
+NAS_CONF=$CONF_DIR/nas.conf   # Adresse, Freigabe, Ordner (nur root)
+NAS_CRED=$CONF_DIR/nas.cred   # Benutzername und Passwort (nur root)
+NAS_MOUNT=/mnt/nas-sicherung
+NAS_HOST='' NAS_SHARE='' NAS_DIR=lol-tippspiel   # werden aus $NAS_CONF überschrieben
+NAS_STATUS=$BACKUP_DIR/.nas-status
 
 # Alles in main(): Bash liest so das ganze Skript vorab ein – wichtig, weil "update" diese Datei ersetzt.
 
@@ -49,7 +56,8 @@ cli() {
 
 backup() {
   local label=${1:-} file
-  install -d -m 700 "$BACKUP_DIR"
+  # Inhalt nur für root; die App (Gruppe) darf die Dateiliste sehen, um die Sicherungen auf der Server-Seite zu zeigen
+  install -d -m 750 -o root -g "$SERVICE_USER" "$BACKUP_DIR"
   file="$BACKUP_DIR/tippspiel-$(date +%Y-%m-%d_%H%M%S)${label:+-$label}.dump"
   runuser -u postgres -- pg_dump --format=custom "$DB_NAME" >"$file.tmp" || { rm -f "$file.tmp"; die "Sicherung fehlgeschlagen."; }
   mv "$file.tmp" "$file"
@@ -61,6 +69,58 @@ backup() {
   find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*-vor-*.dump' -printf '%T@ %p\n' | sort -rn |
     tail -n +$((KEEP_EXTRA_BACKUPS + 1)) | cut -d' ' -f2- | xargs -r rm -f
   ok "Gesichert: $file ($(du -h "$file" | cut -f1))"
+  # Nächtliche und von Hand gemachte Sicherungen zusätzlich auf den Heimnetz-Speicher kopieren (nie mit Fehler beenden)
+  if [[ -z $label ]]; then nas_copy "$file" || true; fi
+}
+
+# ---- Kopie auf den Heimnetz-Speicher (z. B. WD MyCloud) per SMB/Windows-Freigabe ----
+
+nas_status() { # <ok|fehler> <Text>
+  install -d -m 750 -o root -g "$SERVICE_USER" "$BACKUP_DIR"
+  printf '%s\t%s\t%s\n' "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$2" >"$NAS_STATUS"
+  chown root:"$SERVICE_USER" "$NAS_STATUS"
+  chmod 640 "$NAS_STATUS"
+}
+
+# Freigabe einhängen; ältere Geräte können nur ältere SMB-Versionen, deshalb der Reihe nach probieren
+nas_mount() {
+  [[ -f $NAS_CONF && -f $NAS_CRED ]] || return 1
+  # shellcheck disable=SC1090
+  . "$NAS_CONF"
+  mkdir -p "$NAS_MOUNT"
+  mountpoint -q "$NAS_MOUNT" && return 0
+  local v
+  for v in 3.0 2.1 2.0 1.0; do
+    if mount -t cifs "//$NAS_HOST/$NAS_SHARE" "$NAS_MOUNT" -o "credentials=$NAS_CRED,vers=$v,iocharset=utf8,file_mode=0600,dir_mode=0700" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+nas_umount() { mountpoint -q "$NAS_MOUNT" && umount "$NAS_MOUNT" 2>/dev/null || true; }
+
+nas_copy() { # <Sicherungsdatei>
+  [[ -f $NAS_CONF ]] || return 0
+  local file=$1
+  if ! nas_mount; then
+    nas_status fehler "MyCloud nicht erreichbar oder Zugangsdaten falsch"
+    warn "MyCloud nicht erreichbar – die Sicherung liegt nur auf dem Pi (Einrichtung prüfen: tippspiel nas-test)."
+    return 1
+  fi
+  local dir="$NAS_MOUNT/$NAS_DIR"
+  if mkdir -p "$dir" && cp "$file" "$dir/" && sync; then
+    # Nur die neuesten Kopien behalten
+    find "$dir" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP_NAS + 1)) | cut -d' ' -f2- | xargs -r rm -f
+    nas_status ok "$(basename "$file")"
+    ok "Kopie auf der MyCloud: $NAS_HOST/$NAS_SHARE/$NAS_DIR"
+  else
+    nas_status fehler "Kopieren auf die MyCloud fehlgeschlagen (Platz oder Rechte?)"
+    warn "Kopieren auf die MyCloud fehlgeschlagen."
+    nas_umount
+    return 1
+  fi
+  nas_umount
 }
 
 restart() {
@@ -80,6 +140,7 @@ case "${1:-hilfe}" in
     echo "  E-Mail:     $(get_env MAIL_MODE) $(get_env SMTP_USER)"
     last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
     echo "  Sicherung:  ${last:-noch keine}"
+    if [[ -f $NAS_STATUS ]]; then echo "  MyCloud:    $(cut -f1,2 "$NAS_STATUS" | tr '\t' ' ')"; fi
     if systemctl is-enabled --quiet "$SERVICE-update.timer" 2>/dev/null; then
       echo "  Updates:    automatisch alle 15 Minuten (nur geprüfte Versionen)"
     else
@@ -166,6 +227,40 @@ case "${1:-hilfe}" in
     restart
     ;;
 
+  nas-einrichten)
+    # Sicherungen zusätzlich auf die MyCloud (oder einen anderen Netzwerkspeicher mit Windows-Freigabe) kopieren
+    command -v mount.cifs >/dev/null 2>&1 || { echo "Installiere das Programm für Windows-Freigaben (cifs-utils) …"; apt-get install -y cifs-utils >/dev/null || die "cifs-utils konnte nicht installiert werden."; }
+    echo "Angaben zu deiner MyCloud (Antworten mit Enter bestätigen):"
+    read -r -p "  Adresse (z. B. 192.168.1.50 oder wdmycloud): " host
+    read -r -p "  Name der Freigabe (z. B. Public oder ein eigener Ordner der MyCloud): " share
+    read -r -p "  Unterordner für die Sicherungen [lol-tippspiel]: " sub
+    read -r -p "  Benutzername auf der MyCloud: " nuser
+    read -r -s -p "  Passwort: " npass; echo
+    [[ -n $host && -n $share && -n $nuser ]] || die "Adresse, Freigabe und Benutzername werden gebraucht."
+    install -d -m 700 "$CONF_DIR"
+    printf 'NAS_HOST=%q\nNAS_SHARE=%q\nNAS_DIR=%q\n' "$host" "$share" "${sub:-lol-tippspiel}" >"$NAS_CONF"
+    printf 'username=%s\npassword=%s\n' "$nuser" "$npass" >"$NAS_CRED"
+    chmod 600 "$NAS_CONF" "$NAS_CRED"
+    nas_umount
+    last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+    [[ -n $last ]] || { backup; exit; }
+    nas_copy "$last" && ok "Eingerichtet. Ab jetzt wird jede nächtliche Sicherung auch auf die MyCloud kopiert." ||
+      die "Das Kopieren klappt noch nicht. Adresse, Freigabe, Benutzername und Passwort prüfen und den Befehl wiederholen."
+    ;;
+
+  nas-test)
+    [[ -f $NAS_CONF ]] || die "Noch nicht eingerichtet:  tippspiel nas-einrichten"
+    last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+    [[ -n $last ]] || die "Es gibt noch keine Sicherung:  tippspiel sicherung"
+    nas_copy "$last" || die "Das Kopieren klappt nicht."
+    ;;
+
+  nas-entfernen)
+    rm -f "$NAS_CONF" "$NAS_CRED" "$NAS_STATUS"
+    nas_umount
+    ok "Die Kopie auf die MyCloud ist ausgeschaltet. Vorhandene Kopien dort bleiben liegen."
+    ;;
+
   einstellungen | settings)
     cp -p "$ENV_FILE" "$ENV_FILE.vorher"
     # shellcheck disable=SC2086  # EDITOR darf Optionen enthalten
@@ -239,6 +334,9 @@ LoL-Tippspiel – Befehle:
   tippspiel login-link <E-Mail>     Link zum Passwort-Festlegen erzeugen, ohne Mail (falls der Versand mal klemmt)
   tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
   tippspiel sicherungen             Vorhandene Sicherungen anzeigen
+  tippspiel nas-einrichten          Sicherungen zusätzlich auf die MyCloud kopieren (fragt Adresse, Freigabe, Zugang)
+  tippspiel nas-test                Kopie der neuesten Sicherung auf die MyCloud jetzt versuchen
+  tippspiel nas-entfernen           Kopie auf die MyCloud wieder ausschalten
   tippspiel wiederherstellen <Datei>  Daten aus einer Sicherung zurückholen
   tippspiel adresse                 Internet-Adresse der App anzeigen
 EOF
