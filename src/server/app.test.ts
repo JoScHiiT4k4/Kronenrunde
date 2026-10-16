@@ -499,7 +499,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const block = (id: string) => all.text.slice(all.text.indexOf(`id="tipps-${id}"`)).split('</article>')[0];
     const rowsOf = (id: string) => [...block(id).matchAll(/<tr( class="me")?>\s*<td>([^<]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td class="num( hit)?">(\d*)<\/td>/g)].map((r) => [r[2], r[3], r[5], !!r[1]]);
     assert.deepEqual(rowsOf(match['GEN-T1']), [['Anna', 'GEN 3:1', '2', false], ['Ben', 'T1 3:2', '0', true]]);
-    assert.deepEqual(rowsOf(match['G2-KC']), [['Anna', 'KC 2:0', '1', false], ['Ben', 'KC 2:1', '2', true]]);
+    assert.deepEqual(rowsOf(match['G2-KC']), [['Ben', 'KC 2:1', '2', true], ['Anna', 'KC 2:0', '1', false]]); // nach Punkten absteigend
   });
 
   test('Kopfzeile: Countdown vor dem Start, danach Livestream-Links', async () => {

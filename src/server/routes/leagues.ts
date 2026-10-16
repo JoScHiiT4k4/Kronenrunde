@@ -67,6 +67,11 @@ function pointsBadge(points: number | null, exact = false): Html {
   return html`<span class="pts${points > 0 ? ' pts-hit' : ''}${exact ? ' pts-exact' : ''}">+${points}</span>`;
 }
 
+/** Tipp-Tabellen: meiste Punkte zuerst, dann ohne Tipp ans Ende; bei Gleichstand nach Name (Reihenfolge der Mitglieder bleibt erhalten). */
+function byPointsDesc(a: { points: number | null }, b: { points: number | null }): number {
+  return (b.points ?? -1) - (a.points ?? -1);
+}
+
 function leagueNav(access: { league: League; canManage: boolean }, active: 'tippen' | 'alle-tipps' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel') {
   return { slug: access.league.slug, name: access.league.name, canManage: access.canManage, active };
 }
@@ -438,7 +443,8 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
       <tbody>
       ${members.map((u) => {
         const p = byUser.get(u.user_id);
-        const points = p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)).points : null;
+        return { u, p, points: p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)).points : null };
+      }).sort(byPointsDesc).map(({ u, p, points }) => {
         return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
           <td>${u.display_name}</td>
           <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
@@ -772,8 +778,8 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
     <tbody>
     ${members.map((u) => {
       const p = own.get(u.user_id);
-      const score = p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)) : null;
-      const points = score?.points ?? null;
+      return { u, p, points: p ? scorePrediction(toDomainPrediction(p), match, rulesOf(league)).points : null };
+    }).sort(byPointsDesc).map(({ u, p, points }) => {
       return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
         <td>${u.display_name}</td>
         <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
