@@ -1012,6 +1012,11 @@ a.rank-box:hover .rank-more { color: var(--gold-bright); }
 .sys-hot .sys-pct { color: #ff6b6b; }
 .sys-detail { margin-top: 8px; font-size: 0.92rem; }
 .sys-note { margin-top: 2px; font-size: 0.8rem; color: var(--muted); }
+.sys-hot { border-color: #ff6b6b; background: rgb(255 107 107 / 8%); }
+.sys-alert { margin-top: 6px; font-size: 0.85rem; font-weight: 700; color: #ff6b6b; }
+.sys-facts small { font-size: 0.78rem; }
+.sys-fact-hot strong { color: #ff6b6b; }
+.sys-fact-warm strong { color: #f0b429; }
 .sys-facts { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 4px 0 8px; }
 .sys-facts div { display: flex; flex-direction: column; }
 .sys-facts strong { font-size: 1.1rem; }
