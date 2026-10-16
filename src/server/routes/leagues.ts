@@ -470,12 +470,14 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
   const isDone = (m: MatchRow) => m.status === 'finished' || m.status === 'cancelled';
-  // Am aktuellen (noch offenen) Spieltag: das Laufende/als Nächstes Kommende immer oben, bereits
-  // gespielte Begegnungen darunter, neueste zuerst. Vergangene Spieltage bleiben unangetastet.
-  const orderCurrentDay = (ms: MatchRow[]): MatchRow[] => [
-    ...ms.filter((m) => !isDone(m)).sort((a, b) => time(a) - time(b)),
-    ...ms.filter(isDone).sort((a, b) => time(b) - time(a)),
-  ];
+  // Am aktuellen Spieltag (noch nicht jedes Spiel vorbei – auch wenn der Tippschluss, z. B. bei
+  // "automatisch", schon für alle verstrichen ist): das Laufende/als Nächstes Kommende immer oben,
+  // bereits gespielte Begegnungen darunter, neueste zuerst. Ein Spieltag, an dem schon alles vorbei
+  // ist, bleibt unangetastet (chronologisch wie bisher).
+  const orderCurrentDay = (ms: MatchRow[]): MatchRow[] =>
+    ms.some((m) => !isDone(m))
+      ? [...ms.filter((m) => !isDone(m)).sort((a, b) => time(a) - time(b)), ...ms.filter(isDone).sort((a, b) => time(b) - time(a))]
+      : ms;
 
   // Phasen (Play-In, Swiss, …) in zeitlicher Reihenfolge; angezeigt wird immer eine davon
   const phases: { slug: string; name: string; first: number; matches: MatchRow[]; missing: number }[] = [];
@@ -597,7 +599,7 @@ ${
   ${closedDays.map(
     (d, i) => html`<details class="day day-closed"${attr(i === 0, 'open')}>
     <summary><span>${d.start ? formatDayLong(d.start, tz) : ''}</span></summary>
-    ${d.matches.map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m), foldOf(m)))}
+    ${orderCurrentDay(d.matches).map((m) => matchCard(ctx, league, m, own.get(m.id), false, sharesOf(m), tippedOf(m), foldOf(m)))}
   </details>`,
   )}`
     : nothing
