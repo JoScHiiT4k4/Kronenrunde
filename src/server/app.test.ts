@@ -781,6 +781,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const rank = await ben.get(`/r/${slug}/rangliste`);
     assert.match(rank.text, new RegExp(`href="/r/${slug}/spieler/${annaId}"`));
     const prof = await ben.get(`/r/${slug}/spieler/${annaId}`);
+    assert.match(prof.text, /<h2>Abzeichen <span class="progress">\d+ von 8<\/span><\/h2>/);
+    assert.equal((prof.text.match(/class="badge-card badge-l\d"/g) ?? []).length, 8, "alle acht Abzeichen");
+    assert.match(prof.text, /<svg class="badge-icon badge-l\d"/);
     assert.equal(prof.status, 200);
     assert.match(prof.text, /Anna-Lena/);
     assert.match(prof.text, /Platz in der Rangliste/);

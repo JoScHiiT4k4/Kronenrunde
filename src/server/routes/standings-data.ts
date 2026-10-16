@@ -2,6 +2,7 @@
 
 import { possiblePoints } from '../../domain/possible.ts';
 import { type StandingRow, computeStandings } from '../../domain/scoring.ts';
+import type { BonusAnswer, BonusQuestion, LeagueRules, Match, Member, Prediction } from '../../domain/types.ts';
 import { matchResult } from '../../domain/results.ts';
 import type { Queryable } from '../db/index.ts';
 import { type League, leagueMatches, type PredictionRow, rulesOf, toDomainMatch, toDomainPrediction } from './league-data.ts';
@@ -13,6 +14,8 @@ export interface StandingsData {
   /** Bisher überhaupt mögliche Punkte (gewertete Spiele + Sonderfragen mit Lösung) */
   possible: number;
   hasBonus: boolean;
+  /** Rohdaten der Berechnung (z. B. für die Abzeichen im Profil) */
+  raw: { members: Member[]; matches: Match[]; predictions: Prediction[]; rules: LeagueRules; bonusQuestions: BonusQuestion[]; bonusAnswers: BonusAnswer[] };
 }
 
 export async function loadStandings(db: Queryable, league: Pick<League, 'id' | 'points_winner' | 'points_exact' | 'lock_mode'>): Promise<StandingsData> {
@@ -34,19 +37,21 @@ export async function loadStandings(db: Queryable, league: Pick<League, 'id' | '
   const domainMatches = matches.map(toDomainMatch);
   const rules = rulesOf(league as League);
   const bonusQuestions = questions.map((q) => ({ id: q.id, points: q.points, correctAnswers: q.correct_answers }));
-  const rows = computeStandings({
+  const raw = {
     members: members.map((m) => ({ userId: m.user_id, displayName: m.display_name })),
     matches: domainMatches,
     predictions: preds.map(toDomainPrediction),
     rules,
     bonusQuestions,
     bonusAnswers: answers.map((a) => ({ questionId: a.question_id, userId: a.user_id, answer: a.answer })),
-  });
+  };
+  const rows = computeStandings(raw);
   return {
     rows,
     avatarOf: new Map(members.map((m) => [m.user_id, m.avatar_updated_at])),
     finished: domainMatches.filter((m) => matchResult(m)).length,
     possible: possiblePoints(domainMatches, rules, bonusQuestions),
     hasBonus: questions.some((q) => q.correct_answers.length > 0),
+    raw,
   };
 }
