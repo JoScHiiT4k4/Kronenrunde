@@ -124,9 +124,15 @@ jobs:
       - name: Update auf eine neue Version
         run: |
           cd /tmp/quelle
-          echo "<!-- Test -->" >> README.md
-          git -c user.name=Test -c user.email=test@example.org commit -qam "Test: neue Version"
-          docker exec pi tippspiel update
+          # Viele neue Commits (wie beim Umzug auf ein neues Repository): die Liste der Neuerungen
+          # darf das Update nicht abbrechen (früher: "git log | head" + pipefail = stiller Abbruch)
+          lang=$(printf 'Beschreibung %.0s' $(seq 10))
+          for i in $(seq 80); do
+            echo "<!-- Test $i -->" >> README.md
+            git -c user.name=Test -c user.email=test@example.org commit -qam "Test: neue Version $i – $lang"
+          done
+          docker exec pi tippspiel update | tee /tmp/update
+          grep -q 'Update fertig' /tmp/update
           test "$(docker exec pi git -C /opt/lol-tippspiel rev-parse HEAD)" = "$(git rev-parse HEAD)"
           docker exec pi curl -fsS http://127.0.0.1:3001/gesund
 
