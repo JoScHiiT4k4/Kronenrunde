@@ -897,11 +897,10 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .who { display: flex; align-items: center; gap: 10px; }
 .avatar-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 12px 0 18px; }
 .avatar-edit > .stack { flex: 1 1 220px; }
-/* Online-Anzeige: grüner/roter Punkt, als Abzeichen am Profilbild und als Text im Spielerprofil */
+/* Online-Anzeige: grüner/roter Punkt, als Abzeichen am Profilbild (Rangliste/Seitenleiste) und als Text im Spielerprofil */
 .avatar-wrap { position: relative; display: inline-flex; flex: none; }
 .presence-dot { position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--surface); background: var(--red); }
 .presence-dot.presence-on { background: var(--ok); }
-.avatar-lg + .presence-dot { width: 16px; height: 16px; border-width: 3px; }
 .profile-presence { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--muted); font-size: 0.92rem; }
 .profile-presence .presence-dot { position: static; border: none; width: 9px; height: 9px; }
 /* Umschalter Spielleiter / Administrator (nur Betreiber) */
@@ -1145,6 +1144,7 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 /* Profil eines Mitspielers */
 .profile-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .profile-head h1 { margin: 0 0 4px; }
+.profile-rank { color: var(--muted); font-weight: 400; font-size: 0.65em; white-space: nowrap; }
 .profile-head p { margin: 0; }
 .profile-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; }
 .who-link { color: inherit; text-decoration: none; }

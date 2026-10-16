@@ -828,7 +828,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(prof.text, /<svg class="badge-icon badge-l\d"/);
     assert.equal(prof.status, 200);
     assert.match(prof.text, /Anna-Lena/);
-    assert.match(prof.text, /Platz in der Rangliste/);
+    assert.match(prof.text, /class="profile-rank">\(\d+\. Platz\)<\/span>/);
     assert.match(prof.text, /Sonderfragen/);
     assert.equal((await stranger.get(`/r/${slug}/spieler/${annaId}`)).status, 404, 'Fremde ohne Mitgliedschaft');
     assert.equal((await new Client().get(`/r/${slug}/spieler/${annaId}`)).status, 303, 'ohne Anmeldung');
@@ -887,7 +887,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await db.run(`update users set first_name = 'Ben' where email = 'ben@example.de'`);
     const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
     const benProfile = (await anna.get(`/r/${slug}/spieler/${benId}`)).text;
-    assert.match(benProfile, /<h1>Ben<\/h1>\s*<p class="muted">Mitglied in /);
+    assert.match(benProfile, /<h1>Ben <span class="profile-rank">\(\d+\. Platz\)<\/span><\/h1>\s*<p class="muted">Mitglied in /);
 
     const empty = JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text);
     assert.deepEqual(empty.messages, []);
