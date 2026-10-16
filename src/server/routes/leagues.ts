@@ -554,7 +554,6 @@ ${
       ? emptyState('Für dieses Turnier sind noch keine Spiele eingetragen.')
       : nothing
 }
-${matches.some((m) => m.team_a && m.team_b && m.scheduled_at) ? html`<p class="muted page-note"><a href="/r/${league.slug}/kalender.ics">Spielplan als Kalender exportieren (.ics)</a></p>` : nothing}
 ${phaseTabs}
 ${
   openDays.length || unscheduled.length

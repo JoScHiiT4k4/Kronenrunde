@@ -574,6 +574,10 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     const row = await db.one<{ avatar_updated_at: Date | null; first_name: string | null }>('select avatar_updated_at, first_name from users where id = $1', [user.id]);
     const pending = await db.one<{ new_display_name: string; new_first_name: string }>(`select new_display_name, new_first_name from name_requests where user_id = $1 and status = 'pending'`, [user.id]);
     const lastDecision = await db.one<{ status: string }>(`select status from name_requests where user_id = $1 and status <> 'pending' and decided_at > now() - interval '14 days' order by decided_at desc limit 1`, [user.id]);
+    const myLeagues = await db.query<{ slug: string; name: string }>(
+      `select l.slug, l.name from league_members m join leagues l on l.id = m.league_id where m.user_id = $1 order by m.joined_at`,
+      [user.id],
+    );
     content = html`<section class="panel">
   <h2>Profilbild</h2>
   <div class="avatar-edit">
@@ -633,6 +637,17 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string): Promise<R
     </label>
     <button type="submit" class="btn">Vornamen speichern</button>
   </form>`
+  }
+</section>
+<section class="panel">
+  <h2>Kalender-Export</h2>
+  ${
+    myLeagues.length
+      ? html`<p class="muted">Spielplan einer Tipprunde als .ics-Datei – zum Importieren oder Abonnieren in Google/Apple Kalender & Co.</p>
+  <ul class="league-list">
+    ${myLeagues.map((l) => html`<li><a href="/r/${l.slug}/kalender.ics"><span class="league-list-name">${l.name}</span><span class="muted">.ics herunterladen</span></a></li>`)}
+  </ul>`
+      : html`<p class="muted">Du bist noch in keiner Tipprunde.</p>`
   }
 </section>`;
   } else if (area === 'benachrichtigungen') {
