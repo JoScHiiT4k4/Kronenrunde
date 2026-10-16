@@ -332,20 +332,23 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
   </div>
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
   // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind
-  const pct = (mine: number | undefined, other: number | undefined) =>
+  const pct = (mine: number | undefined, other: number | undefined, side: 'a' | 'b') =>
     shares && mine !== undefined && other !== undefined
-      ? html` <span class="pct ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">(${mine} %)</span>`
+      ? html`<span class="pct pct-${side} ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">${mine} %</span>`
       : nothing;
   // Gewonnene Spiele je Team – mit Spoilerschutz: erst nach einem Klick sichtbar
   const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
   const wins = (n: number | null, cls: string, team: string) =>
     html`<button type="button" class="wins ${cls}" data-spoiler data-team="${team}" aria-label="Ergebnis anzeigen">${n}</button>`;
-  const teams = html`<div class="teams${hasScore ? ' has-score' : ''}">
-    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}${pct(shares?.a, shares?.b)}</span>
-    ${hasScore ? wins(m.wins_a, 'wins-a', shortA(m)) : nothing}
-    <span class="vs">VS</span>
-    ${hasScore ? wins(m.wins_b, 'wins-b', shortB(m)) : nothing}
-    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}${pct(shares?.b, shares?.a)}</span>
+  // Innen, rund um das „VS“: Gewinnchance, gewonnene Spiele
+  const teams = html`<div class="teams">
+    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}</span>
+    <span class="mid">
+      ${pct(shares?.a, shares?.b, 'a')}${hasScore ? wins(m.wins_a, 'wins-a', shortA(m)) : nothing}
+      <span class="vs">VS</span>
+      ${hasScore ? wins(m.wins_b, 'wins-b', shortB(m)) : nothing}${pct(shares?.b, shares?.a, 'b')}
+    </span>
+    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}</span>
   </div>`;
 
   if (open && teamsKnown) {
