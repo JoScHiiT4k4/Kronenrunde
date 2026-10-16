@@ -22,6 +22,42 @@ export interface SystemInfo {
   uptimeSeconds: number | null;
   backupBytes: number | null;
   backupCount: number;
+  /** Zeitpunkt der neuesten Sicherung */
+  backupNewest: Date | null;
+}
+
+export type Level = 'ok' | 'warm' | 'hot';
+
+/** Schwellwerte: ab "warm" gelb, ab "hot" rot. Gewählt für einen Raspberry Pi mit SD-Karte. */
+export const LIMITS = {
+  /** Speicherplatz in %: bei voller Karte stehen Datenbank und Sicherungen still */
+  disk: { warm: 70, hot: 85 },
+  /** Arbeitsspeicher in % (verfügbarer Speicher zählt als frei) */
+  memory: { warm: 75, hot: 90 },
+  /** Auslagerung in %: der Pi lagert auf die SD-Karte aus, das bremst und verschleißt sie */
+  swap: { warm: 30, hot: 60 },
+  /** Prozessor-Last in % aller Kerne (1 Minute) */
+  cpu: { warm: 70, hot: 100 },
+  /** Grad Celsius: ab 80 °C drosselt der Pi sich selbst */
+  temperature: { warm: 65, hot: 75 },
+  /** Sicherung älter als (Stunden): nächtlich gesichert, ein Tag Verspätung ist noch ok */
+  backupAgeHours: { warm: 30, hot: 50 },
+} as const;
+
+export function levelOf(value: number, limit: { warm: number; hot: number }): Level {
+  return value >= limit.hot ? 'hot' : value >= limit.warm ? 'warm' : 'ok';
+}
+
+/** Rot, wenn es keine Sicherung gibt oder die neueste zu alt ist. */
+export function backupLevel(count: number, newest: Date | null, now: Date): Level {
+  if (count === 0 || !newest) return 'hot';
+  return levelOf((now.getTime() - newest.getTime()) / 3_600_000, LIMITS.backupAgeHours);
+}
+
+/** Rot, wenn der freie Platz nicht mehr für drei Kopien der Datenbank reicht (Sicherungen, Wartung), gelb unter sechs. */
+export function databaseLevel(dbBytes: number, freeBytes: number | null): Level {
+  if (freeBytes === null || dbBytes <= 0) return 'ok';
+  return freeBytes < dbBytes * 3 ? 'hot' : freeBytes < dbBytes * 6 ? 'warm' : 'ok';
 }
 
 /** /proc/meminfo → Arbeitsspeicher und Auslagerung in Byte ("verfügbar" statt "frei": Cache zählt nicht als belegt). */
@@ -79,12 +115,13 @@ const read = (path: string): string | null => {
   }
 };
 
-function backupSize(dir: string): { bytes: number | null; count: number } {
+function backupSize(dir: string): { bytes: number | null; count: number; newest: Date | null } {
   try {
-    const files = readdirSync(dir).filter((f) => f.endsWith('.dump'));
-    return { bytes: files.reduce((sum, f) => sum + statSync(join(dir, f)).size, 0), count: files.length };
+    const stats = readdirSync(dir).filter((f) => f.endsWith('.dump')).map((f) => statSync(join(dir, f)));
+    const newest = stats.reduce((max, st) => Math.max(max, st.mtimeMs), 0);
+    return { bytes: stats.reduce((sum, st) => sum + st.size, 0), count: stats.length, newest: newest ? new Date(newest) : null };
   } catch {
-    return { bytes: null, count: 0 };
+    return { bytes: null, count: 0, newest: null };
   }
 }
 
@@ -112,5 +149,6 @@ export function readSystemInfo(backupDir = '/var/backups/lol-tippspiel'): System
     uptimeSeconds: up ? Number(up.split(' ')[0]) : null,
     backupBytes: b.bytes,
     backupCount: b.count,
+    backupNewest: b.newest,
   };
 }

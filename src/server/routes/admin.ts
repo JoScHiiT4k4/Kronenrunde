@@ -5,7 +5,7 @@ import { stageLabel } from '../../domain/bracket.ts';
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
 import { existsSync, writeFileSync } from 'node:fs';
-import { formatBytes, formatUptime, percent, readSystemInfo } from '../system-info.ts';
+import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, percent, readSystemInfo } from '../system-info.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
 import { clearChat } from './chat.ts';
 import { hideTestLeague, loadTestState, showTestLeague, syncTestLeague } from '../testspiel.ts';
@@ -113,19 +113,20 @@ function legalForm(ctx: Ctx, area: AdminArea, keys: LegalKey[], legal: Record<Le
 </section>`;
 }
 
-/** Farbe nach Belegung: grün bis 70 %, gelb bis 90 %, darüber rot */
-const level = (p: number) => (p >= 90 ? 'hot' : p >= 70 ? 'warm' : 'ok');
-
-function gauge(label: string, p: number, detail: string, note?: string): Html {
-  return html`<div class="sys-card sys-${level(p)}">
+/** Anzeige mit Balken; die Farbe (grün/gelb/rot) kommt aus den Schwellwerten in system-info.ts. */
+function gauge(label: string, p: number, lvl: Level, detail: string, note?: string): Html {
+  return html`<div class="sys-card sys-${lvl}">
     <div class="sys-head"><span class="sys-label">${label}</span><span class="sys-pct">${p} %</span></div>
     <svg class="sys-bar" viewBox="0 0 100 10" preserveAspectRatio="none" role="img" aria-label="${label}: ${p} Prozent belegt">
       <rect class="sys-track" x="0" y="0" width="100" height="10"/><rect class="sys-fill" x="0" y="0" width="${p}" height="10"/>
     </svg>
     <div class="sys-detail">${detail}</div>
     ${note ? html`<div class="sys-note">${note}</div>` : nothing}
+    ${lvl === 'hot' ? html`<div class="sys-alert">Achtung: Schwellwert erreicht</div>` : nothing}
   </div>`;
 }
+
+const worst = (a: Level, b: Level): Level => (a === 'hot' || b === 'hot' ? 'hot' : a === 'warm' || b === 'warm' ? 'warm' : 'ok');
 
 async function systemPanel(ctx: Ctx): Promise<Html> {
   const { db } = ctx.deps;
@@ -169,15 +170,16 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
   <h2>Server</h2>
   <p class="muted">So ausgelastet ist der Raspberry Pi gerade. Die Seite zeigt den Stand beim Laden – zum Aktualisieren neu laden.</p>
   <div class="sys-grid">
-    ${sys.disk ? gauge('Speicherplatz', percent(sys.disk), `${formatBytes(sys.disk.used)} von ${formatBytes(sys.disk.total)} belegt – ${formatBytes(sys.disk.total - sys.disk.used)} frei`) : nothing}
-    ${sys.memory ? gauge('Arbeitsspeicher', percent(sys.memory), `${formatBytes(sys.memory.used)} von ${formatBytes(sys.memory.total)} belegt`, sys.swap ? `Auslagerung: ${formatBytes(sys.swap.used)} von ${formatBytes(sys.swap.total)}` : undefined) : nothing}
-    ${load1 !== null && sys.load ? gauge('Prozessor', Math.min(100, load1), `Last ${sys.load[0].toFixed(2)} (1 Min.) · ${sys.load[1].toFixed(2)} (5 Min.) · ${sys.load[2].toFixed(2)} (15 Min.)`, `${sys.cores} Prozessorkerne – 100 % heißt: alle Kerne voll ausgelastet`) : nothing}
-    ${temp !== null ? gauge('Temperatur', tempPct, `${temp.toFixed(1).replace('.', ',')} °C`, 'Über 80 °C drosselt der Pi sich selbst.') : nothing}
+    ${sys.disk ? gauge('Speicherplatz', percent(sys.disk), levelOf(percent(sys.disk), LIMITS.disk), `${formatBytes(sys.disk.used)} von ${formatBytes(sys.disk.total)} belegt – ${formatBytes(sys.disk.total - sys.disk.used)} frei`, `Rot ab ${LIMITS.disk.hot} % – dann droht, dass Datenbank und Sicherungen keinen Platz mehr haben.`) : nothing}
+    ${sys.memory ? gauge('Arbeitsspeicher', percent(sys.memory), worst(levelOf(percent(sys.memory), LIMITS.memory), sys.swap ? levelOf(percent(sys.swap), LIMITS.swap) : 'ok'), `${formatBytes(sys.memory.used)} von ${formatBytes(sys.memory.total)} belegt`, `${sys.swap ? `Auslagerung: ${formatBytes(sys.swap.used)} von ${formatBytes(sys.swap.total)}. ` : ''}Rot ab ${LIMITS.memory.hot} % Speicher oder ${LIMITS.swap.hot} % Auslagerung.`) : nothing}
+    ${load1 !== null && sys.load ? gauge('Prozessor', Math.min(100, load1), levelOf(load1, LIMITS.cpu), `Last ${sys.load[0].toFixed(2)} (1 Min.) · ${sys.load[1].toFixed(2)} (5 Min.) · ${sys.load[2].toFixed(2)} (15 Min.)`, `${sys.cores} Prozessorkerne – 100 % heißt: alle Kerne voll ausgelastet. Rot ab ${LIMITS.cpu.hot} %.`) : nothing}
+    ${temp !== null ? gauge('Temperatur', tempPct, levelOf(temp, LIMITS.temperature), `${temp.toFixed(1).replace('.', ',')} °C`, `Rot ab ${LIMITS.temperature.hot} °C – ab 80 °C drosselt der Pi sich selbst.`) : nothing}
   </div>
   <div class="sys-facts">
     ${sys.uptimeSeconds !== null ? html`<div><span class="muted">Läuft seit</span><strong>${formatUptime(sys.uptimeSeconds)}</strong></div>` : nothing}
-    <div><span class="muted">Datenbank</span><strong>${formatBytes(dbBytes)}</strong></div>
-    ${sys.backupBytes !== null ? html`<div><span class="muted">Sicherungen</span><strong>${formatBytes(sys.backupBytes)} (${sys.backupCount})</strong></div>` : nothing}
+    <div class="sys-fact-${databaseLevel(dbBytes, sys.disk ? sys.disk.total - sys.disk.used : null)}"><span class="muted">Datenbank</span><strong>${formatBytes(dbBytes)}</strong></div>
+    ${sys.backupBytes !== null ? html`<div class="sys-fact-${backupLevel(sys.backupCount, sys.backupNewest, ctx.now)}"><span class="muted">Sicherungen</span><strong>${formatBytes(sys.backupBytes)} (${sys.backupCount})</strong>
+      <small class="muted">${sys.backupNewest ? `Neueste: ${formatDateTime(sys.backupNewest, tz)} Uhr` : 'Noch keine Sicherung'} · rot, wenn älter als ${LIMITS.backupAgeHours.hot} Std.</small></div>` : nothing}
   </div>
   <h3 class="small-title">Größte Tabellen der Datenbank</h3>
   <ul class="sys-tables">
