@@ -504,6 +504,24 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const rowsOf = (id: string) => [...block(id).matchAll(/<tr( class="me")?>\s*<td>([^<]+)<\/td>\s*<td>([^<]+)<\/td>\s*<td class="num( hit)?">(\d*)<\/td>/g)].map((r) => [r[2], r[3], r[5], !!r[1]]);
     assert.deepEqual(rowsOf(match['GEN-T1']), [['Anna', 'GEN 3:1', '2', false], ['Ben', 'T1 3:2', '0', true]]);
     assert.deepEqual(rowsOf(match['G2-KC']), [['Ben', 'KC 2:1', '2', true], ['Anna', 'KC 2:0', '1', false]]); // nach Punkten absteigend
+
+    // Alle Tipps: Spielkarten wie beim Tippen (Ergebnis hinter dem Spoilerschutz), keine "Ergebnis:"-Zeile, Filter mit Zurücksetzen
+    assert.match(all.text, /<button type="button" class="score" data-spoiler/);
+    assert.doesNotMatch(all.text, /Ergebnis: <strong>/);
+    assert.match(all.text, /<form method="get" action="\/r\/[a-z0-9-]+\/alle-tipps" class="list-filter" data-auto-filter>/);
+    assert.doesNotMatch(all.text, /Zurücksetzen/, 'ohne Filter kein Zurücksetzen');
+    const dateInputs = all.text.match(/<input type="date" name="von"[^>]*>[\s\S]*?<input type="date" name="bis"[^>]*>/)![0];
+    const days = await db.query<{ first: string; last: string }>(
+      `select to_char(min(scheduled_at) at time zone 'Europe/Berlin', 'YYYY-MM-DD') as first, to_char(max(scheduled_at) at time zone 'Europe/Berlin', 'YYYY-MM-DD') as last from matches where tournament_id = $1`,
+      [tournamentId],
+    );
+    assert.match(dateInputs, new RegExp(`name="von" value="" min="${days[0].first}" max="${days[0].last}"`), 'frühestens erstes Spiel des Turniers');
+    assert.match(dateInputs, new RegExp(`name="bis" value="" min="${days[0].first}" max="${days[0].last}"`), 'spätestens das letzte Spiel (Finale)');
+    const none = await ben.get(`/r/${slug}/alle-tipps?status=laeuft`);
+    assert.match(none.text, /Kein Spiel passt zu diesem Filter/);
+    assert.match(none.text, /href="\/r\/[a-z0-9-]+\/alle-tipps">Zurücksetzen/);
+    assert.match((await ben.get(`/r/${slug}/alle-tipps?status=gespielt&phase=alle`)).text, new RegExp(`id="tipps-${match['GEN-T1']}"`));
+    assert.doesNotMatch((await ben.get(`/r/${slug}/alle-tipps?von=1999-01-01`)).text, /Zurücksetzen[\s\S]*value="1999-01-01"/, 'Datum vor dem Turnier zählt nicht');
   });
 
   test('Kopfzeile: Countdown zum Turnier, zwischen den Spieltagen, "Live" am Spieltag', async () => {
@@ -846,7 +864,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Lautsprecher: standardmäßig stumm, Umschalten gleicht sich mit dem Konto ab
     assert.match(page.text, /data-muted="1"/);
     assert.match(page.text, /data-chat-mute aria-pressed="true"/);
-    assert.match(page.text, /<a class="rank-n" href="\/r\/[a-z0-9-]+\/spieler\/[0-9a-f-]{36}">/, 'Namen in der Rangliste rechts führen zum Profil');
+    // Rangliste rechts: auf Tippen & Co. mit Einklapp-Knopf, nicht auf Rangliste, Turnierbaum und Verwalten
+    assert.doesNotMatch(page.text, /rank-side/, 'auf der Seite Rangliste selbst nicht');
+    const tippen = await anna.get(`/r/${slug}/tippen`);
+    assert.match(tippen.text, /<a class="rank-n" href="\/r\/[a-z0-9-]+\/spieler\/[0-9a-f-]{36}">/, 'Namen in der Rangliste rechts führen zum Profil');
+    assert.match(tippen.text, /data-rank-toggle aria-expanded="true"/, 'ausgeklappt, mit Knopf zum Einklappen');
+    assert.doesNotMatch((await anna.get(`/r/${slug}/turnierbaum`)).text, /rank-side/);
+    assert.doesNotMatch((await anna.get(`/r/${slug}/verwalten`)).text, /rank-side/);
+    assert.match((await anna.get(`/r/${slug}/alle-tipps`)).text, /rank-side/);
     assert.equal((await anna.post('/konto/chat-stumm', { stumm: '0' })).status, 204);
     assert.match((await anna.get(`/r/${slug}/rangliste`)).text, /data-muted="0"/);
     assert.match((await anna.get('/konto?bereich=chat')).text, /name="chat" value="an" checked/);
@@ -1234,8 +1259,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.doesNotMatch(filled.text, /lässt sich scrollen|backup-list|class="pager"/);
     assert.match(filled.text, /name="von"[^>]*>[\s\S]*name="bis"/);
     assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(30)}`)).text), 3, 'ab 30 Tage her: ohne die 40 Tage alte');
-    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(45)}&bis=${day(35)}`)).text), 1, 'nur die 40 Tage alte');
-    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(35)}&bis=${day(45)}`)).text), 1, 'vertauschtes Von/Bis wird geradegerückt');
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(40)}&bis=${day(39)}`)).text), 1, 'nur die 40 Tage alte');
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(39)}&bis=${day(40)}`)).text), 1, 'vertauschtes Von/Bis wird geradegerückt');
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(500)}&bis=${day(-5)}`)).text), 4, 'Daten vor der Inbetriebnahme und nach heute zählen nicht');
+    assert.match(filled.text, new RegExp(`name="bis" value="" min="[\\d-]+" max="${day(0)}"`), 'Bis höchstens heute');
     const upd = await admin.get('/admin?bereich=backup&art=update');
     assert.equal(rows(upd.text), 1);
     assert.match(upd.text, /Vorhandene Sicherungen \(4\)/, 'der Zähler bleibt die Gesamtzahl');
@@ -1256,18 +1283,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(p1.text, /<span class="pager-item current" aria-current="page">1<\/span>/);
     assert.equal(rows((await admin.get('/admin?bereich=backup&seite=2')).text), 3);
     assert.equal(rows((await admin.get('/admin?bereich=backup&seite=99')).text), 3, 'zu große Seitenzahl landet auf der letzten Seite');
-    const filteredPage = await admin.get(`/admin?bereich=backup&art=nacht&von=${day(100)}`);
+    const filteredPage = await admin.get(`/admin?bereich=backup&art=nacht&von=${day(68)}`);
     assert.match(filteredPage.text, /href="\/admin\?bereich=backup&amp;von=[\d-]+&amp;art=nacht&amp;seite=2#sicherungen"/);
 
-    // Rangliste rechts: auch beim Betreiber, der in keiner Tipprunde mitspielt (sonst fehlt die Spalte am PC)
-    const saved = await db.query<{ league_id: string; user_id: string; role: string; joined_at: Date }>(
-      `delete from league_members where user_id = (select id from users where email = 'admin@example.de') returning league_id, user_id, role, joined_at`,
-    );
-    try {
-      assert.match((await admin.get('/admin?bereich=backup')).text, /class="sidecol sidecol-right rank-side"/);
-    } finally {
-      for (const m of saved) await db.query('insert into league_members (league_id, user_id, role, joined_at) values ($1, $2, $3, $4)', [m.league_id, m.user_id, m.role, m.joined_at]);
-    }
+    // Im Administrator-Bereich gibt es keine Rangliste rechts
+    assert.doesNotMatch((await admin.get('/admin?bereich=backup')).text, /rank-side/);
 
     // Knopf: legt nur die Anfrage-Datei ab (die Sicherung selbst macht der Pi), nur mit Formularschutz und nur für den Betreiber
     assert.ok(!existsSync(BACKUP_FILE));

@@ -25,7 +25,7 @@ function requireAdmin(ctx: Ctx) {
 }
 
 function page(ctx: Ctx, title: string, body: Html, error?: string): Res {
-  return htmlResponse(layout(ctx, { title, body, error }), error ? 400 : 200);
+  return htmlResponse(layout(ctx, { title, body, error, noRank: true }), error ? 400 : 200);
 }
 
 interface Team {
@@ -204,20 +204,25 @@ const BACKUP_KINDS = [['alle', 'Alle'], ['nacht', 'Nächtlich'], ['manuell', 'Vo
 const KIND_LABEL = { nacht: 'Nächtlich', manuell: 'Von Hand', update: 'Vor einem Update' } as const;
 
 /** Reiter "Backup": Zustand der Sicherungen und ein Knopf für eine Sicherung von Hand. */
-function backupPanel(ctx: Ctx): Html {
+async function backupPanel(ctx: Ctx): Promise<Html> {
   const tz = ctx.deps.config.timeZone;
   const sys = readSystemInfo(ctx.deps.config.backupDir);
   const files = readBackups(ctx.deps.config.backupDir);
   // Filter (Adresse ?von=…&bis=…&art=…&seite=…): nur gültige Werte, alles andere heißt "kein Filter"
+  // Zeitraum: frühestens der Tag der Inbetriebnahme (erstes Konto bzw. älteste Sicherung), spätestens heute
+  const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
+  const firstUser = await ctx.deps.db.one<{ at: Date | null }>('select min(created_at) as at from users');
+  const starts = [firstUser?.at, ...files.map((f) => f.at)].filter((d): d is Date => d instanceof Date).sort((a, b) => a.getTime() - b.getTime());
+  const minDay = starts.length ? dayOf(starts[0]) : '';
+  const maxDay = dayOf(ctx.now);
   const dateParam = (name: string) => {
     const v = ctx.query.get(name) ?? '';
-    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) && (!minDay || v >= minDay) && v <= maxDay ? v : '';
   };
   let von = dateParam('von');
   let bis = dateParam('bis');
   if (von && bis && von > bis) [von, bis] = [bis, von];
   const art = BACKUP_KINDS.some(([k]) => k === ctx.query.get('art')) ? ctx.query.get('art')! : 'alle';
-  const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
   const shown = files.filter((f) => {
     if (art !== 'alle' && f.kind !== art) return false;
     const day = dayOf(f.at);
@@ -272,12 +277,12 @@ function backupPanel(ctx: Ctx): Html {
   <h2>Vorhandene Sicherungen (${files.length})</h2>
   ${
     files.length
-      ? html`<form method="get" action="/admin#sicherungen" class="backup-filter" data-backup-filter>
+      ? html`<form method="get" action="/admin#sicherungen" class="list-filter" data-auto-filter>
     <input type="hidden" name="bereich" value="backup">
     <label><span class="muted">Von</span>
-      <input type="date" name="von" value="${von}"${attr(bis !== '', `max="${bis}"`)}></label>
+      <input type="date" name="von" value="${von}" min="${minDay}" max="${bis || maxDay}"></label>
     <label><span class="muted">Bis</span>
-      <input type="date" name="bis" value="${bis}"${attr(von !== '', `min="${von}"`)}></label>
+      <input type="date" name="bis" value="${bis}" min="${von || minDay}" max="${maxDay}"></label>
     <label><span class="muted">Art</span>
       <select name="art">${BACKUP_KINDS.map(([k, label]) => html`<option value="${k}"${attr(k === art, 'selected')}>${label}</option>`)}</select></label>
     <noscript><button type="submit" class="btn btn-quiet">Filtern</button></noscript>
@@ -352,7 +357,7 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   } else if (area === 'system') {
     content = await systemPanel(ctx);
   } else if (area === 'backup') {
-    content = backupPanel(ctx);
+    content = await backupPanel(ctx);
   } else if (area === 'abgleich') {
     const [syncRows, counts] = await Promise.all([
       db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),
