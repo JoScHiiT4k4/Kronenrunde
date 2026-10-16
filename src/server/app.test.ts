@@ -23,6 +23,7 @@ import { createDb, type Db, migrate } from './db/index.ts';
 import { createMailer, type Mailer } from './mail.ts';
 import { notifyDue } from './benachrichtigung.ts';
 import { purgeOldMessages } from './routes/chat.ts';
+import { totpCode } from './totp.ts';
 
 const DB_URL = process.env.TEST_DATABASE_URL;
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -307,6 +308,80 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const oldSet = await oldClient.post('/passwort-neu', { token: oldLink.searchParams.get('token')!, password: 'jetzt-mit-passwort' });
     assert.equal(oldSet.location, '/');
     assert.equal((await new Client().post('/anmelden', { email: 'alt@example.de', password: 'jetzt-mit-passwort' })).status, 303);
+  });
+
+  test('Zwei-Faktor-Authentifizierung: einrichten, Anmeldung mit Code und mit Backup-Code, ausschalten', async () => {
+    const two = new Client();
+    await two.login('zwei-faktor@example.de', 'Zwei');
+
+    // Vor der Einrichtung: nur der "Einrichten"-Knopf
+    const before = await two.get('/konto?bereich=sicherheit');
+    assert.match(before.text, /Zwei-Faktor-Authentifizierung/);
+    assert.match(before.text, /action="\/konto\/2fa\/einrichten"/);
+
+    // Einrichten: falsches Passwort wird abgelehnt
+    assert.match((await two.post('/konto/2fa/einrichten', { current: 'falsch' })).text, /Passwort stimmt nicht/);
+    const setup = await two.post('/konto/2fa/einrichten', { current: PASSWORT });
+    assert.equal(setup.status, 200);
+    const secretMatch = /Schlüssel von Hand eingeben: <code>([A-Z2-7]+)<\/code>/.exec(setup.text);
+    assert.ok(secretMatch, setup.text);
+    const secret = secretMatch![1];
+    assert.match(setup.text, /<svg class="qr-code"/, 'QR-Code zum Einscannen wird angezeigt');
+
+    // Bestätigen: falscher Code wird abgelehnt, richtiger aktiviert und zeigt Backup-Codes
+    assert.match((await two.post('/konto/2fa/bestaetigen', { code: '000000' })).text, /Der Code stimmt nicht/);
+    const confirm = await two.post('/konto/2fa/bestaetigen', { code: totpCode(secret) });
+    assert.match(confirm.text, /Deine Backup-Codes/);
+    const backupCodes = [...confirm.text.matchAll(/<li><code>([A-Z2-7-]+)<\/code><\/li>/g)].map((m) => m[1]);
+    assert.equal(backupCodes.length, 8);
+    assert.match((await two.get('/konto?bereich=sicherheit')).text, /Aktiv seit/);
+
+    // Anmeldung verlangt jetzt zusätzlich den Code
+    await two.post('/abmelden');
+    const login = await two.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT, weiter: '/rangliste' });
+    assert.equal(login.status, 303);
+    assert.match(login.location!, /^\/anmelden\/2fa\?token=/);
+    const token = new URL(login.location!, base).searchParams.get('token')!;
+    assert.match((await two.get(`/anmelden/2fa?token=${token}`)).text, /Code aus der Authenticator-App/);
+    assert.match((await two.post('/anmelden/2fa', { token, code: '000000' })).text, /Der Code stimmt nicht/);
+    const right = await two.post('/anmelden/2fa', { token, code: totpCode(secret) });
+    assert.equal(right.status, 303);
+    assert.equal(right.location, '/rangliste', 'landet am ursprünglich gewünschten Ziel');
+
+    // Mit einem Backup-Code anmelden (TOTP-App gerade nicht zur Hand)
+    await two.post('/abmelden');
+    const login2 = await two.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT });
+    const token2 = new URL(login2.location!, base).searchParams.get('token')!;
+    assert.equal((await two.post('/anmelden/2fa', { token: token2, code: backupCodes[0].toLowerCase() })).status, 303, 'Groß-/Kleinschreibung egal');
+
+    // Der gleiche Backup-Code gilt nur einmal
+    await two.post('/abmelden');
+    const login3 = await two.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT });
+    const token3 = new URL(login3.location!, base).searchParams.get('token')!;
+    assert.match((await two.post('/anmelden/2fa', { token: token3, code: backupCodes[0] })).text, /Der Code stimmt nicht/);
+    assert.equal((await two.post('/anmelden/2fa', { token: token3, code: backupCodes[1] })).status, 303);
+
+    // Ein abgelaufener/unbekannter Token führt zur Fehlerseite
+    assert.match((await two.get('/anmelden/2fa?token=unbekannt')).text, /Nicht mehr gültig/);
+
+    // Sehr lange E-Mail-Adresse: otpauth://-URI passt nicht mehr in unseren QR-Encoder (max.
+    // Version 6) – darf nicht abstürzen, zeigt stattdessen nur den Schlüssel zum Abtippen.
+    const longMail = new Client();
+    await longMail.login(`${'x'.repeat(70)}@example.de`, 'Lang');
+    const longSetup = await longMail.post('/konto/2fa/einrichten', { current: PASSWORT });
+    assert.equal(longSetup.status, 200);
+    assert.doesNotMatch(longSetup.text, /<svg class="qr-code"/);
+    assert.match(longSetup.text, /lässt sich leider kein QR-Code erzeugen/);
+    assert.match(longSetup.text, /Schlüssel von Hand eingeben: <code>[A-Z2-7]+<\/code>/);
+
+    // Ausschalten
+    await two.refresh();
+    const off = await two.post('/konto/2fa/deaktivieren', { current: PASSWORT });
+    assert.equal(off.location, '/konto?bereich=sicherheit&hinweis=2fa-deaktiviert');
+    assert.match((await two.get('/konto?bereich=sicherheit')).text, /action="\/konto\/2fa\/einrichten"/);
+    // Ab jetzt wieder normale Anmeldung ohne Code
+    await two.post('/abmelden');
+    assert.equal((await two.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT })).status, 303);
   });
 
   test('Formularschutz: ohne Token und von fremder Seite abgelehnt', async () => {

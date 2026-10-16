@@ -22,6 +22,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'konto-geloescht': { text: 'Dein Konto und alle deine Daten sind gelöscht.', kind: 'ok' },
   'email-gesendet': { text: 'Wir haben dir eine Mail an die neue Adresse geschickt. Mit dem Link darin wird sie übernommen.', kind: 'ok' },
   'email-geaendert': { text: 'Deine E-Mail-Adresse ist geändert.', kind: 'ok' },
+  '2fa-deaktiviert': { text: 'Zwei-Faktor-Authentifizierung ist ausgeschaltet.', kind: 'ok' },
   'avatar-gespeichert': { text: 'Dein Profilbild ist gespeichert.', kind: 'ok' },
   'avatar-geloescht': { text: 'Dein Profilbild ist entfernt.', kind: 'ok' },
   'avatar-fehler': { text: 'Das Bild konnte nicht gespeichert werden. Bitte wähle ein anderes Bild (JPG, PNG oder WebP).', kind: 'warn' },

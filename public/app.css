@@ -371,6 +371,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .qr-code { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; }
 @media (max-width: 520px) { .qr-code { width: 180px; height: 180px; } }
 
+.backup-code-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; }
+.backup-code-list code { display: block; text-align: center; font-size: 1.05em; }
+@media (max-width: 420px) { .backup-code-list { grid-template-columns: 1fr; } }
+
 .danger-zone { --frame: #6e2a26; background-color: transparent; }
 
 /* ---------- Tippen ---------- */
