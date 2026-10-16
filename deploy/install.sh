@@ -261,7 +261,7 @@ fi
 # Neuer Name (Okt. 2026): den alten Standard-Absendernamen ersetzen – selbst gewählte Namen bleiben
 if grep -qE '^(MAIL_FROM_NAME|APP_NAME)=LoL-Tippspiel$' "$ENV_FILE"; then
   sed -i -E 's/^(MAIL_FROM_NAME|APP_NAME)=LoL-Tippspiel$/\1=Kronenrunde/' "$ENV_FILE"
-  ok "Name in den Einstellungen auf „Kronenrunde“ geändert"
+  ok "Name in den Einstellungen auf Kronenrunde geändert"
 fi
 chown root:"$SERVICE_USER" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
