@@ -1,5 +1,6 @@
 // Welche Version läuft gerade, und wann hat der Pi zuletzt nach Updates geschaut?
-// Die Version kommt aus package.json und dem Git-Stand des Programmordners (Kurzform der Commit-Nummer + Datum).
+// Die Version setzt sich zusammen aus Hauptversion.Nebenversion (package.json) und der Anzahl der Commits im Programmordner
+// (zählt von selbst hoch, kein Hochzählen pro Pull Request nötig) – dazu Kurzform der Commit-Nummer und Datum.
 // Den Zeitpunkt der letzten Prüfung schreibt "tippspiel update --auto" (alle 15 Minuten) in die Datei .update-check,
 // den der letzten Installation deploy/install.sh in die Datei .update-installed.
 
@@ -16,6 +17,21 @@ export interface BuildInfo {
   committedAt: Date | null;
 }
 
+/** "0.26.0" + Commit-Anzahl 134 → "0.26.134"; ohne Git-Verlauf bleibt die Version aus package.json. */
+export function composeVersion(base: string, commits: number | null): string {
+  const m = /^(\d+)\.(\d+)\./.exec(base);
+  return m && commits && commits > 0 ? `${m[1]}.${m[2]}.${commits}` : base;
+}
+
+function withCommitCount(base: string): string {
+  try {
+    const n = Number(execFileSync('git', ['-C', root, 'rev-list', '--count', 'HEAD'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    return composeVersion(base, Number.isFinite(n) ? n : null);
+  } catch {
+    return base;
+  }
+}
+
 function load(): BuildInfo {
   let version = '?';
   try {
@@ -26,7 +42,7 @@ function load(): BuildInfo {
   try {
     const out = execFileSync('git', ['-C', root, 'log', '-1', '--format=%h %ct'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     const [commit, ts] = out.split(' ');
-    return { version, commit: commit || null, committedAt: ts ? new Date(Number(ts) * 1000) : null };
+    return { version: withCommitCount(version), commit: commit || null, committedAt: ts ? new Date(Number(ts) * 1000) : null };
   } catch {
     return { version, commit: null, committedAt: null };
   }
