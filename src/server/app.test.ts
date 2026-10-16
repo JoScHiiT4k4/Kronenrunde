@@ -1167,9 +1167,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
     // Links nur ein unsichtbarer Platzhalter (Werbung ist ausgeblendet), rechts die Werbefläche bzw. – angemeldet – die Rangliste
-    assert.equal((pub.text.match(/class="side side-right"/g) ?? []).length, 1);
-    assert.match(pub.text, /class="side side-ghost" aria-hidden="true"/);
-    assert.doesNotMatch(pub.text, /side-left/);
+    assert.equal((pub.text.match(/class="sidecol sidecol-right"/g) ?? []).length, 1);
+    assert.match(pub.text, /class="sidecol sidecol-ghost" aria-hidden="true"/);
+    assert.doesNotMatch(pub.text, /sidecol-left/);
   });
 
   test('Administrator: Update sofort anfordern (legt nur eine Anfrage-Datei ab)', async () => {
@@ -1264,7 +1264,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       `delete from league_members where user_id = (select id from users where email = 'admin@example.de') returning league_id, user_id, role, joined_at`,
     );
     try {
-      assert.match((await admin.get('/admin?bereich=backup')).text, /class="side side-right rank-side"/);
+      assert.match((await admin.get('/admin?bereich=backup')).text, /class="sidecol sidecol-right rank-side"/);
     } finally {
       for (const m of saved) await db.query('insert into league_members (league_id, user_id, role, joined_at) values ($1, $2, $3, $4)', [m.league_id, m.user_id, m.role, m.joined_at]);
     }

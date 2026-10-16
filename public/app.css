@@ -220,7 +220,7 @@ p { margin: 0 0 0.9em; }
 /* Reiter (nav) und Inhalt (main) liegen im selben Raster, also immer in derselben Spalte; Seitenspalten stehen in Zeile 2 */
 .page > .league-nav { grid-row: 1; grid-column: 1; }
 .page > .main { grid-row: 2; grid-column: 1; min-width: 0; padding: 20px 16px 32px; }
-.page > .side { grid-row: 2; }
+.page > .sidecol { grid-row: 2; }
 /* Breiter Inhalt (Turnierbaum): eigene Zeile unter Inhalt und Seitenspalten, mittig und bis 1320px breit */
 .page > .below { grid-row: 3; grid-column: 1 / -1; justify-self: center; width: 100%; max-width: 1320px; min-width: 0; padding: 0 16px 32px; }
 @media (max-width: 919px) { .page > .below { width: 100vw; } }
@@ -870,8 +870,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 }
 
 /* Werbeflächen links und rechts (nur auf breiten Bildschirmen) */
-.side { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
-.side-box {
+.sidecol { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
+.sidecol-box {
   position: sticky;
   top: 16px;
   min-height: 600px;
@@ -882,7 +882,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
   background-color: var(--surface);
   clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
 }
-.side-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
+.sidecol-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
 /* Überschrift über einer Liste von Einstellungen (z. B. Sonderfragen) */
 .small-title { margin: 20px 0 6px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
 /* Abmelden oben rechts */
@@ -1058,7 +1058,7 @@ a.rank-box:hover .rank-more { color: var(--gold-bright); }
 .st-list li > :last-child { text-align: right; }
 
 /* Linke Spalte (früher Werbung): unsichtbarer Platzhalter, damit der Inhalt mittig bleibt */
-.side-ghost { visibility: hidden; }
+.sidecol-ghost { visibility: hidden; }
 
 /* Rangliste auf dem Handy: Nebenspalten ausblenden, Ausbeute und Zahlen unter den Namen */
 .rk-sub { display: none; }
@@ -1275,11 +1275,11 @@ td.bad { color: var(--red); }
 }
 @media (min-width: 1140px) {
   .page { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
-  .page > .side { display: block; }
-  .page > .side-ghost { grid-column: 1; }
+  .page > .sidecol { display: block; }
+  .page > .sidecol-ghost { grid-column: 1; }
   .page > .league-nav,
   .page > .main { grid-column: 2; }
-  .page > .side:not(.side-ghost) { grid-column: 3; }
+  .page > .sidecol:not(.sidecol-ghost) { grid-column: 3; }
 }
 /* Mittlere Fenster (Reiter noch sichtbar, Inhalt schmaler als 720px): Reiter etwas enger, damit sie in einer Zeile bleiben */
 @media (min-width: 641px) and (max-width: 720px) {

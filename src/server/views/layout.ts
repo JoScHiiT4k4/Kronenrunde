@@ -95,7 +95,7 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   </nav>
 </header>
 <div class="page">
-<div class="side side-ghost${ctx.sidebar ? ' side-ghost-wide' : ''}" aria-hidden="true"></div>
+<div class="sidecol sidecol-ghost${ctx.sidebar ? ' sidecol-ghost-wide' : ''}" aria-hidden="true"></div>
 ${o.league ? leagueNav(o.league) : nothing}
 <main class="main">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
@@ -185,7 +185,7 @@ function tournamentBar(ctx: Ctx): Html {
 
 /** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
 function adBox(side: 'left' | 'right'): Html {
-  return html`<aside class="side side-${side}" aria-label="Seitenleiste"><div class="side-box"><span class="side-label">Anzeige</span></div></aside>`;
+  return html`<aside class="sidecol sidecol-${side}" aria-label="Seitenleiste"><div class="sidecol-box"><span class="sidecol-label">Anzeige</span></div></aside>`;
 }
 
 /** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
@@ -205,7 +205,7 @@ function rankBox(ctx: Ctx): Html {
   const top = s.rows.slice(0, 8);
   const me = s.rows.find((r) => r.userId === ctx.user?.id);
   const shown = me && !top.includes(me) ? [...top, me] : top;
-  return html`<aside class="side side-right rank-side" aria-label="Rangliste ${s.leagueName}">
+  return html`<aside class="sidecol sidecol-right rank-side" aria-label="Rangliste ${s.leagueName}">
     <div class="rank-box">
       <a class="rank-stretch rank-title" href="/r/${s.slug}/rangliste">Rangliste</a>
       <span class="rank-league">${s.leagueName}</span>
