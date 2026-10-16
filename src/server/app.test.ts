@@ -465,7 +465,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
     const tips = await anna.get(`/r/${slug}/tippen`);
     assert.match(tips.text, /Vorbei/);
-    assert.match(tips.text, /pts pts-hit pts-exact">\+2</);
+    assert.doesNotMatch(tips.text, /pts-exact/, 'Punkte der Spiele verraten sonst das Ergebnis – sie stehen nur in der aufklappbaren Tipp-Liste');
+    assert.match(tips.text, /<td class="num hit">2<\/td>/);
     // Gewinnchance aus den Tipps: GEN–T1 je einer (50/50), G2–KC beide auf KC (100/0); offene Spiele zeigen nichts
     assert.equal((tips.text.match(/class="pct pct-[ab] pct-even"/g) ?? []).length, 2);
     assert.match(tips.text, /class="pct pct-[ab] pct-up"[^>]*>100 %</);
@@ -621,8 +622,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal(saved.location, `/r/${slug}/sonderfragen?hinweis=antworten-gespeichert`);
     await anna.post(`/r/${slug}/sonderfragen`, { [`antwort_${champ.id}`]: 'T1', [`antwort_${mvp.id}`]: '<script>alert(1)</script>' });
 
-    // Vor der Frist sieht man die Antworten der anderen nicht
-    assert.doesNotMatch((await anna.get(`/r/${slug}/sonderfragen`)).text, /chovy/);
+    // Vor der Frist sieht man die Antworten der anderen nicht; Fortschritt zählt alle Teilnehmer, Fragen sind einklappbar
+    const before = (await anna.get(`/r/${slug}/sonderfragen`)).text;
+    assert.doesNotMatch(before, /chovy/);
+    assert.match(before, /\(\d\/\d+ Teilnehmer haben alle Fragen beantwortet\)/);
+    assert.match(before, /<details class="q-fold">/);
 
     // Erstes Spiel hat begonnen → keine Änderungen mehr, Antworten aller sichtbar (und maskiert)
     await restore();

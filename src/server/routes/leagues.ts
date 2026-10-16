@@ -379,14 +379,12 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
 </article>`;
   }
 
-  const points = own ? scorePrediction(toDomainPrediction(own), match, rulesOf(league)) : null;
   const isPublic = arePredictionsPublic(match, league.lock_mode, ctx.now);
   return html`<article class="match match-closed" id="spiel-${m.id}">
   ${meta}${teams}
   <div class="match-foot">
     ${!teamsKnown && open ? html`<span class="muted">Tippen geht, sobald beide Teams feststehen.</span>` : nothing}
     ${(teamsKnown || !open) && !(isPublic && teamsKnown && fold) ? html`<span>Dein Tipp: <strong>${own ? predictionLabel(m, own) : '–'}</strong></span>` : nothing}
-    ${points ? pointsBadge(points.points, points.exact) : nothing}
   </div>
   ${isPublic && teamsKnown ? (fold ?? nothing) : nothing}
 </article>`;
@@ -942,8 +940,10 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
       ${access.canManage ? html`<p><a href="/r/${league.slug}/verwalten?bereich=fragen">Sonderfragen anlegen</a></p>` : nothing}</section>`;
     }
 
-    const done = qs.filter((q) => myAnswers.has(q.id)).length;
-    const status = progress(done, qs.length, 'Fragen abgegeben', true);
+    // Wie viele Teilnehmer (von allen) alle Fragen dieses Turniers beantwortet haben
+    const answered = new Set(answers.map((a) => `${a.user_id}:${a.question_id}`));
+    const done = members.filter((mem) => qs.every((q) => answered.has(`${mem.user_id}:${q.id}`))).length;
+    const status = progress(done, members.length, 'Teilnehmer haben alle Fragen beantwortet', true);
     if (!closed) {
       return html`<section class="panel">
   <h2>${t.name} ${status}</h2>
@@ -992,11 +992,15 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
           ${opts.map((o) => html`<option value="${o}"${attr(o === current, 'selected')}>${o}</option>`)}
         </select>`;
       }
-      return html`<label class="field question">
-        <span>${q.question} <span class="pts-label">${q.points} ${q.points === 1 ? 'Punkt' : 'Punkte'}</span></span>
-        ${q.hint ? html`<small class="muted">${q.hint}</small>` : nothing}
-        ${input}
-      </label>`;
+      return html`<details class="q-fold"${attr(!current, 'open')}>
+        <summary><span>${q.question} <span class="pts-label">${q.points} ${q.points === 1 ? 'Punkt' : 'Punkte'}</span></span>
+          <span class="q-state ${current ? 'q-done' : 'q-todo'}">${current ? 'beantwortet' : 'offen'}</span></summary>
+        <label class="field question">
+          <span class="sr-only">${q.question}</span>
+          ${q.hint ? html`<small class="muted">${q.hint}</small>` : nothing}
+          ${input}
+        </label>
+      </details>`;
     })}
     <button type="submit" class="btn btn-primary">Antworten speichern</button>
   </form>
@@ -1008,8 +1012,8 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
   <p class="muted">Geschlossen seit dem Start des ersten Spiels (${formatDateTime(t.bonus_deadline_at!, tz)} Uhr).</p>
   ${qs.map((q) => {
     const resolved = q.correct_answers.length > 0;
-    return html`<div class="question-result">
-    <h3>${q.question} <span class="pts-label">${q.points} ${q.points === 1 ? 'Punkt' : 'Punkte'}</span></h3>
+    return html`<details class="question-result">
+    <summary><span>${q.question} <span class="pts-label">${q.points} ${q.points === 1 ? 'Punkt' : 'Punkte'}</span></span></summary>
     ${resolved ? html`<p>Richtig: <strong>${q.correct_answers.join(' / ')}</strong></p>` : html`<p class="muted">Noch nicht aufgelöst.</p>`}
     ${(() => {
       if (!t.bonus_deadline_at) return nothing;
@@ -1031,7 +1035,7 @@ async function bonusPage(ctx: Ctx): Promise<Res> {
       }
       ${given.length && missing.length ? html`<p class="muted">Ohne Antwort: ${missing.map((m) => m.display_name).join(', ')}</p>` : nothing}`;
     })()}
-  </div>`;
+  </details>`;
   })}
 </section>`;
   });

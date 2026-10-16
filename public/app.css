@@ -569,16 +569,18 @@ details > summary {
   cursor: pointer;
   list-style: none;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 10px 0;
   font-weight: 600;
 }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::before { content: "▸"; color: var(--gold); margin-right: -4px; }
-details[open] > summary::before { content: "▾"; }
-details > summary > span:first-of-type { flex: 1; }
+/* Dropdown-Pfeil immer hinter dem Text */
+details > summary::after { content: "▸"; flex: none; color: var(--gold); }
+details[open] > summary::after { content: "▾"; }
+details > summary > span:first-of-type:not(:only-child) { flex: 1; }
+.role-switch > summary::after { color: inherit; }
 
 /* ---------- Tabellen ---------- */
 
@@ -937,7 +939,6 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 /* Aufklappbare Tipps der Mitspieler bei Spielen, die schon begonnen haben */
 .tips-fold { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
 .tips-fold > summary { display: flex; align-items: center; gap: 8px; margin-left: 0; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
-.tips-fold > summary::before { margin-right: 0; }
 .tips-fold summary:hover { color: var(--gold-bright); }
 .tips-fold[open] summary { margin-bottom: 8px; }
 
@@ -1217,3 +1218,13 @@ td.bad { color: var(--red); }
   .teams .pct { font-size: 0.72em; }
   .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
 }
+
+/* Sonderfragen: einzelne Fragen auf- und einklappbar */
+.q-fold, .question-result { border-top: 1px solid var(--line); }
+.q-fold:first-of-type, .question-result:first-of-type { border-top: 0; }
+.q-fold > summary, .question-result > summary { font-weight: 600; }
+.q-fold .question { padding-bottom: 12px; }
+.q-state { flex: none; margin-left: auto; font-size: 0.8rem; font-weight: 700; }
+.q-done { color: var(--ok); }
+.q-todo { color: var(--red); }
+.question-result > :not(summary) { margin-left: 0; }
