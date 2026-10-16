@@ -54,9 +54,9 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const norm = (v: string) => v.trim().toLowerCase();
   const body = html`<p class="muted page-note"><a href="/r/${league.slug}/rangliste">← Zur Rangliste</a></p>
 <section class="panel profile-head">
-  ${avatar(id, person.display_name, person.avatar_updated_at, 'lg', online)}
+  ${avatar(id, person.display_name, person.avatar_updated_at, 'lg')}
   <div>
-    <h1>${person.first_name && sameName ? person.first_name : person.display_name}</h1>
+    <h1>${person.first_name && sameName ? person.first_name : person.display_name} <span class="profile-rank">(${row.rank}. Platz)</span></h1>
     <p class="muted">${person.first_name && !sameName ? html`${person.first_name} · ` : nothing}Mitglied in ${league.name}</p>
     <p class="profile-presence">
       ${presenceDot(online)}${online
@@ -70,7 +70,6 @@ async function profilePage(ctx: Ctx): Promise<Res> {
 <section class="panel">
   <h2>Bisheriger Stand</h2>
   <div class="st-tiles">
-    ${tile(`${row.rank}.`, 'Platz in der Rangliste')}
     ${tile(row.points, row.points === 1 ? 'Punkt' : 'Punkte')}
     ${tile(row.correctWinners, 'richtige Sieger')}
     ${tile(row.exactResults, 'exakte Ergebnisse')}
