@@ -11,11 +11,12 @@ import { isValidResult, matchResult, resultOptions, type ResultOption } from '..
 import { computeStandings, scorePrediction } from '../../domain/scoring.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
-import { dayKey, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
+import { dayKey, formatDate, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
+import { standingsShareCard } from '../views/standings-share-card.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
   canCreateLeague,
@@ -887,7 +888,10 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const { rows, avatarOf, lastSeenOf, finished, possible, hasBonus } = await loadStandings(db, league);
 
   const body = html`<section class="panel">
-  <h1>Rangliste</h1>
+  <div class="panel-head">
+    <h1>Rangliste</h1>
+    <a class="btn btn-quiet profile-share" href="/r/${league.slug}/rangliste/teilen.svg" download="${league.slug}-rangliste.svg" data-share-card data-filename="${league.slug}-rangliste">Rangliste teilen</a>
+  </div>
   <p class="muted">${finished} ${finished === 1 ? 'Spiel' : 'Spiele'} gewertet. Richtiger Sieger ${league.points_winner} ${league.points_winner === 1 ? 'Punkt' : 'Punkte'}, exaktes Ergebnis ${league.points_exact} extra. Bei Gleichstand zählen die exakten Ergebnisse.</p>
   ${filterBar('rk-list', 'Spieler suchen …')}
   <table class="table standings" id="rk-list">
@@ -924,6 +928,27 @@ ${
     : nothing
 }`;
   return htmlResponse(layout(ctx, { title: `Rangliste – ${league.name}`, body, league: leagueNav(access, 'rangliste') }));
+}
+
+/** Teilen-Bild der ganzen Rangliste: die oberen Plätze, zum Herunterladen/Teilen. */
+async function standingsShareImage(ctx: Ctx): Promise<Res> {
+  if (!ctx.user) return loginRedirect(ctx);
+  const { league } = await loadLeague(ctx, ctx.params.slug);
+  const { db, config } = ctx.deps;
+  const { rows } = await loadStandings(db, league);
+
+  const svg = standingsShareCard({
+    appName: config.appName,
+    leagueName: league.name,
+    rows: rows.map((r) => ({ rank: r.rank, displayName: r.displayName, points: r.points })),
+    memberCount: rows.length,
+    dateText: formatDate(ctx.now, config.timeZone),
+  });
+  return {
+    status: 200,
+    headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'content-disposition': `attachment; filename="${league.slug}-rangliste.svg"`, 'cache-control': 'no-store' },
+    body: svg,
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -1184,6 +1209,7 @@ export function registerLeagueRoutes(router: Router<Ctx>) {
   router.get('/r/:slug/spiel/:id', matchPage);
   router.get('/r/:slug/alle-tipps', allTipsPage);
   router.get('/r/:slug/rangliste', standingsPage);
+  router.get('/r/:slug/rangliste/teilen.svg', standingsShareImage);
   router.get('/r/:slug/sonderfragen', bonusPage);
   router.post('/r/:slug/sonderfragen', saveBonus);
   router.post('/r/:slug/verlassen', leave);
