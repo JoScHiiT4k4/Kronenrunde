@@ -1351,3 +1351,9 @@ td.bad { color: var(--red); }
 a.pager-item:hover { border-color: var(--gold); }
 .pager-item.current { color: #0a1622; font-weight: 700; background: var(--gold); border-color: var(--gold); }
 .pager-gap { color: var(--muted, #8a97a6); padding: 0 2px; }
+
+/* Kopfzeile eines Bereichs mit kleinem Symbol rechts (z. B. „Seite aktualisieren“) */
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.panel-head h2 { margin: 0; }
+.refresh-link { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; color: inherit; border: 1px solid currentColor; opacity: 0.7; }
+.refresh-link:hover, .refresh-link:focus-visible { opacity: 1; }

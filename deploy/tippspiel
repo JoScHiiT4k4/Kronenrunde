@@ -141,7 +141,7 @@ case "${1:-hilfe}" in
     echo "  Sicherung:  ${last:-noch keine}"
     if [[ -f $NAS_STATUS ]]; then echo "  MyCloud:    $(cut -f1,2 "$NAS_STATUS" | tr '\t' ' ')"; fi
     if systemctl is-enabled --quiet "$SERVICE-update.timer" 2>/dev/null; then
-      echo "  Updates:    automatisch alle 15 Minuten (nur geprüfte Versionen)"
+      echo "  Updates:    automatisch (sofort per GitHub-Meldung, sonst täglich 08:00; nur geprüfte Versionen)"
     else
       echo "  Updates:    von Hand (tippspiel update)"
     fi
@@ -153,7 +153,7 @@ case "${1:-hilfe}" in
     ;;
 
   update)
-    # --auto: vom Zeitplan alle 15 Minuten aufgerufen – ohne Ausgabe, wenn es nichts Neues gibt
+    # --auto: vom Zeitplan (täglich 08:00) oder der GitHub-Meldung aufgerufen – ohne Ausgabe, wenn es nichts Neues gibt
     auto=0
     [[ ${2:-} == --auto ]] && auto=1
     exec 9>/run/lock/lol-tippspiel-update.lock
@@ -224,6 +224,25 @@ case "${1:-hilfe}" in
       warn "Wiederherstellen fehlgeschlagen – die Daten sind unverändert."
     fi
     restart
+    ;;
+
+  webhook-einrichten)
+    # GitHub meldet neue geprüfte Versionen sofort an die App (/hooks/github) – dann ist keine ständige Abfrage nötig
+    secret=$(get_env GITHUB_WEBHOOK_SECRET)
+    if [[ -z $secret ]]; then
+      secret=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+      if grep -qE '^GITHUB_WEBHOOK_SECRET=' "$ENV_FILE"; then
+        sed -i "s|^GITHUB_WEBHOOK_SECRET=.*|GITHUB_WEBHOOK_SECRET=$secret|" "$ENV_FILE"
+      else
+        printf 'GITHUB_WEBHOOK_SECRET=%s\n' "$secret" >>"$ENV_FILE"
+      fi
+      restart
+    fi
+    ok "Webhook ist eingerichtet. Jetzt auf GitHub eintragen (Repository → Settings → Webhooks → Add webhook):"
+    echo "  Payload URL:   $(get_env APP_URL | sed 's|/*$||')/hooks/github   (statt der Pi-Adresse die öffentliche Adresse nehmen, falls APP_URL intern ist)"
+    echo "  Content type:  application/json"
+    echo "  Secret:        $secret"
+    echo "  Ereignisse:    Just the push event"
     ;;
 
   nas-einrichten)
@@ -328,9 +347,10 @@ LoL-Tippspiel – Befehle:
 
   tippspiel status                  Läuft alles? Adresse, Version, letzte Sicherung
   tippspiel update                  Neueste geprüfte Version von GitHub installieren (läuft auch automatisch
-                                    alle 15 Minuten; sichert vorher; startet sie nicht, geht's automatisch zurück)
+                                    täglich 08:00 und sofort per Webhook; sichert vorher; startet sie nicht, geht's automatisch zurück)
   tippspiel neustart                App neu starten
   tippspiel protokoll               Meldungen der App anzeigen (Fehlersuche)
+  tippspiel webhook-einrichten      GitHub-Webhook einrichten: Update sofort, sobald eine geprüfte Version da ist
   tippspiel einstellungen           Einstellungen ändern (Gmail, Admins, …) – Speichern: Strg+O, Enter, Strg+X
   tippspiel mail-test <E-Mail>      Test-Mail verschicken
   tippspiel daten <Name>            Turnierdaten einspielen, z. B.  tippspiel daten worlds-2026

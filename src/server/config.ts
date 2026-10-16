@@ -19,6 +19,8 @@ export interface Config {
   timeZone: string;
   /** Offizielle Livestreams (Links im Kopf, sobald ein Turnier läuft). */
   streams: { twitch: string; youtube: string };
+  /** Geheimnis für den GitHub-Webhook (/hooks/github): meldet GitHub eine neue geprüfte Version, wird sofort aktualisiert. Leer = Webhook aus. */
+  webhookSecret: string;
   /** Datei, mit der der Administrator ein sofortiges Update anfordert (der Pi beobachtet sie, siehe deploy/install.sh) */
   updateRequestFile: string;
   /** Datei, mit der der Administrator eine Sicherung der Datenbank anfordert (wie beim Update beobachtet der Pi sie) */
@@ -73,6 +75,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         .filter(Boolean),
     ),
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
+    webhookSecret: env.GITHUB_WEBHOOK_SECRET?.trim() ?? '',
     updateRequestFile: env.UPDATE_REQUEST_FILE?.trim() || '/run/lol-tippspiel/update-anfrage',
     backupDir: env.BACKUP_DIR?.trim() || '/var/backups/lol-tippspiel',
     backupRequestFile: env.BACKUP_REQUEST_FILE?.trim() || '/run/lol-tippspiel/sicherung-anfrage',

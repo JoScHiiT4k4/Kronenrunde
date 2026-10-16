@@ -67,6 +67,25 @@ export function parseCookies(header: string | undefined): Record<string, string>
   return out;
 }
 
+/** Liest den Body unverändert (für Webhooks, deren Signatur über die rohen Bytes läuft) mit Größenbegrenzung. */
+export function readRaw(req: IncomingMessage, limitBytes = 1_000_000): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > limitBytes) {
+        reject(new HttpError(413, 'Zu groß'));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
 /** Liest einen Formular-Body (application/x-www-form-urlencoded) mit Größenbegrenzung. */
 export function readForm(req: IncomingMessage, limitBytes = 100_000): Promise<URLSearchParams> {
   const type = (req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();

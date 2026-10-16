@@ -4,6 +4,7 @@
 //
 // Ohne TEST_DATABASE_URL wird der Test übersprungen.
 
+import { createHmac } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
@@ -152,6 +153,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       MAIL_MODE: 'memory',
       APP_SECRET: 'test-geheimnis',
       UPDATE_REQUEST_FILE: UPDATE_FILE,
+      GITHUB_WEBHOOK_SECRET: 'hook-geheimnis',
       BACKUP_REQUEST_FILE: BACKUP_FILE,
       BACKUP_DIR,
     });
@@ -1218,6 +1220,36 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.ok(existsSync(UPDATE_FILE));
     assert.match((await admin.get('/admin?bereich=system')).text, /Ein Update ist angefordert/);
     rmSync(UPDATE_FILE, { force: true });
+  });
+
+  test('Administrator: Symbol zum Aktualisieren der Seite neben Version & Update', async () => {
+    const page = await admin.get('/admin?bereich=system');
+    assert.match(page.text, /class="refresh-link" href="\/admin\?bereich=system"[^>]*aria-label="Seite aktualisieren"/);
+  });
+
+  test('GitHub-Webhook: nur signierte Meldungen über den Zweig stabil lösen ein Update aus', async () => {
+    rmSync(UPDATE_FILE, { force: true });
+    const send = (body: string, event: string, secret: string | null = 'hook-geheimnis') =>
+      fetch(`${base}/hooks/github`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-github-event': event,
+          ...(secret ? { 'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` } : {}),
+        },
+        body,
+      });
+    assert.equal((await send('{"ref":"refs/heads/stabil"}', 'push', null)).status, 401, 'ohne Signatur');
+    assert.equal((await send('{"ref":"refs/heads/stabil"}', 'push', 'falsch')).status, 401, 'falsches Geheimnis');
+    assert.ok(!existsSync(UPDATE_FILE));
+    assert.equal((await send('{"zen":"x"}', 'ping')).status, 200);
+    assert.equal((await send('{"ref":"refs/heads/main"}', 'push')).status, 200, 'anderer Zweig');
+    assert.ok(!existsSync(UPDATE_FILE), 'main löst nichts aus');
+    assert.equal((await send('kaputt', 'push')).status, 400);
+    assert.equal((await send('{"ref":"refs/heads/stabil"}', 'push')).status, 202);
+    assert.ok(existsSync(UPDATE_FILE), 'stabil legt die Update-Anfrage ab');
+    rmSync(UPDATE_FILE, { force: true });
+    assert.equal((await fetch(`${base}/hooks/github`)).status, 404, 'GET gibt es nicht');
   });
 
   test('Administrator: Reiter Backup mit Status, Liste und Knopf für eine Sicherung', async () => {
