@@ -952,7 +952,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .match-meta .tipped { color: var(--muted); }
 .foot .foot-version { max-width: none; margin: 14px 0 0; font-size: 0.75rem; color: var(--muted); text-align: left; opacity: 0.8; }
 
-/* Aufklappbare Tipps der Mitspieler bei Spielen, die schon begonnen haben */
+/* Aufklappbare Alle Tipps bei Spielen, die schon begonnen haben */
 .tips-fold { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 4px; }
 .tips-fold > summary { display: flex; align-items: center; gap: 8px; min-height: 0; padding: 2px 0; margin-left: 0; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
 .tips-fold summary:hover { color: var(--gold-bright); }
@@ -1258,7 +1258,7 @@ td.bad { color: var(--red); }
 .score.plain { cursor: default; }
 .score.plain:hover { border-color: #26384a; }
 
-/* Spielkarte mit aufklappbaren Tipps: unten weniger Luft unter "Tipps der Mitspieler" */
+/* Spielkarte mit aufklappbaren Tipps: unten weniger Luft unter "Alle Tipps" */
 .match:has(> .tips-fold:last-child) { padding-bottom: 8px; }
 .match > .tips-fold:not([open]) { margin-top: 4px; }
 

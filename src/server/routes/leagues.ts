@@ -445,7 +445,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     const match = toDomainMatch(m);
     const byUser = new Map(allPreds.filter((p) => p.match_id === m.id).map((p) => [p.user_id, p]));
     return html`<details class="tips-fold">
-    <summary>Tipps der Mitspieler</summary>
+    <summary>Alle Tipps</summary>
     <table class="table compact tips-table">
       <thead><tr><th>Name</th><th>Tipp</th><th class="num">Punkte</th></tr></thead>
       <tbody>
