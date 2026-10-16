@@ -5,7 +5,7 @@ import { stageLabel } from '../../domain/bracket.ts';
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
 import { existsSync, writeFileSync } from 'node:fs';
-import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, nasLevel, percent, readSystemInfo } from '../system-info.ts';
+import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, nasLevel, percent, readBackups, readSystemInfo } from '../system-info.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
 import { clearChat } from './chat.ts';
 import { hideTestLeague, loadTestState, showTestLeague, syncTestLeague } from '../testspiel.ts';
@@ -90,6 +90,7 @@ const ADMIN_AREAS = [
   ['uebersicht', 'Übersicht'],
   ['nutzer', 'Nutzer'],
   ['system', 'Server'],
+  ['backup', 'Backup'],
   ['abgleich', 'Datenabgleich'],
   ['test', 'Test'],
   ['impressum', 'Impressum'],
@@ -130,7 +131,7 @@ const worst = (a: Level, b: Level): Level => (a === 'hot' || b === 'hot' ? 'hot'
 
 async function systemPanel(ctx: Ctx): Promise<Html> {
   const { db } = ctx.deps;
-  const sys = readSystemInfo();
+  const sys = readSystemInfo(ctx.deps.config.backupDir);
   const [dbSize, tables, chatRow] = await Promise.all([
     db.one<{ bytes: string }>('select pg_database_size(current_database())::text as bytes'),
     db.query<{ name: string; bytes: string }>(
@@ -194,6 +195,51 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
 </section>`;
 }
 
+/** Reiter "Backup": Zustand der Sicherungen und ein Knopf für eine Sicherung von Hand. */
+function backupPanel(ctx: Ctx): Html {
+  const tz = ctx.deps.config.timeZone;
+  const sys = readSystemInfo(ctx.deps.config.backupDir);
+  const files = readBackups(ctx.deps.config.backupDir);
+  const pending = existsSync(ctx.deps.config.backupRequestFile);
+  const level = backupLevel(sys.backupCount, sys.backupNewest, ctx.now);
+  const ageHours = sys.backupNewest ? Math.floor((ctx.now.getTime() - sys.backupNewest.getTime()) / 3_600_000) : null;
+  const ago = ageHours === null ? '' : ageHours < 1 ? 'vor weniger als einer Stunde' : ageHours < 48 ? `vor ${ageHours} Std.` : `vor ${Math.floor(ageHours / 24)} Tagen`;
+  return html`<section class="panel">
+  <h2>Sicherung der Datenbank</h2>
+  <div class="sys-facts">
+    <div class="sys-fact-${level}"><span class="muted">Letzte Sicherung</span>
+      <strong>${sys.backupNewest ? `${formatDateTime(sys.backupNewest, tz)} Uhr` : 'noch keine'}</strong>
+      <small class="muted">${sys.backupNewest ? `${ago} · rot, wenn älter als ${LIMITS.backupAgeHours.hot} Std.` : 'Ohne Sicherung ist bei einem Defekt der SD-Karte alles weg.'}</small></div>
+    <div><span class="muted">Auf dem Pi gespeichert</span><strong>${sys.backupBytes !== null ? `${sys.backupCount} (${formatBytes(sys.backupBytes)})` : 'unbekannt'}</strong>
+      <small class="muted">nächtlich um 4 Uhr, die letzten 14 bleiben</small></div>
+    ${
+      sys.nas
+        ? html`<div class="sys-fact-${nasLevel(sys.nas, ctx.now)}"><span class="muted">Kopie auf der MyCloud</span><strong>${sys.nas.ok ? 'in Ordnung' : 'fehlgeschlagen'}</strong>
+      <small class="muted">${formatDateTime(sys.nas.at, tz)} Uhr${sys.nas.ok ? '' : ` · ${sys.nas.message}`}</small></div>`
+        : html`<div><span class="muted">Kopie auf der MyCloud</span><strong>nicht eingerichtet</strong>
+      <small class="muted">Einrichten auf dem Pi mit „tippspiel nas-einrichten“</small></div>`
+    }
+  </div>
+  ${pending ? html`<p class="notice notice-ok">Eine Sicherung ist angefordert und wird gleich gemacht.</p>` : nothing}
+  <form method="post" action="/admin/backup-erstellen" class="stack">
+    ${csrfField(ctx)}
+    <p class="muted">Sichert die Datenbank sofort, ohne auf die Nacht zu warten, und kopiert sie auf die MyCloud, falls eingerichtet. Die Seite läuft dabei ganz normal weiter.</p>
+    <button type="submit" class="btn btn-primary">Jetzt sichern</button>
+  </form>
+</section>
+<section class="panel">
+  <h2>Vorhandene Sicherungen</h2>
+  ${
+    files.length
+      ? html`<table class="table compact"><thead><tr><th>Zeitpunkt</th><th>Art</th><th class="num">Größe</th></tr></thead><tbody>
+    ${files.slice(0, 15).map((f) => html`<tr><td>${formatDateTime(f.at, tz)} Uhr</td><td>${f.beforeUpdate ? 'vor einem Update' : 'Sicherung'}</td><td class="num">${formatBytes(f.bytes)}</td></tr>`)}
+  </tbody></table>${files.length > 15 ? html`<p class="muted">Die ${files.length - 15} älteren Sicherungen stehen nur auf dem Pi (<code>tippspiel sicherungen</code>).</p>` : nothing}`
+      : html`<p class="muted">Es gibt noch keine Sicherung.</p>`
+  }
+  <p class="muted">Zurückspielen geht nur auf dem Pi mit <code>tippspiel wiederherstellen</code>. Das ist Absicht, damit es nicht aus Versehen im Browser passiert.</p>
+</section>`;
+}
+
 async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
   const { db } = ctx.deps;
   const wanted = ctx.query.get('bereich');
@@ -248,6 +294,8 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
 </section>`;
   } else if (area === 'system') {
     content = await systemPanel(ctx);
+  } else if (area === 'backup') {
+    content = backupPanel(ctx);
   } else if (area === 'abgleich') {
     const [syncRows, counts] = await Promise.all([
       db.query<{ name: string; ok_at: Date | null; details: string | null; error: string | null }>('select name, ok_at, details, error from sync_status'),
@@ -587,6 +635,16 @@ export function registerAdminRoutes(router: Router<Ctx>) {
       return adminHome(ctx, 'Das Update konnte nicht angefordert werden. Der Update-Dienst ist auf diesem Server nicht eingerichtet (Version erst von Hand mit "tippspiel update" installieren).');
     }
     return redirect('/admin?bereich=system&hinweis=update-angefordert');
+  });
+
+  post('/admin/backup-erstellen', async (ctx) => {
+    // Wie beim Update: Die App legt nur eine Anfrage ab, die Sicherung macht der Pi als root (deploy/install.sh)
+    try {
+      writeFileSync(ctx.deps.config.backupRequestFile, `${ctx.now.toISOString()}\n`);
+    } catch {
+      return adminHome(ctx, 'Die Sicherung konnte nicht angefordert werden. Der Sicherungs-Dienst ist auf diesem Server nicht eingerichtet (von Hand: "tippspiel sicherung" auf dem Pi).');
+    }
+    return redirect('/admin?bereich=backup&hinweis=backup-angefordert');
   });
 
   post('/admin/abgleich', async (ctx) => {

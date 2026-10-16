@@ -21,6 +21,10 @@ export interface Config {
   streams: { twitch: string; youtube: string };
   /** Datei, mit der der Administrator ein sofortiges Update anfordert (der Pi beobachtet sie, siehe deploy/install.sh) */
   updateRequestFile: string;
+  /** Datei, mit der der Administrator eine Sicherung der Datenbank anfordert (wie beim Update beobachtet der Pi sie) */
+  backupRequestFile: string;
+  /** Ordner mit den Sicherungen (legt `tippspiel sicherung` an; die App liest ihn nur) */
+  backupDir: string;
   mail: {
     mode: MailMode;
     from: string;
@@ -70,6 +74,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ),
     timeZone: env.APP_TIMEZONE ?? 'Europe/Berlin',
     updateRequestFile: env.UPDATE_REQUEST_FILE?.trim() || '/run/lol-tippspiel/update-anfrage',
+    backupDir: env.BACKUP_DIR?.trim() || '/var/backups/lol-tippspiel',
+    backupRequestFile: env.BACKUP_REQUEST_FILE?.trim() || '/run/lol-tippspiel/sicherung-anfrage',
     streams: {
       twitch: env.STREAM_TWITCH_URL?.trim() || 'https://www.twitch.tv/riotgames',
       youtube: env.STREAM_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@lolesports',

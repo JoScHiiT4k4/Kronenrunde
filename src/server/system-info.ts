@@ -62,6 +62,29 @@ export function backupLevel(count: number, newest: Date | null, now: Date): Leve
   return levelOf((now.getTime() - newest.getTime()) / 3_600_000, LIMITS.backupAgeHours);
 }
 
+export interface BackupFile {
+  name: string;
+  bytes: number;
+  at: Date;
+  /** Automatisch vor einem Update angelegt */
+  beforeUpdate: boolean;
+}
+
+/** Vorhandene Sicherungen auf dem Pi, die neueste zuerst. */
+export function readBackups(dir = '/var/backups/lol-tippspiel'): BackupFile[] {
+  try {
+    return readdirSync(dir)
+      .filter((f) => f.startsWith('tippspiel-') && f.endsWith('.dump'))
+      .map((f) => {
+        const st = statSync(join(dir, f));
+        return { name: f, bytes: st.size, at: new Date(st.mtimeMs), beforeUpdate: f.includes('-vor-') };
+      })
+      .sort((a, b) => b.at.getTime() - a.at.getTime());
+  } catch {
+    return [];
+  }
+}
+
 /** Statusdatei des Servers (`ok|fehler`, Zeitpunkt, Meldung – durch Tabulator getrennt), siehe deploy/tippspiel. */
 export function parseNasStatus(text: string | null): NasStatus | null {
   if (!text) return null;
