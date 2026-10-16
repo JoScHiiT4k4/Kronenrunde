@@ -816,7 +816,7 @@ a.bk-match:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--gold
 .bracket-tree { display: block; }
 .bk-svg { display: block; max-width: none; font-family: inherit; }
 /* Am PC füllt der Baum die Breite aus; kleine Bildschirme scrollen seitlich */
-@media (min-width: 940px) and (max-width: 1139px) { .bracket-tree .bk-svg { width: 100%; height: auto; max-width: 1300px; } }
+@media (min-width: 900px) { .bracket-tree .bk-svg { width: 100%; height: auto; max-width: 1300px; } }
 .bk-box { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
 a.bk-match:hover .bk-box { stroke: var(--gold); }
 a.bk-match:focus-visible { outline: none; }
@@ -1248,11 +1248,15 @@ td.bad { color: var(--red); }
 .match > .tips-fold:not([open]) { margin-top: 4px; }
 
 /* Spalten je Fensterbreite (Reiter und Inhalt bleiben immer in derselben Spalte):
-   ab 940px steht die Rangliste rechts neben dem Inhalt, ab 1140px zusätzlich ein Platzhalter links (Inhalt mittig),
-   Seiten mit breitem Inhalt (Turnierbaum) erst ab 1540px. Die Seitenspalten geben nach, der Inhalt behält seine Breite. */
-@media (min-width: 940px) and (max-width: 1139px) {
+   ab 920px steht die Rangliste rechts neben dem Inhalt, ab 1140px zusätzlich ein Platzhalter links (Inhalt mittig),
+   Seiten mit breitem Inhalt (Turnierbaum) bekommen den Platzhalter links erst ab 1540px. Die Seitenspalten geben nach, der Inhalt behält seine Breite. */
+@media (min-width: 920px) and (max-width: 1139px) {
   .page:not(.page-wide):has(> .rank-side) { grid-template-columns: minmax(0, 720px) 200px; }
   .page:not(.page-wide) > .rank-side { display: block; grid-column: 2; }
+}
+@media (min-width: 920px) and (max-width: 1539px) {
+  .page-wide:has(> .rank-side) { grid-template-columns: minmax(0, 1320px) 210px; }
+  .page-wide > .rank-side { display: block; grid-column: 2; }
 }
 @media (min-width: 1140px) {
   .page:not(.page-wide) { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
