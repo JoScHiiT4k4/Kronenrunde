@@ -140,6 +140,16 @@ Alle Befehle: `tippspiel hilfe`. Eventuell fragt der Pi dabei nach deinem Pi-Pas
 
 Die Datenbank wird jede Nacht gesichert (die letzten 14 Sicherungen bleiben), und Sicherheits-Updates für den Pi laufen automatisch.
 
+### Sicherung zusätzlich auf die MyCloud
+
+Die Sicherungen liegen sonst nur auf der SD-Karte des Pi. Damit sie einen Defekt der Karte überstehen, kann jede nächtliche Sicherung zusätzlich auf eine Windows-Freigabe (SMB) im Heimnetz kopiert werden, zum Beispiel auf die WD MyCloud:
+
+```bash
+tippspiel nas-einrichten
+```
+
+Der Befehl fragt nach der Adresse der MyCloud (IP oder `wdmycloud`), dem Namen der Freigabe, einem Unterordner und dem Benutzer samt Passwort, installiert bei Bedarf das nötige Programm und kopiert gleich die neueste Sicherung als Test. Auf der MyCloud bleiben die letzten 30 Kopien. Zugangsdaten liegen nur für den Administrator lesbar unter `/etc/lol-tippspiel/`. Weitere Befehle: `tippspiel nas-test` (jetzt kopieren) und `tippspiel nas-entfernen` (ausschalten).
+
 ---
 
 ## Wenn etwas nicht klappt
