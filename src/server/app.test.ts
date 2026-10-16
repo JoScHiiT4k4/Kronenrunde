@@ -1634,4 +1634,40 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       await db.run('delete from tournaments where id = $1', [tid]);
     }
   });
+
+  test('Tippen: bei Tippschluss "automatisch" gilt die Reihenfolge auch unter "Vorbei" (Tippschluss ist für alle schon vorbei, gespielt ist aber nicht alles)', async () => {
+    // Eigenes, isoliertes Turnier und eigene Runde, damit die Reihenfolge nicht von anderen Tests abhängt
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Reihenfolge-Automatisch-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    const addMatch = (a: string, b: string, at: Date, opts: { status?: string; winsA?: number; winsB?: number } = {}) =>
+      db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status, wins_a, wins_b)
+         values ($1, $2, $3, 1, $4, $5, $6, $7) returning id`,
+        [tid, team[a], team[b], at, opts.status ?? 'scheduled', opts.winsA ?? null, opts.winsB ?? null],
+      );
+    try {
+      // Derselbe Spieltag: GEN–T1 vor zwei Stunden entschieden, T1–KC startet erst in einer Stunde – aber bei
+      // "automatisch" ist der Tippschluss dafür schon vorbei, sobald das Spiel davor vorbei ist. Beide Begegnungen
+      // landen also unter "Vorbei" (kein Spiel des Tages ist mehr tippbar), obwohl T1–KC noch gar nicht läuft.
+      const done = (await addMatch('GEN', 'T1', hours(-2), { status: 'finished', winsA: 1, winsB: 0 }))!.id;
+      const next = (await addMatch('T1', 'KC', hours(1)))!.id;
+
+      // Bereits angemeldeter Spielleiter wiederverwenden statt ein neues Konto anzulegen (Limit neuer Konten je Adresse)
+      const created = await admin.post('/neu', { name: 'Reihenfolge-Auto-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'auto' });
+      assert.equal(created.status, 303, created.text);
+      const rslug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+      const page = await admin.get(`/r/${rslug}/tippen`);
+      assert.equal(page.status, 200);
+      const vorbeiAt = page.text.indexOf('>Vorbei<');
+      assert.ok(vorbeiAt >= 0, 'beide Spiele sollten unter "Vorbei" stehen, da der Tippschluss für den ganzen Tag vorbei ist');
+      const positions = [next, done].map((id) => ({ id, i: page.text.indexOf(`id="spiel-${id}"`) }));
+      assert.ok(positions.every((p) => p.i > vorbeiAt), 'beide Spiele liegen im "Vorbei"-Bereich');
+      // Das noch nicht gespielte (aber schon gesperrte) Spiel steht auch unter "Vorbei" oben, das gespielte darunter
+      assert.deepEqual(positions.sort((a, b) => a.i - b.i).map((p) => p.id), [next, done]);
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+    }
+  });
 });

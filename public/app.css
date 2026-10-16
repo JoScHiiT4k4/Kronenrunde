@@ -520,6 +520,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   border: 1px solid rgb(200 170 110 / 35%);
 }
 .versus .vs { display: inline-grid; vertical-align: middle; }
+/* Das VS-Medaillon ist schmaler als der Ergebnis-Block (92px) – außen genauso breit, damit die
+   Gewinnchance bei noch ausstehenden Spielen denselben Abstand hat wie bei Spielen mit Spoilerschutz. */
+.teams .mid .vs { margin: 0 27px; }
 
 .picks {
   display: grid;
@@ -1290,6 +1293,7 @@ td.bad { color: var(--red); }
   .teams .mid { gap: 8px; }
   .teams .pct { font-size: 0.9em; }
   .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
+  .teams .mid .vs { margin: 0 19px; }
 }
 
 /* Sonderfragen: einzelne Fragen auf- und einklappbar */
