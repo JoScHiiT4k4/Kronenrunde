@@ -506,18 +506,33 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rowsOf(match['G2-KC']), [['Ben', 'KC 2:1', '2', true], ['Anna', 'KC 2:0', '1', false]]); // nach Punkten absteigend
   });
 
-  test('Kopfzeile: Countdown vor dem Start, danach Livestream-Links', async () => {
+  test('Kopfzeile: Countdown zum Turnier, zwischen den Spieltagen, "Live" am Spieltag', async () => {
+    // Vor dem Turnier: "<Name> in <Countdown>"
     const restore = await postponeTournament(tournamentId);
     const before = await anna.get(`/r/${slug}/tippen`);
+    assert.match(before.text, /class="tbar-label">[^<]+ in<\/span>\s*<time class="tbar-count"/);
     assert.match(before.text, /data-countdown="/);
     assert.match(before.text, /twitch\.tv/, 'Links gibt es schon vor dem Start');
     await restore();
-    const after = await anna.get(`/r/${slug}/tippen`);
-    assert.doesNotMatch(after.text, /data-countdown/);
-    assert.match(after.text, /class="tbar-label">[^<]+<\/span>/, 'läuft: nur der Turniername');
-    assert.doesNotMatch(after.text, /class="tbar-label">[^<]* in<\/span>/);
-    assert.match(after.text, /href="https:\/\/www\.twitch\.tv\/riotgames"/);
-    assert.match(after.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+
+    // Turnier läuft, heute kein Spiel: Countdown bis zu den nächsten Begegnungen, ohne "in" und ohne "Live"
+    const between = await anna.get(`/r/${slug}/tippen`);
+    assert.match(between.text, /class="tbar-label">[^<]+<\/span>\s*<time class="tbar-count"/);
+    assert.doesNotMatch(between.text, /class="tbar-label">[^<]* in<\/span>/);
+    assert.doesNotMatch(between.text, /tbar-live/);
+    assert.match(between.text, /href="https:\/\/www\.twitch\.tv\/riotgames"/);
+    assert.match(between.text, /href="https:\/\/www\.youtube\.com\/@lolesports"/);
+
+    // Ein Spiel läuft: "Live" statt Countdown
+    const open = await db.query<{ id: string }>(`select id from matches where tournament_id = $1 and status = 'scheduled'`, [tournamentId]);
+    await db.run(`update matches set status = 'live' where id = $1`, [open[0].id]);
+    try {
+      const live = await anna.get(`/r/${slug}/tippen`);
+      assert.match(live.text, /<span class="tbar-live">Live<\/span>/);
+      assert.doesNotMatch(live.text, /data-countdown/);
+    } finally {
+      await db.run(`update matches set status = 'scheduled' where id = $1`, [open[0].id]);
+    }
   });
 
   test('Administrator: Reiter, keine Turnier-Bearbeitung auf der Startseite', async () => {
@@ -1152,9 +1167,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
     // Links nur ein unsichtbarer Platzhalter (Werbung ist ausgeblendet), rechts die Werbefläche bzw. – angemeldet – die Rangliste
-    assert.equal((pub.text.match(/class="ad ad-right"/g) ?? []).length, 1);
-    assert.match(pub.text, /class="ad ad-ghost" aria-hidden="true"/);
-    assert.doesNotMatch(pub.text, /ad-left/);
+    assert.equal((pub.text.match(/class="side side-right"/g) ?? []).length, 1);
+    assert.match(pub.text, /class="side side-ghost" aria-hidden="true"/);
+    assert.doesNotMatch(pub.text, /side-left/);
   });
 
   test('Administrator: Update sofort anfordern (legt nur eine Anfrage-Datei ab)', async () => {
@@ -1249,7 +1264,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       `delete from league_members where user_id = (select id from users where email = 'admin@example.de') returning league_id, user_id, role, joined_at`,
     );
     try {
-      assert.match((await admin.get('/admin?bereich=backup')).text, /class="ad ad-right rank-side"/);
+      assert.match((await admin.get('/admin?bereich=backup')).text, /class="side side-right rank-side"/);
     } finally {
       for (const m of saved) await db.query('insert into league_members (league_id, user_id, role, joined_at) values ($1, $2, $3, $4)', [m.league_id, m.user_id, m.role, m.joined_at]);
     }

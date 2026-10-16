@@ -280,7 +280,7 @@ function backupPanel(ctx: Ctx): Html {
       <input type="date" name="bis" value="${bis}"${attr(von !== '', `min="${von}"`)}></label>
     <label><span class="muted">Art</span>
       <select name="art">${BACKUP_KINDS.map(([k, label]) => html`<option value="${k}"${attr(k === art, 'selected')}>${label}</option>`)}</select></label>
-    <button type="submit" class="btn btn-quiet">Filtern</button>
+    <noscript><button type="submit" class="btn btn-quiet">Filtern</button></noscript>
     ${filterActive ? html`<a class="btn btn-quiet" href="/admin?bereich=backup#sicherungen">Zurücksetzen</a>` : nothing}
   </form>
   ${
