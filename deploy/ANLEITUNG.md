@@ -152,7 +152,7 @@ Vorbereitung an der MyCloud: NFS einschalten und für den Ordner dem Pi (am best
 tippspiel nas-einrichten
 ```
 
-Der Befehl fragt nach der NFS-Adresse (z. B. `nfs://192.168.1.50/nfs/Sicherung`) und einem Unterordner, installiert bei Bedarf das nötige Programm (`nfs-common`) und kopiert gleich die neueste Sicherung als Test. Auf der MyCloud bleiben die letzten 30 Kopien. Weitere Befehle: `tippspiel nas-test` (jetzt kopieren) und `tippspiel nas-entfernen` (ausschalten).
+Der Befehl fragt nach der NFS-Adresse (z. B. `nfs://192.168.1.50/nfs/Sicherung`) und einem Unterordner, installiert bei Bedarf das nötige Programm (`nfs-common`) und kopiert gleich die neueste Sicherung als Test. Die neueste Sicherung wird dann täglich um 7 Uhr auf die MyCloud kopiert; dort bleiben die letzten 30 Kopien. Weitere Befehle: `tippspiel nas-test` (jetzt kopieren) und `tippspiel nas-entfernen` (ausschalten).
 
 ---
 
