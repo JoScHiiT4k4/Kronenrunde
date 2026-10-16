@@ -220,7 +220,7 @@ p { margin: 0 0 0.9em; }
 /* Reiter (nav) und Inhalt (main) liegen im selben Raster, also immer in derselben Spalte; Seitenspalten stehen in Zeile 2 */
 .page > .league-nav { grid-row: 1; grid-column: 1; }
 .page > .main { grid-row: 2; grid-column: 1; min-width: 0; padding: 20px 16px 32px; }
-.page > .side { grid-row: 2; }
+.page > .sidecol { grid-row: 2; }
 /* Breiter Inhalt (Turnierbaum): eigene Zeile unter Inhalt und Seitenspalten, mittig und bis 1320px breit */
 .page > .below { grid-row: 3; grid-column: 1 / -1; justify-self: center; width: 100%; max-width: 1320px; min-width: 0; padding: 0 16px 32px; }
 @media (max-width: 919px) { .page > .below { width: 100vw; } }
@@ -870,8 +870,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 }
 
 /* Werbeflächen links und rechts (nur auf breiten Bildschirmen) */
-.side { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
-.side-box {
+.sidecol { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
+.sidecol-box {
   position: sticky;
   top: 16px;
   min-height: 600px;
@@ -882,7 +882,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
   background-color: var(--surface);
   clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
 }
-.side-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
+.sidecol-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
 /* Überschrift über einer Liste von Einstellungen (z. B. Sonderfragen) */
 .small-title { margin: 20px 0 6px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
 /* Abmelden oben rechts */
@@ -986,6 +986,14 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 }
 a.rank-box:hover { border-color: var(--gold); color: inherit; }
 a.rank-box:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: -2px; }
+.rank-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rank-body { display: flex; flex-direction: column; gap: 6px; }
+.rank-toggle { position: relative; z-index: 2; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; color: var(--gold-text); background: transparent; border: 1px solid #2c3f53; border-radius: 2px; cursor: pointer; }
+.rank-toggle[hidden] { display: none; }
+.rank-toggle:hover { color: var(--gold-bright); border-color: var(--gold); }
+.rank-toggle .ico { transition: transform 0.15s; }
+.rank-box.collapsed .rank-toggle .ico { transform: rotate(-90deg); }
+.rank-box.collapsed .rank-body { display: none; }
 .rank-title { font-family: var(--font-display); font-size: 1.1rem; letter-spacing: 0.06em; color: var(--gold-text); }
 .rank-league { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
 .rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -1058,7 +1066,7 @@ a.rank-box:hover .rank-more { color: var(--gold-bright); }
 .st-list li > :last-child { text-align: right; }
 
 /* Linke Spalte (früher Werbung): unsichtbarer Platzhalter, damit der Inhalt mittig bleibt */
-.side-ghost { visibility: hidden; }
+.sidecol-ghost { visibility: hidden; }
 
 /* Rangliste auf dem Handy: Nebenspalten ausblenden, Ausbeute und Zahlen unter den Namen */
 .rk-sub { display: none; }
@@ -1274,12 +1282,13 @@ td.bad { color: var(--red); }
   .page > .rank-side { display: block; grid-column: 2; }
 }
 @media (min-width: 1140px) {
-  .page { grid-template-columns: minmax(190px, var(--side)) 720px minmax(190px, var(--side)); }
-  .page > .side { display: block; }
-  .page > .side-ghost { grid-column: 1; }
+  .page { grid-template-columns: minmax(190px, 1fr) 720px minmax(190px, 1fr); }
+  .page > .sidecol { display: block; }
+  .page > .sidecol-ghost { grid-column: 1; }
   .page > .league-nav,
   .page > .main { grid-column: 2; }
-  .page > .side:not(.side-ghost) { grid-column: 3; }
+  /* Rechte Spalte (Rangliste): so weit rechts am Fensterrand wie möglich, der Inhalt bleibt mittig */
+  .page > .sidecol:not(.sidecol-ghost) { grid-column: 3; justify-self: end; width: min(100%, var(--side)); padding-right: 16px; box-sizing: content-box; }
 }
 /* Mittlere Fenster (Reiter noch sichtbar, Inhalt schmaler als 720px): Reiter etwas enger, damit sie in einer Zeile bleiben */
 @media (min-width: 641px) and (max-width: 720px) {
@@ -1343,11 +1352,11 @@ td.bad { color: var(--red); }
 }
 
 /* ---------- Administrator > Backup: Liste der Sicherungen ---------- */
-.backup-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin: 6px 0 12px; }
-.backup-filter label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; min-width: 0; }
-.backup-filter select, .backup-filter input[type="date"] { min-height: 40px; min-width: 9.5rem; padding: 6px 10px; font: inherit; color: var(--text); color-scheme: dark; background-color: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }
-.backup-filter select:focus, .backup-filter input[type="date"]:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgb(200 170 110 / 30%); }
-.backup-filter .btn { min-height: 40px; }
+.list-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin: 6px 0 12px; }
+.list-filter label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; min-width: 0; }
+.list-filter select, .list-filter input[type="date"] { min-height: 40px; min-width: 9.5rem; padding: 6px 10px; font: inherit; color: var(--text); color-scheme: dark; background-color: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }
+.list-filter select:focus, .list-filter input[type="date"]:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgb(200 170 110 / 30%); }
+.list-filter .btn { min-height: 40px; }
 .backup-table { margin: 0 0 10px; }
 .pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
 .pager-item { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; padding: 0 8px; font-size: 0.9rem; color: var(--text); text-decoration: none; background: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }

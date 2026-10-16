@@ -322,9 +322,9 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
   return [...days.values()];
 }
 
-function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null, tipped?: string, fold?: Html): Html {
+/** Kopf einer Spielkarte: Zeit, Bo, Phase, Live-Hinweis und die Teams mit (verdecktem) Ergebnis – für Tippen und Alle Tipps gleich. */
+function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?: Shares | null, tipped?: string): { meta: Html; teams: Html } {
   const tz = ctx.deps.config.timeZone;
-  const match = toDomainMatch(m);
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
   // Bei "automatisch" schließen die weiteren Spiele eines Tages, sobald das Spiel davor vorbei ist
   const autoLock = open && league.lock_mode === 'auto' && m.has_prev && m.scheduled_at;
@@ -363,6 +363,14 @@ function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | u
     </span>
     <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}</span>
   </div>`;
+  return { meta, teams };
+}
+
+function matchCard(ctx: Ctx, league: League, m: MatchRow, own: PredictionRow | undefined, open: boolean, shares?: Shares | null, tipped?: string, fold?: Html): Html {
+  const tz = ctx.deps.config.timeZone;
+  const match = toDomainMatch(m);
+  const teamsKnown = !!(m.team_a_id && m.team_b_id);
+  const { meta, teams } = matchHead(ctx, league, m, open, shares, tipped);
 
   if (open && teamsKnown) {
     const options = resultOptions(m.best_of);
@@ -716,6 +724,8 @@ ${
 // Alle Tipps: jedes Spiel, dessen Tippschluss vorbei ist, mit den Tipps aller Mitglieder
 // ---------------------------------------------------------------------
 
+const ALL_TIPS_STATUS = [['alle', 'Alle Spiele'], ['gespielt', 'Gespielt'], ['laeuft', 'Läuft gerade'], ['offen', 'Noch nicht gespielt']] as const;
+
 async function allTipsPage(ctx: Ctx): Promise<Res> {
   if (!ctx.user) return loginRedirect(ctx);
   const access = await loadLeague(ctx, ctx.params.slug);
@@ -740,39 +750,50 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   for (const m of visible) tips.set(m.id, new Map());
   for (const p of preds) tips.get(p.match_id)?.set(p.user_id, p);
 
-  // Phasen wie beim Tippen; ohne Auswahl die Phase des zuletzt geschlossenen Spiels
-  const phases: { slug: string; name: string; matches: MatchRow[] }[] = [];
+  // Filter (Adresse ?phase=…&team=…&status=…&von=…&bis=…): nur bekannte Werte, alles andere heißt "kein Filter"
+  const phases: { slug: string; name: string }[] = [];
+  const teams = new Map<string, string>();
   for (const m of visible) {
     const name = phaseName(m);
-    let p = phases.find((x) => x.name === name);
-    if (!p) phases.push((p = { slug: phaseSlug(name), name, matches: [] }));
-    p.matches.push(m);
+    if (!phases.some((x) => x.name === name)) phases.push({ slug: phaseSlug(name), name });
+    if (m.team_a_id && m.team_a) teams.set(m.team_a_id, shortA(m));
+    if (m.team_b_id && m.team_b) teams.set(m.team_b_id, shortB(m));
   }
+  // Ohne Auswahl die Phase des zuletzt geschlossenen Spiels
   const latest = visible.at(-1);
-  const current = phases.find((p) => p.slug === ctx.query.get('phase')) ?? phases.find((p) => latest && p.name === phaseName(latest));
-  const phaseTabs = phases.length > 1
-    ? tabMenu('phase-tabs', 'Phasen', phases.map((p) => ({ href: `/r/${league.slug}/alle-tipps?phase=${p.slug}`, label: p.name, current: p === current })))
-    : nothing;
+  const phaseParam = ctx.query.get('phase') ?? '';
+  const phase = phaseParam === 'alle' ? 'alle' : (phases.find((p) => p.slug === phaseParam) ?? phases.find((p) => latest && p.name === phaseName(latest)))?.slug ?? 'alle';
+  const teamId = [...teams.keys()].includes(ctx.query.get('team') ?? '') ? ctx.query.get('team')! : '';
+  const status = ALL_TIPS_STATUS.some(([k]) => k === ctx.query.get('status')) ? ctx.query.get('status')! : 'alle';
+  // Zeitraum: frühestens der Tag des ersten, spätestens der Tag des letzten Spiels (Finale) des Turniers
+  const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
+  const times = matches.map((m) => m.scheduled_at).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime());
+  const minDay = times.length ? dayOf(times[0]) : '';
+  const maxDay = times.length ? dayOf(times[times.length - 1]) : '';
+  const dateParam = (name: string) => {
+    const v = ctx.query.get(name) ?? '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) && (!minDay || v >= minDay) && (!maxDay || v <= maxDay) ? v : '';
+  };
+  let von = dateParam('von');
+  let bis = dateParam('bis');
+  if (von && bis && von > bis) [von, bis] = [bis, von];
+  const filterActive = ['phase', 'team', 'status', 'von', 'bis'].some((k) => ctx.query.has(k) && ctx.query.get(k) !== '');
+  const shown = visible.filter((m) => {
+    if (phase !== 'alle' && phaseSlug(phaseName(m)) !== phase) return false;
+    if (teamId && m.team_a_id !== teamId && m.team_b_id !== teamId) return false;
+    if (status !== 'alle' && ({ gespielt: 'finished', laeuft: 'live', offen: 'scheduled' } as Record<string, string>)[status] !== m.status) return false;
+    const day = m.scheduled_at ? dayOf(m.scheduled_at) : '';
+    return (!von || (day !== '' && day >= von)) && (!bis || (day !== '' && day <= bis));
+  });
   // Neueste Spieltage zuerst
-  const days = groupMatchdays(current?.matches ?? [], tz).reverse();
+  const days = groupMatchdays(shown, tz).reverse();
 
   const card = (m: MatchRow) => {
     const match = toDomainMatch(m);
-    const result = resultLabel(m);
     const own = tips.get(m.id)!;
-    return html`<article class="match match-tips" id="tipps-${m.id}" data-item data-text="${`${m.team_a ? shortA(m) : ''} ${m.team_b ? shortB(m) : ''} ${m.team_a ?? ''} ${m.team_b ?? ''}`.toLowerCase()}">
-  <div class="match-meta">
-    <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : ''}</span>
-    <span class="bo">Bo${m.best_of}</span>
-    ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
-    ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
-  </div>
-  <div class="teams">
-    <span class="team team-a">${shortA(m)}</span>
-    <span class="vs">VS</span>
-    <span class="team team-b">${shortB(m)}</span>
-  </div>
-  <p class="tips-result">${result ? html`Ergebnis: <strong>${result}</strong>` : html`<span class="muted">Noch kein Ergebnis</span>`}</p>
+    const { meta, teams: teamRow } = matchHead(ctx, league, m, false);
+    return html`<article class="match match-tips" id="tipps-${m.id}">
+  ${meta}${teamRow}
   <table class="table compact tips-table">
     <thead><tr><th>Name</th><th>Tipp</th><th class="num">Punkte</th></tr></thead>
     <tbody>
@@ -791,19 +812,35 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
 </article>`;
   };
 
+  const select = (name: string, label: string, options: [string, string][], value: string) => html`<label><span class="muted">${label}</span>
+      <select name="${name}">${options.map(([k, text]) => html`<option value="${k}"${attr(k === value, 'selected')}>${text}</option>`)}</select></label>`;
+  const filter = html`<form method="get" action="/r/${league.slug}/alle-tipps" class="list-filter" data-auto-filter>
+    ${phases.length > 1 ? select('phase', 'Phase', [['alle', 'Alle Phasen'], ...phases.map((p): [string, string] => [p.slug, p.name])], phase) : nothing}
+    ${select('team', 'Team', [['', 'Alle Teams'], ...[...teams].sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]): [string, string] => [id, name])], teamId)}
+    ${select('status', 'Spiel', ALL_TIPS_STATUS.map(([k, label]): [string, string] => [k, label]), status)}
+    <label><span class="muted">Von</span>
+      <input type="date" name="von" value="${von}" min="${minDay}" max="${bis || maxDay}"></label>
+    <label><span class="muted">Bis</span>
+      <input type="date" name="bis" value="${bis}" min="${von || minDay}" max="${maxDay}"></label>
+    <noscript><button type="submit" class="btn btn-quiet">Filtern</button></noscript>
+    ${filterActive ? html`<a class="btn btn-quiet" href="/r/${league.slug}/alle-tipps">Zurücksetzen</a>` : nothing}
+  </form>`;
+
   const body = html`
-${phaseTabs}
 ${
   visible.length
     ? html`<p class="muted page-note">Alle Spiele, bei denen der Tippschluss vorbei ist – die neuesten oben.</p>
-  ${filterBar('tips-list', 'Team suchen …')}
-  <div id="tips-list">${days.map(
-    (d) => html`<section class="day" data-group>
+  ${filter}
+  ${
+    days.length
+      ? html`<div id="tips-list">${days.map(
+    (d) => html`<section class="day">
     <header class="day-head"><h2>${d.start ? formatDayLong(d.start, tz) : 'Ohne Termin'}</h2></header>
     ${d.matches.map(card)}
   </section>`,
-  )}</div>
-  <p class="muted filter-empty" hidden>Keine Treffer.</p>`
+  )}</div>`
+      : html`<p class="muted filter-empty">Kein Spiel passt zu diesem Filter.</p>`
+  }`
     : emptyState('Noch sind keine Tipps zu sehen. Sobald bei einem Spiel der Tippschluss vorbei ist, stehen hier die Tipps aller Mitspieler.')
 }`;
   return htmlResponse(layout(ctx, { title: `Alle Tipps – ${league.name}`, body, league: leagueNav(access, 'alle-tipps') }));

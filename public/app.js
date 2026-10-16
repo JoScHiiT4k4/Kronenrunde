@@ -193,6 +193,226 @@ if ('serviceWorker' in navigator) {
   tick();
 })();
 
+// Rangliste rechts ein- und ausklappen (Standard: ausgeklappt; die Wahl merkt sich der Browser)
+(() => {
+  const box = document.querySelector('.rank-box');
+  const btn = box && box.querySelector('[data-rank-toggle]');
+  if (!btn) return;
+  btn.hidden = false;
+  const set = (collapsed) => {
+    box.classList.toggle('collapsed', collapsed);
+    const label = collapsed ? 'Rangliste ausklappen' : 'Rangliste einklappen';
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  };
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('rank-collapsed') === '1'; } catch { /* ohne Speicher: ausgeklappt */ }
+  set(collapsed);
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    collapsed = !collapsed;
+    set(collapsed);
+    try { localStorage.setItem('rank-collapsed', collapsed ? '1' : '0'); } catch { /* egal */ }
+  });
+})();
+
+// Profilbild: im Browser auf 128x128 zuschneiden und verkleinern (JPEG), dann als Text mitschicken
+(() => {
+  const form = document.querySelector('[data-avatar-form]');
+  if (!form) return;
+  const file = form.querySelector('[data-avatar-file]');
+  const hidden = form.querySelector('input[name="avatar"]');
+  const submit = form.querySelector('[data-avatar-submit]');
+  file.addEventListener('change', () => {
+    submit.disabled = true;
+    hidden.value = '';
+    const f = file.files && file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 128;
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!side) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+        hidden.value = canvas.toDataURL('image/jpeg', 0.85);
+        submit.disabled = false;
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  });
+})();
+
+// Sonderfragen: Rückfrage, wenn beim Speichern Fragen abgewählt (also gelöscht) werden
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  const text = form.dataset && form.dataset.confirmUncheck;
+  if (!text || (e.submitter && e.submitter.dataset.confirm)) return;
+  const removed = [...form.querySelectorAll('input[data-was-checked]')].some((i) => !i.checked && !i.disabled);
+  if (removed && !window.confirm(text)) e.preventDefault();
+});
+
+// Live-Suche / Filter: Listen mit data-item-Zeilen, Leiste bleibt ohne JavaScript verborgen
+document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
+  const list = document.getElementById(bar.dataset.filter);
+  if (!list) return;
+  const q = bar.querySelector('.filter-q');
+  const region = bar.querySelector('.filter-region');
+  const empty = list.parentElement.querySelector('.st-empty, .filter-empty');
+  const apply = () => {
+    const text = q.value.trim().toLowerCase();
+    const reg = region ? region.value : '';
+    let shown = 0;
+    list.querySelectorAll('[data-item]').forEach((row) => {
+      const ok = (!text || (row.dataset.text || '').includes(text)) && (!reg || row.dataset.region === reg);
+      row.hidden = !ok;
+      if (ok) shown++;
+    });
+    list.querySelectorAll('[data-group]').forEach((g) => {
+      const has = !!g.querySelector('[data-item]:not([hidden])');
+      g.hidden = !has;
+      if (has && text && g.tagName === 'DETAILS') g.open = true;
+    });
+    if (empty) empty.hidden = shown > 0;
+  };
+  q.addEventListener('input', apply);
+  if (region) region.addEventListener('change', apply);
+  bar.hidden = false;
+});
+
+// Push-Benachrichtigungen im Konto: dieses Gerät an- und abmelden
+(function () {
+  const box = document.querySelector('[data-push]');
+  if (!box || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+  const on = box.querySelector('[data-push-on]');
+  const off = box.querySelector('[data-push-off]');
+  const status = box.querySelector('[data-push-status]');
+  const csrf = box.querySelector('[data-push-csrf]').value;
+  const toBytes = (b64) => {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+  const post = (url, data) =>
+    fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ _csrf: csrf, ...data }) });
+  const show = (subscribed) => {
+    on.hidden = subscribed;
+    off.hidden = !subscribed;
+    if (subscribed) status.textContent = 'Push ist auf diesem Gerät aktiv.';
+  };
+  const registration = () => navigator.serviceWorker.ready;
+  registration().then(async (reg) => {
+    box.hidden = false;
+    show(!!(await reg.pushManager.getSubscription()));
+  });
+  on.addEventListener('click', async () => {
+    try {
+      if ((await Notification.requestPermission()) !== 'granted') {
+        status.textContent = 'Der Browser blockiert Benachrichtigungen. Erlaube sie in den Seiteneinstellungen.';
+        return;
+      }
+      const reg = await registration();
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(box.dataset.key) }));
+      const j = sub.toJSON();
+      const r = await post('/konto/push', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+      if (!r.ok) throw new Error('save');
+      show(true);
+      status.textContent = 'Push ist auf diesem Gerät aktiv. Mit „Speichern“ oben legst du Vorlaufzeit fest.';
+      const cb = document.querySelector('input[name="push"]');
+      if (cb) cb.checked = true;
+    } catch {
+      status.textContent = 'Das hat nicht geklappt. Auf dem iPhone muss die App zuerst zum Startbildschirm hinzugefügt werden.';
+    }
+  });
+  off.addEventListener('click', async () => {
+    const reg = await registration();
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await post('/konto/push/entfernen', { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+    show(false);
+    status.textContent = 'Push ist auf diesem Gerät abgeschaltet.';
+  });
+})();
+
+// Dropdowns (Handy-Menüs, Spielleiter/Administrator): Tipp daneben schließt sie wieder
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open]').forEach((d) => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
+
+// Spoilerschutz: Klick auf den Ergebnis-Block zeigt das Ergebnis (noch einmal klicken verdeckt es wieder)
+document.addEventListener('click', (e) => {
+  const btn = e.target instanceof Element ? e.target.closest('[data-spoiler]') : null;
+  if (!btn) return;
+  const shown = btn.classList.toggle('revealed');
+  btn.setAttribute('aria-label', shown ? btn.dataset.label + ' – Ergebnis verdecken' : 'Ergebnis anzeigen');
+});
+
+// Filterformulare (Backup, Alle Tipps): Auswahlfelder wirken sofort; nach dem Von-Datum öffnet sich gleich der Bis-Kalender,
+// mit dem Bis-Datum wird gefiltert
+document.querySelectorAll('form[data-auto-filter]').forEach((form) => {
+  let sent = false;
+  const send = () => {
+    if (sent) return;
+    sent = true;
+    form.submit();
+  };
+  form.querySelectorAll('select').forEach((sel) => sel.addEventListener('change', send));
+  const von = form.elements.namedItem('von');
+  const bis = form.elements.namedItem('bis');
+  if (!(von instanceof HTMLInputElement) || !(bis instanceof HTMLInputElement)) return;
+  von.addEventListener('change', () => {
+    bis.min = von.value || bis.min;
+    if (!von.value) return send();
+    bis.focus();
+    try { bis.showPicker(); } catch { /* ältere Browser: Bis von Hand wählen */ }
+  });
+  bis.addEventListener('change', () => {
+    von.max = bis.value || von.max;
+    send();
+  });
+  // Bis-Kalender ohne Auswahl geschlossen: der Filter gilt dann ab dem Von-Datum
+  bis.addEventListener('blur', () => {
+    if (von.value && von.value !== von.defaultValue) send();
+  });
+});
+
+// Rangliste rechts ein- und ausklappen (Standard: ausgeklappt; die Wahl merkt sich der Browser)
+(() => {
+  const box = document.querySelector('.rank-box');
+  const btn = box && box.querySelector('[data-rank-toggle]');
+  if (!btn) return;
+  btn.hidden = false;
+  const set = (collapsed) => {
+    box.classList.toggle('collapsed', collapsed);
+    const label = collapsed ? 'Rangliste ausklappen' : 'Rangliste einklappen';
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  };
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('rank-collapsed') === '1'; } catch { /* ohne Speicher: ausgeklappt */ }
+  set(collapsed);
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    collapsed = !collapsed;
+    set(collapsed);
+    try { localStorage.setItem('rank-collapsed', collapsed ? '1' : '0'); } catch { /* egal */ }
+  });
+})();
+
 // Profilbild: im Browser auf 128x128 zuschneiden und verkleinern (JPEG), dann als Text mitschicken
 (() => {
   const form = document.querySelector('[data-avatar-form]');

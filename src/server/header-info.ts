@@ -1,7 +1,7 @@
 // Turnier-Anzeige im Kopf:
 // - vor dem Turnier: "<Name> in <Countdown>" bis zum ersten Spiel
-// - am Spieltag: "Live" (ab dem ersten Anstoß, bis alle Spiele des Tages vorbei sind)
-// - zwischen den Spieltagen: Countdown bis zum Start des nächsten Spieltags
+// - solange ein Spiel läuft: "Live"
+// - sonst (auch zwischen zwei Spielen am selben Tag): Countdown bis zum Start des nächsten Spiels
 // - nach dem Turnier: Countdown zum nächsten Turnier, sobald dessen Termin bekannt ist
 
 import type { Db } from './db/index.ts';
@@ -10,11 +10,11 @@ export interface HeaderTournament {
   name: string;
   /** Start des ersten Spiels */
   startsAt: Date;
-  /** Läuft gerade ein Spieltag (ab dem ersten Anstoß, bis alle Spiele des Tages vorbei sind)? */
+  /** Läuft gerade ein Spiel (oder müsste es laut Plan schon laufen)? */
   live: boolean;
   /** Turnier hat begonnen und ist noch nicht zu Ende */
   running: boolean;
-  /** Läuft das Turnier und ist gerade kein Spieltag: Start der nächsten Begegnungen */
+  /** Läuft das Turnier und gerade kein Spiel: Start der nächsten Begegnung */
   nextStart: Date | null;
 }
 
@@ -32,21 +32,16 @@ export interface MatchTime {
 }
 
 /** Ein Spiel, das laut Plan längst hätte laufen müssen, aber nie gewertet wurde (verschoben/vergessen), zählt nicht mehr. */
-const STALE_MS = 12 * 3_600_000;
+const STALE_MS = 6 * 3_600_000;
 
-/** Spieltag-Zustand eines laufenden Turniers: läuft gerade der Spieltag ("live") oder wann beginnt der nächste. */
-export function matchdayState(matches: MatchTime[], now: Date, timeZone: string): { live: boolean; next: Date | null } {
-  const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone });
-  const open = matches
-    .filter((m) => m.status === 'live' || (m.status === 'scheduled' && m.at && m.at.getTime() > now.getTime() - STALE_MS))
-    .sort((a, b) => (a.at ?? now).getTime() - (b.at ?? now).getTime());
-  if (!open.length) return { live: false, next: null };
-  const day = dayOf(open[0].at ?? now);
-  const today = matches.filter((m) => m.status !== 'cancelled' && dayOf(m.at ?? now) === day);
-  // Der Spieltag hat begonnen, sobald eines seiner Spiele läuft, fertig ist oder angepfiffen sein müsste
-  const started = today.some((m) => m.status === 'live' || m.status === 'finished' || (m.at !== null && m.at <= now));
-  if (started) return { live: true, next: null };
-  const next = open.find((m) => m.at && dayOf(m.at) === day)?.at ?? null;
+/**
+ * Zustand eines laufenden Turniers: "live", solange ein Spiel läuft (oder angepfiffen sein müsste), sonst der Start des
+ * nächsten Spiels – auch zwischen zwei Spielen am selben Tag (Countdown bis dahin).
+ */
+export function matchdayState(matches: MatchTime[], now: Date): { live: boolean; next: Date | null } {
+  const open = matches.filter((m) => m.status === 'live' || (m.status === 'scheduled' && m.at && m.at.getTime() > now.getTime() - STALE_MS));
+  if (open.some((m) => m.status === 'live' || (m.at !== null && m.at <= now))) return { live: true, next: null };
+  const next = open.map((m) => m.at).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
   return { live: false, next };
 }
 
@@ -69,7 +64,7 @@ function make(r: Row, now: Date, state: { live: boolean; next: Date | null } | n
   return { name: r.name, startsAt: r.starts_at, live: running ? (state?.live ?? r.live) : false, running, nextStart: running ? (state?.next ?? null) : null };
 }
 
-async function choose(db: Db, rows: Row[], now: Date, timeZone: string): Promise<HeaderTournament | null> {
+async function choose(db: Db, rows: Row[], now: Date): Promise<HeaderTournament | null> {
   const ordered = orderTournaments(rows, now);
   let fallback: HeaderTournament | null = null;
   for (const r of ordered) {
@@ -78,7 +73,7 @@ async function choose(db: Db, rows: Row[], now: Date, timeZone: string): Promise
       `select coalesce(scheduled_at, live_at) as at, status from matches where tournament_id = $1 and status <> 'cancelled'`,
       [r.id],
     );
-    const state = matchdayState(matches, now, timeZone);
+    const state = matchdayState(matches, now);
     // Ein begonnenes Turnier ohne Spieltag und ohne bekannten nächsten Termin macht Platz für das nächste Turnier
     if (state.live || state.next) return make(r, now, state);
     fallback ??= make(r, now, state);
@@ -87,7 +82,7 @@ async function choose(db: Db, rows: Row[], now: Date, timeZone: string): Promise
 }
 
 /** Turniere der Tipprunden des Nutzers (oder der Tipprunde, die gerade offen ist); ohne Treffer alle. */
-export async function loadHeaderTournament(db: Db, userId: string | null, leagueSlug: string | null, now: Date, timeZone = 'Europe/Berlin'): Promise<HeaderTournament | null> {
+export async function loadHeaderTournament(db: Db, userId: string | null, leagueSlug: string | null, now: Date): Promise<HeaderTournament | null> {
   const sql = (filter: string) => `
     select t.id, t.name, tournament_start(t.id) as starts_at,
            exists (select 1 from matches m where m.tournament_id = t.id and m.status = 'live') as live,
@@ -96,11 +91,11 @@ export async function loadHeaderTournament(db: Db, userId: string | null, league
      where tournament_start(t.id) is not null ${filter}`;
   if (leagueSlug) {
     const rows = await db.query<Row>(sql('and t.id in (select lt.tournament_id from league_tournaments lt join leagues l on l.id = lt.league_id where l.slug = $1)'), [leagueSlug]);
-    if (rows.length) return choose(db, rows, now, timeZone);
+    if (rows.length) return choose(db, rows, now);
   }
   if (userId) {
     const rows = await db.query<Row>(sql('and t.id in (select lt.tournament_id from league_tournaments lt join league_members lm on lm.league_id = lt.league_id where lm.user_id = $1)'), [userId]);
-    if (rows.length) return choose(db, rows, now, timeZone);
+    if (rows.length) return choose(db, rows, now);
   }
-  return choose(db, await db.query<Row>(sql('')), now, timeZone);
+  return choose(db, await db.query<Row>(sql('')), now);
 }

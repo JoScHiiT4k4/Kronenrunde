@@ -56,6 +56,8 @@ export interface LeagueNav {
 }
 
 export interface PageOptions {
+  /** Keine Rangliste rechts (z. B. Administrator-Bereich) */
+  noRank?: boolean;
   title: string;
   body: Html;
   league?: LeagueNav;
@@ -95,14 +97,14 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   </nav>
 </header>
 <div class="page">
-<div class="side side-ghost${ctx.sidebar ? ' side-ghost-wide' : ''}" aria-hidden="true"></div>
+<div class="sidecol sidecol-ghost" aria-hidden="true"></div>
 ${o.league ? leagueNav(o.league) : nothing}
 <main class="main">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
 </main>
-${rankBox(ctx)}
+${hideRank(o) ? adBox('right') : rankBox(ctx)}
 ${o.below ? html`<div class="below">${o.below}</div>` : nothing}
 </div>
 ${chatWidget(ctx)}
@@ -185,7 +187,7 @@ function tournamentBar(ctx: Ctx): Html {
 
 /** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
 function adBox(side: 'left' | 'right'): Html {
-  return html`<aside class="side side-${side}" aria-label="Seitenleiste"><div class="side-box"><span class="side-label">Anzeige</span></div></aside>`;
+  return html`<aside class="sidecol sidecol-${side}" aria-label="Seitenleiste"><div class="sidecol-box"><span class="sidecol-label">Anzeige</span></div></aside>`;
 }
 
 /** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
@@ -198,6 +200,12 @@ export function scaleBar(points: number, possible: number): Html {
   </svg>`;
 }
 
+/** Reiter, auf denen die Rangliste rechts fehlt: dort steht die Rangliste bzw. der Turnierbaum selbst bzw. die Verwaltung. */
+const NO_RANK_TABS = ['rangliste', 'turnierbaum', 'verwalten'];
+function hideRank(o: PageOptions): boolean {
+  return !!o.noRank || (!!o.league && NO_RANK_TABS.includes(o.league.active));
+}
+
 /** Rechts neben dem Inhalt (breite Bildschirme): die Rangliste der aktuellen Tipprunde, klickbar zur Seite "Rangliste". */
 function rankBox(ctx: Ctx): Html {
   const s = ctx.sidebar;
@@ -205,9 +213,13 @@ function rankBox(ctx: Ctx): Html {
   const top = s.rows.slice(0, 8);
   const me = s.rows.find((r) => r.userId === ctx.user?.id);
   const shown = me && !top.includes(me) ? [...top, me] : top;
-  return html`<aside class="side side-right rank-side" aria-label="Rangliste ${s.leagueName}">
+  return html`<aside class="sidecol sidecol-right rank-side" aria-label="Rangliste ${s.leagueName}">
     <div class="rank-box">
-      <a class="rank-stretch rank-title" href="/r/${s.slug}/rangliste">Rangliste</a>
+      <div class="rank-head">
+        <a class="rank-stretch rank-title" href="/r/${s.slug}/rangliste">Rangliste</a>
+        <button type="button" class="rank-toggle" data-rank-toggle aria-expanded="true" aria-controls="rank-body" title="Rangliste einklappen" aria-label="Rangliste einklappen" hidden>${ICON_CHEVRON}</button>
+      </div>
+      <div class="rank-body" id="rank-body">
       <span class="rank-league">${s.leagueName}</span>
       <ol class="rank-list">
         ${shown.map(
@@ -221,10 +233,12 @@ function rankBox(ctx: Ctx): Html {
       </ol>
       <span class="rank-foot">${s.possible > 0 ? `${s.possible} Punkte bisher möglich` : 'Noch keine Spiele gewertet'}</span>
       <span class="rank-more">Zur ganzen Rangliste →</span>
+      </div>
     </div>
   </aside>`;
 }
 
+const ICON_CHEVRON = html`<svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
 const ICON_USER = html`<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>`;
 const ICON_LOGOUT = html`<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`;
 
