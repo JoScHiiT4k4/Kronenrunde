@@ -48,6 +48,8 @@ jobs:
           EOF
           # Code wie von GitHub: eine Kopie, die als "origin" dient (für "tippspiel update")
           cp -a "$GITHUB_WORKSPACE" /tmp/quelle
+          # Im PR ist der Code ohne Zweig ausgecheckt – der Pi braucht aber einen (origin/main), sonst bricht "tippspiel update" ab
+          git -C /tmp/quelle checkout -q -B main
           git -C /tmp/quelle remote set-url origin /quelle
           docker run -d --name pi --hostname homebridge --privileged --cgroupns=host \
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock -v /tmp/quelle:/quelle pi
