@@ -155,8 +155,11 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
           } else if (m.tabs || !m.menu) {
             problems.push(`${where}: auf dem Handy fehlt das Menü oder die Reiter-Leiste ist noch da`);
           }
-          const rankExpected = name === 'turnierbaum' ? width >= 920 : width >= 920;
-          if (rankExpected && !m.rank) problems.push(`${where}: Rangliste rechts fehlt`);
+          // Rangliste rechts: überall bei PC-Breite – außer auf Rangliste, Turnierbaum und Verwalten (dort ausgeblendet)
+          const rankHidden = ['rangliste', 'turnierbaum', 'verwalten'].includes(name);
+          if (width >= 920 && !rankHidden && !m.rank) problems.push(`${where}: Rangliste rechts fehlt`);
+          if (rankHidden && m.rank) problems.push(`${where}: Rangliste rechts sollte hier ausgeblendet sein`);
+          if (m.rank && width >= 1140 && m.rank.right < m.inner - 24) problems.push(`${where}: Rangliste steht nicht am rechten Rand (${Math.round(m.rank.right)} von ${m.inner}px)`);
           if (m.rank && m.main && m.rank.left < m.main.right - 1) problems.push(`${where}: Rangliste überlappt den Inhalt`);
           await page.screenshot({ path: join(SHOTS, `${name}-${width}.png`) });
         }
