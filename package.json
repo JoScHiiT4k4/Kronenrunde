@@ -1,6 +1,6 @@
 {
   "name": "lol-tippspiel",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "private": true,
   "description": "Tippspiel-Web-App für League-of-Legends-Turniere",
   "type": "module",
@@ -19,6 +19,7 @@
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
     "test:db": "bash scripts/test-db.sh",
     "test:app": "bash scripts/test-app.sh",
+    "test:browser": "BROWSER_TEST=1 node --experimental-strip-types --disable-warning=ExperimentalWarning --test src/server/browser.test.ts",
     "typecheck": "tsc --noEmit"
   }
 }

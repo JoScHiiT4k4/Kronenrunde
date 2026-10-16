@@ -58,6 +58,48 @@ jobs:
       - run: bash scripts/test-db.sh
       - run: bash scripts/test-app.sh
 
+  # Öffnet die App in einem echten Chrome bei Handy-, Tablet- und PC-Breiten, misst das Layout (Reiter bündig,
+  # nichts ragt heraus, Rangliste da) und legt Screenshots ab. Bewusst NICHT Voraussetzung für die Freigabe:
+  # Ein Fehler hier erscheint rot am Commit, hält Updates für den Pi aber nicht auf.
+  browser:
+    name: Browser-Prüfung (Layout und Screenshots)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tippspiel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tippspiel_test
+      BROWSER_TEST: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Chrome einrichten
+        run: |
+          npm install --no-save --no-package-lock playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Seiten bei mehreren Fensterbreiten prüfen
+        run: node --experimental-strip-types --disable-warning=ExperimentalWarning --test src/server/browser.test.ts
+      - name: Screenshots ablegen (werden nach 7 Tagen automatisch gelöscht)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: browser-screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
+
   # Sind alle Prüfungen grün, wird diese Version auf den Zweig "stabil" geschoben.
   # Nur von dort holt sich der Raspberry Pi automatisch neue Versionen (tippspiel update).
   freigeben:
