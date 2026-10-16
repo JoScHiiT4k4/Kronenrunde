@@ -506,7 +506,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.deepEqual(rowsOf(match['G2-KC']), [['Ben', 'KC 2:1', '2', true], ['Anna', 'KC 2:0', '1', false]]); // nach Punkten absteigend
 
     // Alle Tipps: Spielkarten wie beim Tippen (Ergebnis hinter dem Spoilerschutz), keine "Ergebnis:"-Zeile, Filter mit Zurücksetzen
-    assert.match(all.text, /<button type="button" class="score" data-spoiler/);
+    assert.match(all.text, /<span class="score revealed plain" role="img"/, 'Ergebnis offen, ohne Spoilerschutz');
+    assert.doesNotMatch(all.text, /data-spoiler/);
     assert.doesNotMatch(all.text, /Ergebnis: <strong>/);
     assert.match(all.text, /<form method="get" action="\/r\/[a-z0-9-]+\/alle-tipps" class="list-filter" data-auto-filter>/);
     assert.doesNotMatch(all.text, /Zurücksetzen/, 'ohne Filter kein Zurücksetzen');
@@ -517,10 +518,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     );
     assert.match(dateInputs, new RegExp(`name="von" value="" min="${days[0].first}" max="${days[0].last}"`), 'frühestens erstes Spiel des Turniers');
     assert.match(dateInputs, new RegExp(`name="bis" value="" min="${days[0].first}" max="${days[0].last}"`), 'spätestens das letzte Spiel (Finale)');
-    const none = await ben.get(`/r/${slug}/alle-tipps?status=laeuft`);
+    const none = await ben.get(`/r/${slug}/alle-tipps?von=${days[0].last}&bis=${days[0].last}`);
     assert.match(none.text, /Kein Spiel passt zu diesem Filter/);
     assert.match(none.text, /href="\/r\/[a-z0-9-]+\/alle-tipps">Zurücksetzen/);
-    assert.match((await ben.get(`/r/${slug}/alle-tipps?status=gespielt&phase=alle`)).text, new RegExp(`id="tipps-${match['GEN-T1']}"`));
+    assert.match((await ben.get(`/r/${slug}/alle-tipps?phase=alle`)).text, new RegExp(`id="tipps-${match['GEN-T1']}"`));
+    assert.doesNotMatch(all.text, /name="status"/, 'kein Filter "Spiel" mehr');
+    assert.ok(all.text.indexOf('name="von"') < all.text.indexOf('name="bis"') && all.text.indexOf('name="bis"') < all.text.indexOf('name="team"'), 'Reihenfolge: Von, Bis, Team');
     assert.doesNotMatch((await ben.get(`/r/${slug}/alle-tipps?von=1999-01-01`)).text, /Zurücksetzen[\s\S]*value="1999-01-01"/, 'Datum vor dem Turnier zählt nicht');
   });
 
@@ -1192,7 +1195,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   test('Layout: Werbeflächen links und rechts', async () => {
     const pub = await new Client().get('/impressum');
     // Links nur ein unsichtbarer Platzhalter (Werbung ist ausgeblendet), rechts die Werbefläche bzw. – angemeldet – die Rangliste
-    assert.equal((pub.text.match(/class="sidecol sidecol-right"/g) ?? []).length, 1);
+    assert.doesNotMatch(pub.text, /Anzeige|sidecol-right/, 'keine Werbefläche rechts');
     assert.match(pub.text, /class="sidecol sidecol-ghost" aria-hidden="true"/);
     assert.doesNotMatch(pub.text, /sidecol-left/);
   });
