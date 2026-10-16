@@ -486,6 +486,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   letter-spacing: 0;
   color: var(--muted);
 }
+/* Rundes Messing-Medaillon mit Doppelring, statt der früheren schrägen Raute */
 .vs {
   position: relative;
   isolation: isolate;
@@ -493,21 +494,22 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   place-items: center;
   width: 38px;
   height: 38px;
+  border-radius: 50%;
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--gold);
+  letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  background: radial-gradient(circle at 50% 35%, #17293c 0%, var(--bg) 70%);
+  border: 1.5px solid var(--gold);
+  box-shadow: 0 0 0 1px var(--frame) inset, 0 0 12px rgb(200 170 110 / 30%);
 }
 .vs::before {
   content: "";
   position: absolute;
-  inset: 7px;
-  z-index: -1;
-  transform: rotate(45deg);
-  border: 1px solid var(--gold);
-  background: var(--bg);
-  box-shadow: 0 0 14px rgb(200 170 110 / 25%);
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgb(200 170 110 / 35%);
 }
 .versus .vs { display: inline-grid; vertical-align: middle; }
 
