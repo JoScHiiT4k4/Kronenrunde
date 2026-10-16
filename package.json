@@ -1,6 +1,6 @@
 {
   "name": "lol-tippspiel",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "private": true,
   "description": "Tippspiel-Web-App für League-of-Legends-Turniere",
   "type": "module",

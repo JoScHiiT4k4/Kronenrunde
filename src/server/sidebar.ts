@@ -30,13 +30,18 @@ interface LeagueRow {
   is_test: boolean;
 }
 
-export async function loadSidebar(db: Db, userId: string, slug: string | null): Promise<Sidebar | null> {
+export async function loadSidebar(db: Db, userId: string, slug: string | null, isAdmin = false): Promise<Sidebar | null> {
   const cols = 'l.id, l.name, l.slug, l.points_winner, l.points_exact, l.lock_mode, l.is_test';
   let league: LeagueRow | null = null;
   if (slug) {
     league = await db.one<LeagueRow>(`select ${cols} from leagues l join league_members m on m.league_id = l.id and m.user_id = $2 where l.slug = $1`, [slug, userId]);
   }
   league ??= await db.one<LeagueRow>(`select ${cols} from leagues l join league_members m on m.league_id = l.id where m.user_id = $1 and not l.is_test order by m.joined_at desc limit 1`, [userId]);
+  // Der Betreiber sieht die Rangliste auch dort, wo er nicht mitspielt: erst die Tipprunde aus der Adresse, sonst die neueste
+  if (!league && isAdmin) {
+    if (slug) league = await db.one<LeagueRow>(`select ${cols} from leagues l where l.slug = $1`, [slug]);
+    league ??= await db.one<LeagueRow>(`select ${cols} from leagues l where not l.is_test order by l.created_at desc limit 1`);
+  }
   if (!league) return null;
   const [s, prefs, leagues] = await Promise.all([
     loadStandings(db, league),

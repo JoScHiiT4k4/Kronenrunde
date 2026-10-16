@@ -232,7 +232,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     if (method === 'GET' && ctx.user) {
       const slug = /^\/r\/([^/]+)/.exec(path)?.[1] ?? null;
       ctx.headerTournament = await loadHeaderTournament(db, ctx.user.id, slug, ctx.now);
-      ctx.sidebar = await loadSidebar(db, ctx.user.id, slug);
+      ctx.sidebar = await loadSidebar(db, ctx.user.id, slug, ctx.isAdmin);
     }
 
     if (method === 'POST') {

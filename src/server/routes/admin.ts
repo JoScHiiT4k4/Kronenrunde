@@ -199,7 +199,7 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
 </section>`;
 }
 
-const BACKUP_TIMES = [['alle', 'Alle'], ['heute', 'Heute'], ['7', 'Letzte 7 Tage'], ['30', 'Letzte 30 Tage']] as const;
+const BACKUP_PAGE = 10;
 const BACKUP_KINDS = [['alle', 'Alle'], ['nacht', 'Nächtlich'], ['manuell', 'Von Hand'], ['update', 'Vor einem Update']] as const;
 const KIND_LABEL = { nacht: 'Nächtlich', manuell: 'Von Hand', update: 'Vor einem Update' } as const;
 
@@ -208,16 +208,39 @@ function backupPanel(ctx: Ctx): Html {
   const tz = ctx.deps.config.timeZone;
   const sys = readSystemInfo(ctx.deps.config.backupDir);
   const files = readBackups(ctx.deps.config.backupDir);
-  // Filter (Adresse ?zeit=…&art=…): nur bekannte Werte, alles andere heißt "alle"
-  const zeit = BACKUP_TIMES.some(([k]) => k === ctx.query.get('zeit')) ? ctx.query.get('zeit')! : 'alle';
+  // Filter (Adresse ?von=…&bis=…&art=…&seite=…): nur gültige Werte, alles andere heißt "kein Filter"
+  const dateParam = (name: string) => {
+    const v = ctx.query.get(name) ?? '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+  };
+  let von = dateParam('von');
+  let bis = dateParam('bis');
+  if (von && bis && von > bis) [von, bis] = [bis, von];
   const art = BACKUP_KINDS.some(([k]) => k === ctx.query.get('art')) ? ctx.query.get('art')! : 'alle';
   const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
   const shown = files.filter((f) => {
     if (art !== 'alle' && f.kind !== art) return false;
-    if (zeit === 'heute') return dayOf(f.at) === dayOf(ctx.now);
-    if (zeit === '7' || zeit === '30') return ctx.now.getTime() - f.at.getTime() <= Number(zeit) * 86_400_000;
-    return true;
+    const day = dayOf(f.at);
+    return (!von || day >= von) && (!bis || day <= bis);
   });
+  const pages = Math.max(1, Math.ceil(shown.length / BACKUP_PAGE));
+  const page = Math.min(pages, Math.max(1, Math.floor(Number(ctx.query.get('seite'))) || 1));
+  const pageItems = shown.slice((page - 1) * BACKUP_PAGE, page * BACKUP_PAGE);
+  const filterActive = Boolean(von || bis || art !== 'alle');
+  const pageHref = (n: number) => {
+    const q = new URLSearchParams({ bereich: 'backup' });
+    if (von) q.set('von', von);
+    if (bis) q.set('bis', bis);
+    if (art !== 'alle') q.set('art', art);
+    if (n > 1) q.set('seite', String(n));
+    return `/admin?${q}#sicherungen`;
+  };
+  // Seitenzahlen: erste, letzte und die Nachbarn der aktuellen Seite, dazwischen "…"
+  const pageNumbers: (number | null)[] = [];
+  for (let n = 1; n <= pages; n += 1) {
+    if (n === 1 || n === pages || Math.abs(n - page) <= 1) pageNumbers.push(n);
+    else if (pageNumbers[pageNumbers.length - 1] !== null) pageNumbers.push(null);
+  }
   const pending = existsSync(ctx.deps.config.backupRequestFile);
   const level = backupLevel(sys.backupCount, sys.backupNewest, ctx.now);
   const ageHours = sys.backupNewest ? Math.floor((ctx.now.getTime() - sys.backupNewest.getTime()) / 3_600_000) : null;
@@ -245,25 +268,27 @@ function backupPanel(ctx: Ctx): Html {
     <button type="submit" class="btn btn-primary">Jetzt sichern</button>
   </form>
 </section>
-<section class="panel">
-  <h2>Vorhandene Sicherungen</h2>
+<section class="panel" id="sicherungen">
+  <h2>Vorhandene Sicherungen (${files.length})</h2>
   ${
     files.length
-      ? html`<form method="get" action="/admin" class="backup-filter" data-autosubmit>
+      ? html`<form method="get" action="/admin#sicherungen" class="backup-filter" data-backup-filter>
     <input type="hidden" name="bereich" value="backup">
-    <label><span class="muted">Zeitpunkt</span>
-      <select name="zeit">${BACKUP_TIMES.map(([k, label]) => html`<option value="${k}"${attr(k === zeit, 'selected')}>${label}</option>`)}</select></label>
+    <label><span class="muted">Von</span>
+      <input type="date" name="von" value="${von}"${attr(bis !== '', `max="${bis}"`)}></label>
+    <label><span class="muted">Bis</span>
+      <input type="date" name="bis" value="${bis}"${attr(von !== '', `min="${von}"`)}></label>
     <label><span class="muted">Art</span>
       <select name="art">${BACKUP_KINDS.map(([k, label]) => html`<option value="${k}"${attr(k === art, 'selected')}>${label}</option>`)}</select></label>
     <button type="submit" class="btn btn-quiet">Filtern</button>
+    ${filterActive ? html`<a class="btn btn-quiet" href="/admin?bereich=backup#sicherungen">Zurücksetzen</a>` : nothing}
   </form>
-  <p class="muted backup-count">${shown.length === files.length ? `${files.length} ${files.length === 1 ? 'Sicherung' : 'Sicherungen'}` : `${shown.length} von ${files.length} Sicherungen`}${shown.length > 10 ? ' – die Liste lässt sich scrollen' : ''}</p>
   ${
-    shown.length
-      ? html`<div class="backup-list" tabindex="0" role="region" aria-label="Vorhandene Sicherungen">
-    <table class="table compact"><thead><tr><th>Zeitpunkt</th><th>Art</th><th class="num">Größe</th></tr></thead><tbody>
-    ${shown.map((f) => html`<tr><td>${formatDateTime(f.at, tz)} Uhr</td><td>${KIND_LABEL[f.kind]}</td><td class="num">${formatBytes(f.bytes)}</td></tr>`)}
-  </tbody></table></div>`
+    pageItems.length
+      ? html`<table class="table compact backup-table"><thead><tr><th>Zeitpunkt</th><th>Art</th><th class="num">Größe</th></tr></thead><tbody>
+    ${pageItems.map((f) => html`<tr><td>${formatDateTime(f.at, tz)} Uhr</td><td>${KIND_LABEL[f.kind]}</td><td class="num">${formatBytes(f.bytes)}</td></tr>`)}
+  </tbody></table>
+  ${pages > 1 ? html`<nav class="pager" aria-label="Seiten">${pageNumbers.map((n) => (n === null ? html`<span class="pager-gap" aria-hidden="true">…</span>` : n === page ? html`<span class="pager-item current" aria-current="page">${n}</span>` : html`<a class="pager-item" href="${pageHref(n)}" aria-label="Seite ${n}">${n}</a>`))}</nav>` : nothing}`
       : html`<p class="muted">Keine Sicherung passt zu diesem Filter.</p>`
   }`
       : html`<p class="muted">Es gibt noch keine Sicherung.</p>`

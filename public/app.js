@@ -330,9 +330,21 @@ document.addEventListener('click', (e) => {
   btn.setAttribute('aria-label', shown ? btn.dataset.label + ' – Ergebnis verdecken' : 'Ergebnis anzeigen');
 });
 
-// Filterformulare mit data-autosubmit: sofort absenden, sobald eine Auswahl geändert wird (ohne JavaScript bleibt der Knopf "Filtern")
-document.querySelectorAll('form[data-autosubmit]').forEach((form) => {
-  form.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => form.submit()));
-  const button = form.querySelector('button[type="submit"]');
-  if (button) button.hidden = true;
+// Backup-Filter: Art wirkt sofort; nach dem Von-Datum öffnet sich gleich der Bis-Kalender, mit dem Bis-Datum wird gefiltert
+document.querySelectorAll('form[data-backup-filter]').forEach((form) => {
+  const von = form.elements.namedItem('von');
+  const bis = form.elements.namedItem('bis');
+  const art = form.elements.namedItem('art');
+  if (art instanceof HTMLSelectElement) art.addEventListener('change', () => form.submit());
+  if (!(von instanceof HTMLInputElement) || !(bis instanceof HTMLInputElement)) return;
+  von.addEventListener('change', () => {
+    bis.min = von.value;
+    if (!von.value) return form.submit();
+    bis.focus();
+    try { bis.showPicker(); } catch { /* ältere Browser: Bis von Hand wählen, dann "Filtern" */ }
+  });
+  bis.addEventListener('change', () => {
+    von.max = bis.value;
+    form.submit();
+  });
 });

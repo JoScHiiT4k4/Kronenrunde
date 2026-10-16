@@ -1211,18 +1211,48 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(filled.text, /<strong>4 \(3,8 KB\)<\/strong>/);
     assert.match(filled.text, /Kopie auf der MyCloud<\/span><strong>in Ordnung/);
 
-    // Filter: Zeitpunkt und Art (unbekannte Werte zählen als "alle")
+    // Filter: Von-Bis und Art (ungültige Werte zählen als "kein Filter")
     const rows = (t: string) => (t.match(/<tr><td>[^<]*Uhr<\/td>/g) ?? []).length;
+    const day = (offsetDays: number) => new Date(Date.now() - offsetDays * 86_400_000).toLocaleDateString('sv', { timeZone: 'Europe/Berlin' });
     assert.equal(rows(filled.text), 4);
-    assert.match(filled.text, /<div class="backup-list"/);
-    assert.equal(rows((await admin.get('/admin?bereich=backup&zeit=30')).text), 3, 'letzte 30 Tage: ohne die 40 Tage alte');
+    assert.match(filled.text, /Vorhandene Sicherungen \(4\)/);
+    assert.doesNotMatch(filled.text, /lässt sich scrollen|backup-list|class="pager"/);
+    assert.match(filled.text, /name="von"[^>]*>[\s\S]*name="bis"/);
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(30)}`)).text), 3, 'ab 30 Tage her: ohne die 40 Tage alte');
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(45)}&bis=${day(35)}`)).text), 1, 'nur die 40 Tage alte');
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&von=${day(35)}&bis=${day(45)}`)).text), 1, 'vertauschtes Von/Bis wird geradegerückt');
     const upd = await admin.get('/admin?bereich=backup&art=update');
     assert.equal(rows(upd.text), 1);
-    assert.match(upd.text, /1 von 4 Sicherungen/);
-    assert.equal(rows((await admin.get('/admin?bereich=backup&art=manuell&zeit=7')).text), 1);
-    assert.equal(rows((await admin.get('/admin?bereich=backup&art=nacht&zeit=30')).text), 1);
-    assert.equal(rows((await admin.get('/admin?bereich=backup&art=quatsch&zeit=xyz')).text), 4);
-    assert.match((await admin.get('/admin?bereich=backup&art=update&zeit=heute')).text.replace(/\s+/g, ' '), /Keine Sicherung passt zu diesem Filter/);
+    assert.match(upd.text, /Vorhandene Sicherungen \(4\)/, 'der Zähler bleibt die Gesamtzahl');
+    assert.match(upd.text, /Zurücksetzen/);
+    assert.equal(rows((await admin.get(`/admin?bereich=backup&art=manuell&von=${day(7)}`)).text), 1);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&art=quatsch&von=xyz&bis=2026-13')).text), 4);
+    assert.match((await admin.get(`/admin?bereich=backup&art=update&von=${day(1)}`)).text.replace(/\s+/g, ' '), /Keine Sicherung passt zu diesem Filter/);
+
+    // Seiten: 10 Einträge pro Seite, der Filter bleibt in den Seitenlinks erhalten
+    for (let i = 0; i < 9; i += 1) {
+      const f = join(BACKUP_DIR, `tippspiel-2026-08-${String(10 + i)}_040000.dump`);
+      writeFileSync(f, 'p'.repeat(100));
+      utimesSync(f, new Date(Date.now() - (60 + i) * 86_400_000), new Date(Date.now() - (60 + i) * 86_400_000));
+    }
+    const p1 = await admin.get('/admin?bereich=backup');
+    assert.equal(rows(p1.text), 10);
+    assert.match(p1.text, /Vorhandene Sicherungen \(13\)/);
+    assert.match(p1.text, /<span class="pager-item current" aria-current="page">1<\/span>/);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&seite=2')).text), 3);
+    assert.equal(rows((await admin.get('/admin?bereich=backup&seite=99')).text), 3, 'zu große Seitenzahl landet auf der letzten Seite');
+    const filteredPage = await admin.get(`/admin?bereich=backup&art=nacht&von=${day(100)}`);
+    assert.match(filteredPage.text, /href="\/admin\?bereich=backup&amp;von=[\d-]+&amp;art=nacht&amp;seite=2#sicherungen"/);
+
+    // Rangliste rechts: auch beim Betreiber, der in keiner Tipprunde mitspielt (sonst fehlt die Spalte am PC)
+    const saved = await db.query<{ league_id: string; user_id: string; role: string; joined_at: Date }>(
+      `delete from league_members where user_id = (select id from users where email = 'admin@example.de') returning league_id, user_id, role, joined_at`,
+    );
+    try {
+      assert.match((await admin.get('/admin?bereich=backup')).text, /class="ad ad-right rank-side"/);
+    } finally {
+      for (const m of saved) await db.query('insert into league_members (league_id, user_id, role, joined_at) values ($1, $2, $3, $4)', [m.league_id, m.user_id, m.role, m.joined_at]);
+    }
 
     // Knopf: legt nur die Anfrage-Datei ab (die Sicherung selbst macht der Pi), nur mit Formularschutz und nur für den Betreiber
     assert.ok(!existsSync(BACKUP_FILE));

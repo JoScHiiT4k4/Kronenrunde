@@ -210,6 +210,7 @@ p { margin: 0 0 0.9em; }
   grid-template-columns: minmax(0, 720px);
   justify-content: center;
   align-items: start;
+  align-content: start;
   column-gap: 20px;
   min-width: 0;
   overflow-x: clip;
@@ -1342,14 +1343,14 @@ td.bad { color: var(--red); }
 }
 
 /* ---------- Administrator > Backup: Liste der Sicherungen ---------- */
-.backup-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin: 6px 0 8px; }
+.backup-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin: 6px 0 12px; }
 .backup-filter label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; min-width: 0; }
-.backup-filter select { min-height: 40px; min-width: 9.5rem; padding: 6px 10px; font: inherit; color: var(--text); background-color: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }
-.backup-filter select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgb(200 170 110 / 30%); }
-.backup-count { margin: 0 0 6px; font-size: 0.85rem; }
-/* Zehn Zeilen sichtbar, der Rest per Scrollbalken; die Kopfzeile bleibt oben stehen */
-.backup-list { max-height: var(--backup-h, 25rem); overflow-y: auto; border: 1px solid var(--line); scrollbar-width: thin; scrollbar-color: var(--frame) transparent; }
-.backup-list:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
-.backup-list thead th { position: sticky; top: 0; background: var(--surface-2, #0e1c2b); z-index: 1; }
-.backup-list .table { margin: 0; }
-.backup-list .table tr:last-child td { border-bottom: 0; }
+.backup-filter select, .backup-filter input[type="date"] { min-height: 40px; min-width: 9.5rem; padding: 6px 10px; font: inherit; color: var(--text); color-scheme: dark; background-color: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }
+.backup-filter select:focus, .backup-filter input[type="date"]:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgb(200 170 110 / 30%); }
+.backup-filter .btn { min-height: 40px; }
+.backup-table { margin: 0 0 10px; }
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
+.pager-item { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; padding: 0 8px; font-size: 0.9rem; color: var(--text); text-decoration: none; background: #0a1622; border: 1px solid #2c3f53; border-radius: 2px; }
+a.pager-item:hover { border-color: var(--gold); }
+.pager-item.current { color: #0a1622; font-weight: 700; background: var(--gold); border-color: var(--gold); }
+.pager-gap { color: var(--muted, #8a97a6); padding: 0 2px; }
