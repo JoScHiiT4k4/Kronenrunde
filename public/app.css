@@ -1148,6 +1148,7 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .profile-head h1 { margin: 0 0 4px; }
 .profile-rank { color: var(--muted); font-weight: 400; font-size: 0.65em; white-space: nowrap; }
 .profile-head p { margin: 0; }
+.profile-share { margin-left: auto; white-space: nowrap; }
 .profile-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; }
 .who-link { color: inherit; text-decoration: none; }
 .who-link:hover span { color: var(--gold-bright); text-decoration: underline; }

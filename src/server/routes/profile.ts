@@ -3,12 +3,13 @@
 import type { Ctx } from '../app.ts';
 import { computeBadges } from '../../domain/badges.ts';
 import { pointHistory } from '../../domain/history.ts';
-import { formatDateTime } from '../format.ts';
+import { formatDate, formatDateTime } from '../format.ts';
 import { html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, type Res, type Router } from '../http.ts';
 import { badgeGrid } from '../views/badges.ts';
 import { historyChart } from '../views/history-chart.ts';
 import { avatar, isOnline, layout, presenceDot, scaleBar } from '../views/layout.ts';
+import { shareCard } from '../views/share-card.ts';
 import { isUuid, loginRedirect } from './common.ts';
 import { leagueTournaments, loadLeague } from './league-data.ts';
 import { loadStandings } from './standings-data.ts';
@@ -69,6 +70,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
           : html`Noch nicht online gewesen`}
     </p>
   </div>
+  <a class="btn btn-quiet profile-share" href="/r/${league.slug}/spieler/${id}/teilen.svg" download="${league.slug}-ergebnis.svg">Ergebnis teilen</a>
 </section>
 <section class="panel">
   <h2>Bisheriger Stand</h2>
@@ -111,6 +113,44 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   return htmlResponse(layout(ctx, { title: `Profil – ${person.display_name}`, body, league: { slug: league.slug, name: league.name, canManage: access.canManage, recap: league.ended, active: 'rangliste' } }));
 }
 
+/** Teilen-Bild: eigenständige SVG-Karte mit Platzierung, Punkten und den besten Abzeichen – zum Herunterladen/Teilen. */
+async function shareImage(ctx: Ctx): Promise<Res> {
+  if (!ctx.user) return loginRedirect(ctx);
+  const { league } = await loadLeague(ctx, ctx.params.slug);
+  const { db, config } = ctx.deps;
+  const id = ctx.params.userId;
+  if (!isUuid(id)) throw new HttpError(404, 'Nicht gefunden.');
+  const person = await db.one<{ display_name: string; avatar_b64: string | null }>(
+    `select u.display_name, u.avatar_b64 from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 and lm.user_id = $2`,
+    [league.id, id],
+  );
+  if (!person) throw new HttpError(404, 'Nicht gefunden.');
+
+  const standings = await loadStandings(db, league);
+  const row = standings.rows.find((r) => r.userId === id)!;
+  const badges = computeBadges({ ...standings.raw, userId: id, rank: row.rank, points: row.points })
+    .filter((b) => b.level > 0)
+    .sort((a, b) => b.level - a.level);
+
+  const svg = shareCard({
+    appName: config.appName,
+    leagueName: league.name,
+    displayName: person.display_name,
+    avatarB64: person.avatar_b64,
+    rank: row.rank,
+    memberCount: standings.rows.length,
+    points: row.points,
+    earnedBadges: badges,
+    dateText: formatDate(ctx.now, config.timeZone),
+  });
+  return {
+    status: 200,
+    headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'content-disposition': `attachment; filename="${league.slug}-ergebnis.svg"`, 'cache-control': 'no-store' },
+    body: svg,
+  };
+}
+
 export function registerProfileRoutes(router: Router<Ctx>) {
   router.get('/r/:slug/spieler/:userId', profilePage);
+  router.get('/r/:slug/spieler/:userId/teilen.svg', shareImage);
 }
