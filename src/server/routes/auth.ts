@@ -3,6 +3,7 @@
 import { encodeQr } from '../../domain/qrcode.ts';
 import type { Ctx } from '../app.ts';
 import {
+  calendarToken,
   consumeLoginToken,
   createSession,
   destroySession,
@@ -19,6 +20,7 @@ import {
   recordLoginFailure,
   registrationAllowed,
   requestPasswordLink,
+  resetCalendarToken,
   safeNext,
   sessionCookieName,
   SESSION_DAYS,
@@ -448,6 +450,12 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return redirect('/konto?bereich=profil&hinweis=anfrage-zurueckgezogen');
   });
 
+  router.post('/konto/kalender/token-neu', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await resetCalendarToken(ctx.deps.db, ctx.user.id);
+    return redirect('/konto?bereich=profil&hinweis=kalender-link-neu');
+  });
+
   router.post('/konto/benachrichtigung', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const h = intField(ctx.form.get('stunden') || '0', 0, 168);
@@ -736,6 +744,8 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
       `select l.slug, l.name from league_members m join leagues l on l.id = m.league_id where m.user_id = $1 order by m.joined_at`,
       [user.id],
     );
+    const calToken = myLeagues.length ? await calendarToken(db, user.id) : '';
+    const calUrl = (slug: string) => `${ctx.deps.config.appUrl}/r/${slug}/kalender/${calToken}/spielplan.ics`;
     content = html`<section class="panel">
   <h2>Profilbild</h2>
   <div class="avatar-edit">
@@ -798,13 +808,23 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
   }
 </section>
 <section class="panel">
-  <h2>Kalender-Export</h2>
+  <h2>Kalender-Abo</h2>
   ${
     myLeagues.length
-      ? html`<p class="muted">Spielplan einer Tipprunde als .ics-Datei – zum Importieren oder Abonnieren in Google/Apple Kalender & Co.</p>
-  <ul class="league-list">
-    ${myLeagues.map((l) => html`<li><a href="/r/${l.slug}/kalender.ics"><span class="league-list-name">${l.name}</span><span class="muted">.ics herunterladen</span></a></li>`)}
-  </ul>`
+      ? html`<p class="muted">Live-Link zum Abonnieren in Google/Apple Kalender & Co. – neue oder geänderte Termine (z. B. neu feststehende Turnierbaum-Spiele) holt sich dein Kalender danach von selbst, ohne dass du erneut etwas herunterladen musst.</p>
+  <div class="stack">
+    ${myLeagues.map(
+      (l, i) => html`<div class="copy-row">
+      <input type="text" readonly value="${calUrl(l.slug)}" id="cal-link-${i}" aria-label="Kalender-Link für ${l.name}">
+      <button type="button" class="btn" data-copy="cal-link-${i}">Kopieren</button>
+    </div>
+    <p class="muted"><small>${l.name}: <a href="${calUrl(l.slug).replace(/^https?:/, 'webcal:')}">direkt abonnieren</a> (öffnet die Kalender-App) oder den Link oben von Hand als Kalender-Abo eintragen.</small></p>`,
+    )}
+  </div>
+  ${postButton(ctx, '/konto/kalender/token-neu', 'Neuen Link erstellen', {
+    cls: 'btn btn-quiet',
+    confirm: 'Die bisherigen Kalender-Links funktionieren danach nicht mehr – schon abonnierte Kalender müssten neu eingerichtet werden. Fortfahren?',
+  })}`
       : html`<p class="muted">Du bist noch in keiner Tipprunde.</p>`
   }
 </section>`;
