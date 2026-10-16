@@ -104,7 +104,7 @@ ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.t
 ${o.error ? html`<p class="notice notice-error" role="alert">${o.error}</p>` : nothing}
 ${o.body}
 </main>
-${hideRank(o) ? adBox('right') : rankBox(ctx)}
+${hideRank(o) ? nothing : rankBox(ctx)}
 ${o.below ? html`<div class="below">${o.below}</div>` : nothing}
 </div>
 ${chatWidget(ctx)}
@@ -185,11 +185,6 @@ function tournamentBar(ctx: Ctx): Html {
   </div>`;
 }
 
-/** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
-function adBox(side: 'left' | 'right'): Html {
-  return html`<aside class="sidecol sidecol-${side}" aria-label="Seitenleiste"><div class="sidecol-box"><span class="sidecol-label">Anzeige</span></div></aside>`;
-}
-
 /** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
 export function scaleBar(points: number, possible: number): Html {
   const got = gotPercent(points, possible);
@@ -209,7 +204,7 @@ function hideRank(o: PageOptions): boolean {
 /** Rechts neben dem Inhalt (breite Bildschirme): die Rangliste der aktuellen Tipprunde, klickbar zur Seite "Rangliste". */
 function rankBox(ctx: Ctx): Html {
   const s = ctx.sidebar;
-  if (!s) return adBox('right');
+  if (!s) return nothing;
   const top = s.rows.slice(0, 8);
   const me = s.rows.find((r) => r.userId === ctx.user?.id);
   const shown = me && !top.includes(me) ? [...top, me] : top;
