@@ -436,19 +436,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   margin-bottom: 12px;
 }
 .teams .mid { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-.wins {
-  min-width: 2rem; padding: 2px 6px; font: inherit; font-size: 1.15rem; line-height: 1.2; text-align: center;
-  color: var(--text); background: transparent; border: 1px solid transparent; cursor: pointer;
+/* Ergebnis mit Spoilerschutz: ein Block, Zahl – Schrägstrich – Zahl; verdeckt zeigt er ein durchgestrichenes Auge */
+.score {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 92px; height: 46px; padding: 0 14px; cursor: pointer;
+  font: inherit; font-size: 1.3rem; line-height: 1; color: var(--text);
+  background: #0a1622; border: 1px solid #2c3f53; border-radius: 4px;
 }
-.wins-a { text-align: right; }
-.wins-b { text-align: left; }
-/* Spoilerschutz: Zahl verdeckt, bis man tippt */
-.teams:not(.revealed) .wins {
-  color: transparent; text-shadow: none; user-select: none;
-  border-color: var(--frame);
-  background: repeating-linear-gradient(135deg, rgb(200 170 110 / 18%) 0 4px, rgb(200 170 110 / 6%) 4px 8px);
-}
-.teams:not(.revealed) .wins:hover, .wins:focus-visible { border-color: var(--gold); outline: none; }
+.score:hover, .score:focus-visible { border-color: var(--gold); outline: none; }
+.score-num { min-width: 0.7em; text-align: center; font-variant-numeric: tabular-nums; }
+.score-slash { flex: none; color: #5c6f83; }
+.score-eye { position: absolute; inset: 0; margin: auto; color: var(--muted); display: none; }
+.score:not(.revealed) .score-num, .score:not(.revealed) .score-slash { visibility: hidden; }
+.score:not(.revealed) .score-eye { display: block; }
+.score.revealed { border-color: #26384a; }
 .team-a { color: #8cc3ff; }
 .team-b { color: #ff9a92; text-align: right; }
 .team.tbd {
@@ -935,7 +936,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 
 /* Aufklappbare Tipps der Mitspieler bei Spielen, die schon begonnen haben */
 .tips-fold { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-.tips-fold summary { display: list-item; margin-left: 18px; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
+.tips-fold > summary { display: flex; align-items: center; gap: 8px; margin-left: 0; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
+.tips-fold > summary::before { margin-right: 0; }
 .tips-fold summary:hover { color: var(--gold-bright); }
 .tips-fold[open] summary { margin-bottom: 8px; }
 
@@ -1213,5 +1215,5 @@ td.bad { color: var(--red); }
 @media (max-width: 420px) {
   .teams .mid { gap: 4px; }
   .teams .pct { font-size: 0.72em; }
-  .wins { min-width: 1.5rem; padding: 2px 3px; }
+  .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
 }

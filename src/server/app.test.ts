@@ -472,8 +472,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(tips.text, /class="pct pct-[ab] pct-down"[^>]*>0 %</);
     assert.match(tips.text, /class="tipped">\(\d+\/\d+ Spieler getippt\)/);
     // Gewonnene Spiele je Team mit Spoilerschutz (GEN 3:1, G2–KC 1:2)
-    assert.equal((tips.text.match(/<button type="button" class="wins wins-[ab]" data-spoiler/g) ?? []).length, 4);
-    assert.match(tips.text, /class="wins wins-a" data-spoiler[^>]*>3<\/button>/);
+    assert.equal((tips.text.match(/<button type="button" class="score" data-spoiler/g) ?? []).length, 2, 'ein Block je Begegnung');
+    assert.match(tips.text, /class="score-num">3<\/span>/);
+    assert.doesNotMatch(tips.text, /class="match-foot"[^>]*>[^]*?Ergebnis:/, 'Ergebnis steht nur hinter dem Spoilerschutz');
     assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
     assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
