@@ -170,4 +170,72 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     }
     assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
   });
+
+  test('Team ohne Kürzel (langer Name): VS/% in der Mitte bleibt bündig, Zeile ragt nicht heraus', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Kürzel-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    const mkTeam = async (name: string, short: string | null) =>
+      (await db.one<{ id: string }>(`insert into teams (name, short_name, region) values ($1, $2, 'X') returning id`, [name, short]))!.id;
+    const kurzA = await mkTeam('KC', 'KC');
+    const kurzB = await mkTeam('C9', 'C9');
+    // Ohne gepflegtes Kürzel fällt die Anzeige auf den vollen Namen zurück (siehe shortA/shortB) – der
+    // darf die mittlere Spalte (VS/%) nicht verschieben und die Zeile nicht breiter als den Bildschirm machen.
+    const langA = await mkTeam('Ein ziemlich langer Teamname ohne Kürzel', null);
+    const langB = await mkTeam('Noch ein langer Teamname ohne Kürzel', null);
+    const addMatch = (a: string, b: string, at: Date) =>
+      db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, $4, 'scheduled') returning id`,
+        [tid, a, b, at],
+      );
+    const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
+    const kurzMatch = (await addMatch(kurzA, kurzB, hours(1)))!.id;
+    const langMatch = (await addMatch(langA, langB, hours(2)))!.id;
+
+    const me = new Client();
+    // Nur der Administrator (ADMIN_EMAILS = admin@example.de, aus dem vorigen Test schon registriert) darf
+    // Tipprunden anlegen – hier anmelden statt neu zu registrieren.
+    await me.request('GET', '/anmelden');
+    assert.equal((await me.request('POST', '/anmelden', { email: 'admin@example.de', password: PASSWORT })).status, 303);
+    await me.request('GET', '/konto');
+    const created = await me.request('POST', '/neu', { name: 'Kürzel-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+    assert.equal(created.status, 303, created.text);
+    const slug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+    const { chromium } = playwright!;
+    const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+    const problems: string[] = [];
+    try {
+      const context = await browser.newContext({ locale: 'de-DE' });
+      await context.addCookies([...me.cookies].map(([name, value]) => ({ name, value, url: base })));
+      for (const width of [390, 1300]) {
+        const page = await context.newPage();
+        await page.setViewportSize({ width, height: 900 });
+        const where = `${width}px`;
+        await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
+        const m = await page.evaluate(
+          ({ kurzId, langId }: { kurzId: string; langId: string }) => {
+            const midLeft = (id: string) => {
+              const el = document.querySelector(`#spiel-${id} .mid`);
+              return el ? el.getBoundingClientRect().left : null;
+            };
+            return {
+              scroll: document.documentElement.scrollWidth,
+              inner: window.innerWidth,
+              kurzX: midLeft(kurzId),
+              langX: midLeft(langId),
+            };
+          },
+          { kurzId: kurzMatch, langId: langMatch },
+        );
+        if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
+        if (m.kurzX === null || m.langX === null) problems.push(`${where}: Zeile(n) nicht gefunden`);
+        else if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
+        await page.close();
+      }
+    } finally {
+      await browser.close();
+    }
+    assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
+  });
 });

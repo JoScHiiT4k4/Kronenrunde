@@ -363,12 +363,14 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
   // Innen: Gewinnchance, in der Mitte „VS“ bzw. das verdeckte Ergebnis. Läuft das Spiel noch ohne
   // Ergebnis, bekommt das Medaillon einen grünen Schimmer statt des separaten "läuft"-Texts.
   const vs = html`<span class="vs${m.status === 'live' ? ' vs-live' : ''}"${attr(m.status === 'live', 'aria-label="Läuft"')}>VS</span>`;
+  // Titel mit vollem Teamnamen: hilfreich, falls der Name (ohne Kürzel) abgeschnitten wird (siehe .team-a/.team-b).
+  const teamTitle = (name: string | null) => (name ? html` title="${name}"` : nothing);
   const teams = html`<div class="teams">
-    <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}</span>
+    <span class="team team-a${m.team_a ? '' : ' tbd'}"${teamTitle(m.team_a)}>${m.team_a ? shortA(m) : 'Steht noch nicht fest'}</span>
     <span class="mid">
       ${pct(shares?.a, shares?.b, 'a')}${score ?? vs}${pct(shares?.b, shares?.a, 'b')}
     </span>
-    <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}</span>
+    <span class="team team-b${m.team_b ? '' : ' tbd'}"${teamTitle(m.team_b)}>${m.team_b ? shortB(m) : 'Steht noch nicht fest'}</span>
   </div>`;
   return { meta, teams };
 }

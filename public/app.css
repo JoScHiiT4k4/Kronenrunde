@@ -476,6 +476,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .teams .mid { display: grid; grid-template-columns: 58px 92px 58px; column-gap: 16px; align-items: center; }
 .teams .mid .pct-b { text-align: left; }
 .teams .mid .vs, .teams .mid .score { justify-self: center; }
+/* Grid-Spalten (team-a/team-b) dürfen über ihren Inhalt hinaus nicht breiter werden, sonst verschiebt
+   ein langer Teamname (ohne Kürzel) die mittlere Spalte (VS/%) und sprengt die Zeilenbreite. */
+.teams .team-a, .teams .team-b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Ergebnis mit Spoilerschutz: ein Block, Zahl – Schrägstrich – Zahl; verdeckt zeigt er ein durchgestrichenes Auge */
 .score {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
