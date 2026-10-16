@@ -322,13 +322,10 @@ document.addEventListener('click', (e) => {
   });
 });
 
-// Spoilerschutz: Klick auf eine verdeckte Zahl zeigt das Ergebnis der Begegnung (noch einmal klicken verdeckt es wieder)
+// Spoilerschutz: Klick auf den Ergebnis-Block zeigt das Ergebnis (noch einmal klicken verdeckt es wieder)
 document.addEventListener('click', (e) => {
   const btn = e.target instanceof Element ? e.target.closest('[data-spoiler]') : null;
-  const box = btn && btn.closest('.teams');
-  if (!btn || !box) return;
-  const shown = box.classList.toggle('revealed');
-  for (const b of box.querySelectorAll('[data-spoiler]')) {
-    b.setAttribute('aria-label', shown ? b.dataset.team + ' hat ' + b.textContent + ' Spiele gewonnen' : 'Ergebnis anzeigen');
-  }
+  if (!btn) return;
+  const shown = btn.classList.toggle('revealed');
+  btn.setAttribute('aria-label', shown ? btn.dataset.label + ' – Ergebnis verdecken' : 'Ergebnis anzeigen');
 });
