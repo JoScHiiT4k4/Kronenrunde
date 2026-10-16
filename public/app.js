@@ -167,7 +167,7 @@ if ('serviceWorker' in navigator) {
   }
 })();
 
-// Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann erscheinen die Livestream-Links)
+// Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann steht dort "Live" bzw. der nächste Countdown)
 (() => {
   const el = document.querySelector('[data-countdown]');
   if (!el) return;
@@ -180,7 +180,13 @@ if ('serviceWorker' in navigator) {
     el.textContent = d > 0 ? `${d} Tg ${rest}` : rest;
     if (s === 0) {
       clearInterval(timer);
-      setTimeout(() => location.reload(), 1500);
+      // Danach zeigt der Kopf "Live" bzw. den nächsten Countdown; geht die Uhr hier vor, nach ein paar Sekunden noch einmal
+      let again = false;
+      try {
+        again = Date.now() - Number(sessionStorage.getItem('countdown-reload')) < 10000;
+        sessionStorage.setItem('countdown-reload', String(Date.now()));
+      } catch { /* ohne Speicher: einfach neu laden */ }
+      setTimeout(() => location.reload(), again ? 5000 : 1500);
     }
   };
   const timer = setInterval(tick, 1000);
@@ -343,8 +349,18 @@ document.querySelectorAll('form[data-backup-filter]').forEach((form) => {
     bis.focus();
     try { bis.showPicker(); } catch { /* ältere Browser: Bis von Hand wählen, dann "Filtern" */ }
   });
+  let sent = false;
+  const send = () => {
+    if (sent) return;
+    sent = true;
+    form.submit();
+  };
   bis.addEventListener('change', () => {
     von.max = bis.value;
-    form.submit();
+    send();
+  });
+  // Bis-Kalender ohne Auswahl geschlossen: der Filter gilt dann ab dem Von-Datum
+  bis.addEventListener('blur', () => {
+    if (von.value && von.value !== von.defaultValue) send();
   });
 });

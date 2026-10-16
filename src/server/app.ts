@@ -231,7 +231,7 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     ctx.params = route.params;
     if (method === 'GET' && ctx.user) {
       const slug = /^\/r\/([^/]+)/.exec(path)?.[1] ?? null;
-      ctx.headerTournament = await loadHeaderTournament(db, ctx.user.id, slug, ctx.now);
+      ctx.headerTournament = await loadHeaderTournament(db, ctx.user.id, slug, ctx.now, config.timeZone);
       ctx.sidebar = await loadSidebar(db, ctx.user.id, slug, ctx.isAdmin);
     }
 

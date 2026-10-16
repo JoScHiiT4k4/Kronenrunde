@@ -95,7 +95,7 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   </nav>
 </header>
 <div class="page">
-<div class="ad ad-ghost${ctx.sidebar ? ' ad-ghost-wide' : ''}" aria-hidden="true"></div>
+<div class="side side-ghost${ctx.sidebar ? ' side-ghost-wide' : ''}" aria-hidden="true"></div>
 ${o.league ? leagueNav(o.league) : nothing}
 <main class="main">
 ${notice ? html`<p class="notice notice-${notice.kind}" role="status">${notice.text}</p>` : nothing}
@@ -162,17 +162,20 @@ function countdownText(ms: number): string {
   return d > 0 ? `${d} Tg ${two(h)}:${two(m)}:${two(sec)}` : `${two(h)}:${two(m)}:${two(sec)}`;
 }
 
-/** Mitte im Kopf: Countdown bis zum Turnierstart (solange er läuft), dazu immer die Links zum Livestream – mit grünem „Live“, wenn gespielt wird. */
+/**
+ * Mitte im Kopf: vor dem Turnier "Name in <Countdown>", danach am Spieltag ein grünes „Live“, dazwischen der Countdown bis
+ * zu den nächsten Begegnungen (ohne „in“). Dazu immer die Links zum Livestream.
+ */
 function tournamentBar(ctx: Ctx): Html {
   const t = ctx.headerTournament;
   if (!t) return nothing;
   const { twitch, youtube } = ctx.deps.config.streams;
+  const count = (to: Date) => html`<time class="tbar-count" datetime="${to.toISOString()}" data-countdown="${to.toISOString()}">${countdownText(to.getTime() - ctx.now.getTime())}</time>`;
   return html`<div class="tbar" aria-label="${t.name}">
     ${
       t.running
-        ? html`<span class="tbar-label">${t.name}</span>`
-        : html`<span class="tbar-label">${t.name} in</span>
-    <time class="tbar-count" datetime="${t.startsAt.toISOString()}" data-countdown="${t.startsAt.toISOString()}">${countdownText(t.startsAt.getTime() - ctx.now.getTime())}</time>`
+        ? html`<span class="tbar-label">${t.name}</span>${!t.live && t.nextStart ? count(t.nextStart) : nothing}`
+        : html`<span class="tbar-label">${t.name} in</span>${count(t.startsAt)}`
     }
     ${t.live ? html`<span class="tbar-live">Live</span>` : nothing}
     <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
@@ -182,7 +185,7 @@ function tournamentBar(ctx: Ctx): Html {
 
 /** Platz für Werbung links und rechts neben dem Inhalt (nur auf breiten Bildschirmen sichtbar). */
 function adBox(side: 'left' | 'right'): Html {
-  return html`<aside class="ad ad-${side}" aria-label="Werbung"><div class="ad-box"><span class="ad-label">Anzeige</span></div></aside>`;
+  return html`<aside class="side side-${side}" aria-label="Seitenleiste"><div class="side-box"><span class="side-label">Anzeige</span></div></aside>`;
 }
 
 /** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
@@ -202,7 +205,7 @@ function rankBox(ctx: Ctx): Html {
   const top = s.rows.slice(0, 8);
   const me = s.rows.find((r) => r.userId === ctx.user?.id);
   const shown = me && !top.includes(me) ? [...top, me] : top;
-  return html`<aside class="ad ad-right rank-side" aria-label="Rangliste ${s.leagueName}">
+  return html`<aside class="side side-right rank-side" aria-label="Rangliste ${s.leagueName}">
     <div class="rank-box">
       <a class="rank-stretch rank-title" href="/r/${s.slug}/rangliste">Rangliste</a>
       <span class="rank-league">${s.leagueName}</span>
