@@ -13,8 +13,7 @@ KEEP_BACKUPS=14        # nächtliche Sicherungen
 KEEP_EXTRA_BACKUPS=10  # Sicherungen vor Updates, Datenimporten usw.
 KEEP_NAS=30            # Kopien auf dem Heimnetz-Speicher (MyCloud)
 CONF_DIR=/etc/lol-tippspiel
-NAS_CONF=$CONF_DIR/nas.conf   # Adresse, Freigabe, Ordner (nur root)
-NAS_CRED=$CONF_DIR/nas.cred   # Benutzername und Passwort (nur root)
+NAS_CONF=$CONF_DIR/nas.conf   # Adresse, NFS-Pfad, Ordner (nur root)
 NAS_MOUNT=/mnt/nas-sicherung
 NAS_HOST='' NAS_SHARE='' NAS_DIR=lol-tippspiel   # werden aus $NAS_CONF überschrieben
 NAS_STATUS=$BACKUP_DIR/.nas-status
@@ -73,7 +72,7 @@ backup() {
   if [[ -z $label ]]; then nas_copy "$file" || true; fi
 }
 
-# ---- Kopie auf den Heimnetz-Speicher (z. B. WD MyCloud) per SMB/Windows-Freigabe ----
+# ---- Kopie auf den Heimnetz-Speicher (z. B. WD MyCloud) per NFS ----
 
 nas_status() { # <ok|fehler> <Text>
   install -d -m 750 -o root -g "$SERVICE_USER" "$BACKUP_DIR"
@@ -82,16 +81,17 @@ nas_status() { # <ok|fehler> <Text>
   chmod 640 "$NAS_STATUS"
 }
 
-# Freigabe einhängen; ältere Geräte können nur ältere SMB-Versionen, deshalb der Reihe nach probieren
+# NFS-Freigabe einhängen (ohne Passwort: der Netzwerkspeicher lässt den Pi über seine IP-Adresse herein).
+# Je nach Gerät klappt NFS 3 oder 4, deshalb der Reihe nach probieren; "timeout" verhindert langes Hängen.
 nas_mount() {
-  [[ -f $NAS_CONF && -f $NAS_CRED ]] || return 1
+  [[ -f $NAS_CONF ]] || return 1
   # shellcheck disable=SC1090
   . "$NAS_CONF"
   mkdir -p "$NAS_MOUNT"
   mountpoint -q "$NAS_MOUNT" && return 0
   local v
-  for v in 3.0 2.1 2.0 1.0; do
-    if mount -t cifs "//$NAS_HOST/$NAS_SHARE" "$NAS_MOUNT" -o "credentials=$NAS_CRED,vers=$v,iocharset=utf8,file_mode=0600,dir_mode=0700" 2>/dev/null; then
+  for v in "" ",vers=3" ",vers=4"; do
+    if timeout 40 mount -t nfs -o "soft,timeo=100,retrans=2${v}" "$NAS_HOST:$NAS_SHARE" "$NAS_MOUNT" 2>/dev/null; then
       return 0
     fi
   done
@@ -104,7 +104,7 @@ nas_copy() { # <Sicherungsdatei>
   [[ -f $NAS_CONF ]] || return 0
   local file=$1
   if ! nas_mount; then
-    nas_status fehler "MyCloud nicht erreichbar oder Zugangsdaten falsch"
+    nas_status fehler "MyCloud nicht erreichbar oder der Pi darf die NFS-Freigabe nicht einhängen"
     warn "MyCloud nicht erreichbar – die Sicherung liegt nur auf dem Pi (Einrichtung prüfen: tippspiel nas-test)."
     return 1
   fi
@@ -113,7 +113,7 @@ nas_copy() { # <Sicherungsdatei>
     # Nur die neuesten Kopien behalten
     find "$dir" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP_NAS + 1)) | cut -d' ' -f2- | xargs -r rm -f
     nas_status ok "$(basename "$file")"
-    ok "Kopie auf der MyCloud: $NAS_HOST/$NAS_SHARE/$NAS_DIR"
+    ok "Kopie auf der MyCloud: $NAS_HOST:$NAS_SHARE/$NAS_DIR"
   else
     nas_status fehler "Kopieren auf die MyCloud fehlgeschlagen (Platz oder Rechte?)"
     warn "Kopieren auf die MyCloud fehlgeschlagen."
@@ -228,24 +228,22 @@ case "${1:-hilfe}" in
     ;;
 
   nas-einrichten)
-    # Sicherungen zusätzlich auf die MyCloud (oder einen anderen Netzwerkspeicher mit Windows-Freigabe) kopieren
-    command -v mount.cifs >/dev/null 2>&1 || { echo "Installiere das Programm für Windows-Freigaben (cifs-utils) …"; apt-get install -y cifs-utils >/dev/null || die "cifs-utils konnte nicht installiert werden."; }
+    # Sicherungen zusätzlich auf die MyCloud (oder einen anderen Netzwerkspeicher) kopieren – per NFS, ohne Passwort
+    command -v mount.nfs >/dev/null 2>&1 || { echo "Installiere das Programm für NFS-Freigaben (nfs-common) …"; apt-get install -y nfs-common >/dev/null || die "nfs-common konnte nicht installiert werden."; }
     echo "Angaben zu deiner MyCloud (Antworten mit Enter bestätigen):"
-    read -r -p "  Adresse (z. B. 192.168.1.50 oder wdmycloud): " host
-    read -r -p "  Name der Freigabe (z. B. Public oder ein eigener Ordner der MyCloud): " share
+    read -r -p "  NFS-Adresse (z. B. nfs://192.168.1.50/nfs/Sicherung): " addr
     read -r -p "  Unterordner für die Sicherungen [lol-tippspiel]: " sub
-    read -r -p "  Benutzername auf der MyCloud: " nuser
-    read -r -s -p "  Passwort: " npass; echo
-    [[ -n $host && -n $share && -n $nuser ]] || die "Adresse, Freigabe und Benutzername werden gebraucht."
+    addr=${addr#nfs://}
+    if [[ $addr == *:/* ]]; then host=${addr%%:*} share=${addr#*:}; elif [[ $addr == */* ]]; then host=${addr%%/*} share=/${addr#*/}; else host='' share=''; fi
+    [[ -n $host && $share == /* ]] || die "Die Adresse muss so aussehen:  nfs://192.168.1.50/nfs/Sicherung"
     install -d -m 700 "$CONF_DIR"
     printf 'NAS_HOST=%q\nNAS_SHARE=%q\nNAS_DIR=%q\n' "$host" "$share" "${sub:-lol-tippspiel}" >"$NAS_CONF"
-    printf 'username=%s\npassword=%s\n' "$nuser" "$npass" >"$NAS_CRED"
-    chmod 600 "$NAS_CONF" "$NAS_CRED"
+    chmod 600 "$NAS_CONF"
     nas_umount
     last=$(find "$BACKUP_DIR" -maxdepth 1 -name 'tippspiel-*.dump' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
     [[ -n $last ]] || { backup; exit; }
     nas_copy "$last" && ok "Eingerichtet. Ab jetzt wird jede nächtliche Sicherung auch auf die MyCloud kopiert." ||
-      die "Das Kopieren klappt noch nicht. Adresse, Freigabe, Benutzername und Passwort prüfen und den Befehl wiederholen."
+      die "Das Kopieren klappt noch nicht. Ist NFS an der MyCloud eingeschaltet und darf der Pi (seine IP) auf den Ordner schreiben? Dann den Befehl wiederholen."
     ;;
 
   nas-test)
@@ -256,7 +254,7 @@ case "${1:-hilfe}" in
     ;;
 
   nas-entfernen)
-    rm -f "$NAS_CONF" "$NAS_CRED" "$NAS_STATUS"
+    rm -f "$NAS_CONF" "$NAS_STATUS"
     nas_umount
     ok "Die Kopie auf die MyCloud ist ausgeschaltet. Vorhandene Kopien dort bleiben liegen."
     ;;
@@ -334,7 +332,7 @@ LoL-Tippspiel – Befehle:
   tippspiel login-link <E-Mail>     Link zum Passwort-Festlegen erzeugen, ohne Mail (falls der Versand mal klemmt)
   tippspiel sicherung               Datenbank jetzt sichern (passiert auch jede Nacht automatisch)
   tippspiel sicherungen             Vorhandene Sicherungen anzeigen
-  tippspiel nas-einrichten          Sicherungen zusätzlich auf die MyCloud kopieren (fragt Adresse, Freigabe, Zugang)
+  tippspiel nas-einrichten          Sicherungen zusätzlich auf die MyCloud kopieren (per NFS; fragt nach der Adresse)
   tippspiel nas-test                Kopie der neuesten Sicherung auf die MyCloud jetzt versuchen
   tippspiel nas-entfernen           Kopie auf die MyCloud wieder ausschalten
   tippspiel wiederherstellen <Datei>  Daten aus einer Sicherung zurückholen

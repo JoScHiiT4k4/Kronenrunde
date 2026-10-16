@@ -142,13 +142,15 @@ Die Datenbank wird jede Nacht gesichert (die letzten 14 Sicherungen bleiben), un
 
 ### Sicherung zusätzlich auf die MyCloud
 
-Die Sicherungen liegen sonst nur auf der SD-Karte des Pi. Damit sie einen Defekt der Karte überstehen, kann jede nächtliche Sicherung zusätzlich auf eine Windows-Freigabe (SMB) im Heimnetz kopiert werden, zum Beispiel auf die WD MyCloud:
+Die Sicherungen liegen sonst nur auf der SD-Karte des Pi. Damit sie einen Defekt der Karte überstehen, kann jede nächtliche Sicherung zusätzlich per **NFS** auf einen Speicher im Heimnetz kopiert werden, zum Beispiel auf die WD MyCloud.
+
+Vorbereitung an der MyCloud: NFS einschalten und für den Ordner dem Pi (am besten mit fester IP im Router) Schreibrechte geben. NFS braucht kein Passwort, der Speicher erkennt den Pi an der IP-Adresse. Dann auf dem Pi:
 
 ```bash
 tippspiel nas-einrichten
 ```
 
-Der Befehl fragt nach der Adresse der MyCloud (IP oder `wdmycloud`), dem Namen der Freigabe, einem Unterordner und dem Benutzer samt Passwort, installiert bei Bedarf das nötige Programm und kopiert gleich die neueste Sicherung als Test. Auf der MyCloud bleiben die letzten 30 Kopien. Zugangsdaten liegen nur für den Administrator lesbar unter `/etc/lol-tippspiel/`. Weitere Befehle: `tippspiel nas-test` (jetzt kopieren) und `tippspiel nas-entfernen` (ausschalten).
+Der Befehl fragt nach der NFS-Adresse (z. B. `nfs://192.168.1.50/nfs/Sicherung`) und einem Unterordner, installiert bei Bedarf das nötige Programm (`nfs-common`) und kopiert gleich die neueste Sicherung als Test. Auf der MyCloud bleiben die letzten 30 Kopien. Weitere Befehle: `tippspiel nas-test` (jetzt kopieren) und `tippspiel nas-entfernen` (ausschalten).
 
 ---
 
