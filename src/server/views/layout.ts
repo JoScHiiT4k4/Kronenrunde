@@ -91,7 +91,7 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn" title="Abmelden" aria-label="Abmelden">${ICON_LOGOUT}</button></form>`: html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
-${o.league ? leagueNav(o.league) : nothing}
+${o.league ? leagueNav(o.league, !!ctx.sidebar, !!o.wide) : nothing}
 <div class="page${o.wide ? ' page-wide' : ''}">
 <div class="ad ad-ghost${ctx.sidebar ? ' ad-ghost-wide' : ''}" aria-hidden="true"></div>
 <main class="main${o.wide ? ' main-wide' : ''}">
@@ -281,7 +281,7 @@ function mobileMenu(cls: string, ariaLabel: string, items: TabItem[], link: (t: 
 </details>`;
 }
 
-function leagueNav(l: LeagueNav): Html {
+function leagueNav(l: LeagueNav, withSidebar: boolean, wide: boolean): Html {
   const tab = (key: LeagueNav['active'], label: string): TabItem => ({ href: `/r/${l.slug}/${key}`, label, current: l.active === key });
   const items: TabItem[] = [
     tab('tippen', 'Tippen'),
@@ -293,12 +293,20 @@ function leagueNav(l: LeagueNav): Html {
     ...(l.canManage ? [tab('verwalten', 'Verwalten')] : []),
   ];
   const link = (t: TabItem) => html`<a href="${t.href}"${t.current ? html` aria-current="page"` : nothing}>${t.label}</a>`;
+  // Gleiche Spalten wie der Inhalt darunter (Platzhalter links/rechts), damit Reiter und Inhalt bei jeder Fensterbreite untereinander stehen
+  const ghost = html`<div class="ad ad-ghost${withSidebar ? ' ad-ghost-wide' : ''}" aria-hidden="true"></div>`;
   return html`<nav class="league-nav" aria-label="${l.name}">
-  <div class="league-name">${l.name}</div>
-  <div class="tabs">
-    ${items.map(link)}
+  <div class="page nav-page${wide ? ' page-wide' : ''}">
+    ${ghost}
+    <div class="main nav-main${wide ? ' main-wide' : ''}">
+      <div class="league-name">${l.name}</div>
+      <div class="tabs">
+        ${items.map(link)}
+      </div>
+      ${mobileMenu('league-tabs', l.name, items, link)}
+    </div>
+    ${ghost}
   </div>
-  ${mobileMenu('league-tabs', l.name, items, link)}
 </nav>`;
 }
 
