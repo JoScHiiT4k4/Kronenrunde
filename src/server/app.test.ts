@@ -378,6 +378,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const manage = await anna.get(`/r/${slug}/verwalten?bereich=mitglieder`);
     assert.equal(manage.status, 200);
     invite = /\/beitreten\/([0-9a-f]+)/.exec(manage.text)![1];
+    assert.match(manage.text, /QR-Code anzeigen/);
+    assert.match(manage.text, /<svg class="qr-code"/);
 
     // Fremde sehen die Runde nicht
     await stranger.login('fremd@example.de', 'Fremd');

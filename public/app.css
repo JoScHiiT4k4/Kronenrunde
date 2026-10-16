@@ -367,6 +367,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .copy-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .copy-row input { flex: 1; min-width: 0; }
 
+.qr-wrap { display: flex; justify-content: center; padding: 8px 0 4px; }
+.qr-code { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; }
+@media (max-width: 520px) { .qr-code { width: 180px; height: 180px; } }
+
 .danger-zone { --frame: #6e2a26; background-color: transparent; }
 
 /* ---------- Tippen ---------- */

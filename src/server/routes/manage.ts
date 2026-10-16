@@ -3,10 +3,12 @@
 import type { Ctx } from '../app.ts';
 import { ANSWER_TYPE_LABELS, type AnswerType, QUESTION_CATALOG } from '../../domain/questions.ts';
 import { missingAnswers, missingTips } from '../../domain/missing.ts';
+import { encodeQr } from '../../domain/qrcode.ts';
 import { formatDateTime, formatRemaining } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { csrfField, layout, postButton, progress, tabMenu } from '../views/layout.ts';
+import { qrSvg } from '../views/qr-svg.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
 import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, shortA, shortB, toDomainMatch } from './league-data.ts';
 import { clearChat } from './chat.ts';
@@ -306,6 +308,10 @@ ${area === 'mitglieder' ? html`
     cls: 'btn btn-quiet',
     confirm: 'Der bisherige Link funktioniert danach nicht mehr. Fortfahren?',
   })}
+  <details class="qr-details">
+    <summary>QR-Code anzeigen</summary>
+    <div class="qr-wrap">${qrSvg(encodeQr(inviteLink))}</div>
+  </details>
 </section>
 <section class="panel">
   <h2>Mitglieder (${members.length})</h2>
