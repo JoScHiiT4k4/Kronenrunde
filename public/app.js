@@ -34,6 +34,65 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Ergebnis teilen: die vom Server gelieferte SVG-Karte wird hier im Browser selbst (Canvas)
+// zu einem PNG gerastert – zum Teilen über das Teilen-Menü des Geräts (z. B. Instagram) oder
+// zum Herunterladen. Ohne Canvas-Unterstützung bleibt der normale Link (SVG-Download) bestehen.
+// ---------------------------------------------------------------------------
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-share-card]');
+  if (!link || !document.createElement('canvas').getContext) return;
+  e.preventDefault();
+  const label = link.textContent;
+  link.textContent = 'Wird vorbereitet …';
+  shareCardAsPng(link).catch(() => {
+    window.location.href = link.href; // etwas schiefgelaufen: als SVG herunterladen
+  }).finally(() => {
+    link.textContent = label;
+  });
+});
+
+async function shareCardAsPng(link) {
+  const res = await fetch(link.href);
+  if (!res.ok) throw new Error('Karte konnte nicht geladen werden');
+  const svgText = await res.text();
+  const svgUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+  try {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('Karte lässt sich nicht als Bild laden'));
+      img.src = svgUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || 1080;
+    canvas.height = img.naturalHeight || 1080;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('PNG konnte nicht erzeugt werden');
+    const filename = `${link.dataset.filename || 'ergebnis'}.png`;
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: document.title });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // Nutzer hat das Teilen-Menü abgebrochen
+        // sonst: als Download anbieten (unten)
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
 // Ungespeicherte Tipps: Knopf markieren und vor dem Verlassen der Seite warnen
 const tipForm = document.querySelector('.tip-form');
 if (tipForm) {
