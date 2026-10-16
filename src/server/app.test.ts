@@ -579,6 +579,17 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const rows = [...table.text.matchAll(/<td class="num rank">(\d+)<\/td>\s*<td><a class="who who-link"[^>]*>(?:<span class="avatar-wrap">)?(?:<img[^>]*>|<span class="avatar[^"]*"[^>]*>[^<]*<\/span>)(?:<span class="presence-dot[^"]*"[^>]*><\/span><\/span>)?<span>([^<]+)<\/span><\/a>[\s\S]*?<td class="num total">(\d+)<\/td>/g)].map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(rows, [['1', 'Anna', '3'], ['2', 'Ben', '2']]);
 
+    // Rangliste teilen: eigenständige Bild-Karte der ganzen Tabelle, allen Mitgliedern zugänglich
+    assert.match(table.text, new RegExp(`data-share-card data-filename="${slug}-rangliste"[^>]*>Rangliste teilen`));
+    const standingsSvg = await anna.get(`/r/${slug}/rangliste/teilen.svg`);
+    assert.equal(standingsSvg.status, 200);
+    assert.match(standingsSvg.headers.get('content-type') ?? '', /image\/svg\+xml/);
+    assert.match(standingsSvg.text, /<svg[^>]* width="1080" height="1080"/);
+    assert.match(standingsSvg.text, />Anna<\/text>/);
+    assert.match(standingsSvg.text, />Ben<\/text>/);
+    assert.equal((await stranger.get(`/r/${slug}/rangliste/teilen.svg`)).status, 404, 'Fremde ohne Mitgliedschaft');
+    assert.equal((await new Client().get(`/r/${slug}/rangliste/teilen.svg`)).status, 303, 'ohne Anmeldung');
+
     const tips = await anna.get(`/r/${slug}/tippen`);
     assert.match(tips.text, /Vorbei/);
     assert.doesNotMatch(tips.text, /pts-exact/, 'Punkte der Spiele verraten sonst das Ergebnis – sie stehen nur in der aufklappbaren Tipp-Liste');
@@ -940,8 +951,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(prof.text, /Anna-Lena/);
     assert.match(prof.text, /class="profile-rank">\(\d+\. Platz\)<\/span>/);
     assert.match(prof.text, /Sonderfragen/);
-    assert.match(prof.text, new RegExp(`data-share-card data-filename="${slug}-ergebnis"[^>]*>Ergebnis teilen`));
-    const shareSvg = await ben.get(`/r/${slug}/spieler/${annaId}/teilen.svg`);
+    // Teilen nur im eigenen Profil, nicht bei anderen Mitspielern
+    assert.doesNotMatch(prof.text, /Ergebnis teilen/, 'Ben sieht auf Annas Profil keinen Teilen-Button');
+    assert.equal((await ben.get(`/r/${slug}/spieler/${annaId}/teilen.svg`)).status, 404, 'Ben darf Annas Karte nicht teilen');
+    const benId = (await db.one<{ id: string }>(`select id from users where display_name = 'Ben'`))!.id;
+    const ownProf = await ben.get(`/r/${slug}/spieler/${benId}`);
+    assert.match(ownProf.text, new RegExp(`data-share-card data-filename="${slug}-ergebnis"[^>]*>Ergebnis teilen`));
+    const shareSvg = await ben.get(`/r/${slug}/spieler/${benId}/teilen.svg`);
     assert.equal(shareSvg.status, 200);
     assert.match(shareSvg.headers.get('content-type') ?? '', /image\/svg\+xml/);
     assert.match(shareSvg.text, /<svg[^>]* width="1080" height="1080"/); // Breite/Höhe nötig, damit der Browser sie beim Rastern zu PNG kennt

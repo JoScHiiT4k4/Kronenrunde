@@ -63,7 +63,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
   const body = html`<p class="muted page-note"><a href="/r/${league.slug}/rangliste">← Zur Rangliste</a></p>
 <section class="panel profile-head">
   ${avatar(id, person.display_name, person.avatar_updated_at, 'lg')}
-  <div>
+  <div class="profile-head-info">
     <h1>${person.first_name && sameName ? person.first_name : person.display_name} <span class="profile-rank">(${row.rank}. Platz)</span></h1>
     <p class="muted">${person.first_name && !sameName ? html`${person.first_name} · ` : nothing}Mitglied in ${league.name}</p>
     <p class="profile-presence">
@@ -74,7 +74,11 @@ async function profilePage(ctx: Ctx): Promise<Res> {
           : html`Noch nicht online gewesen`}
     </p>
   </div>
-  <a class="btn btn-quiet profile-share" href="/r/${league.slug}/spieler/${id}/teilen.svg" download="${league.slug}-ergebnis.svg" data-share-card data-filename="${league.slug}-ergebnis">Ergebnis teilen</a>
+  ${
+    own
+      ? html`<a class="btn btn-quiet profile-share" href="/r/${league.slug}/spieler/${id}/teilen.svg" download="${league.slug}-ergebnis.svg" data-share-card data-filename="${league.slug}-ergebnis">Ergebnis teilen</a>`
+      : nothing
+  }
 </section>
 <section class="panel">
   <h2>Bisheriger Stand</h2>
@@ -124,6 +128,7 @@ async function shareImage(ctx: Ctx): Promise<Res> {
   const { db, config } = ctx.deps;
   const id = ctx.params.userId;
   if (!isUuid(id)) throw new HttpError(404, 'Nicht gefunden.');
+  if (id !== ctx.user.id) throw new HttpError(404, 'Nicht gefunden.'); // Jeder kann nur sein eigenes Ergebnis teilen
   const person = await db.one<{ display_name: string; avatar_b64: string | null }>(
     `select u.display_name, u.avatar_b64 from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 and lm.user_id = $2`,
     [league.id, id],
