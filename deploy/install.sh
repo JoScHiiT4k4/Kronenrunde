@@ -10,7 +10,7 @@
 #   4. Dienst "lol-tippspiel": startet automatisch, auch nach Stromausfall
 #   5. Tägliche Sicherung der Datenbank nach /var/backups/lol-tippspiel
 #   6. Tailscale Funnel: macht die App unter https://….ts.net im Internet erreichbar
-#   7. Befehl "tippspiel" für Updates, Sicherungen usw. (tippspiel hilfe); Updates laufen automatisch alle 15 Minuten
+#   7. Befehl "tippspiel" für Updates, Sicherungen usw. (tippspiel hilfe); Updates laufen automatisch (sofort per GitHub-Webhook, sonst täglich 08:00)
 #
 # Das Skript kann gefahrlos mehrfach laufen: Einstellungen und Daten bleiben erhalten.
 # "tippspiel update" ruft es mit --update auf (ohne Fragen, ohne Tailscale-Einrichtung).
@@ -343,7 +343,7 @@ Persistent=true
 WantedBy=timers.target
 EOF
 
-# Automatische Updates: alle 15 Minuten nach einer neuen, auf GitHub geprüften Version schauen
+# Automatische Updates: einmal täglich um 08:00 nach einer neuen, auf GitHub geprüften Version schauen
 cat >/etc/systemd/system/$SERVICE-update.service <<EOF
 [Unit]
 Description=LoL-Tippspiel: neue geprüfte Version von GitHub holen
@@ -358,11 +358,11 @@ EOF
 
 cat >/etc/systemd/system/$SERVICE-update.timer <<EOF
 [Unit]
-Description=LoL-Tippspiel: alle 15 Minuten nach Updates schauen
+Description=LoL-Tippspiel: täglich um 08:00 nach Updates schauen
 
 [Timer]
-OnCalendar=*:0/15
-RandomizedDelaySec=90
+OnCalendar=*-*-* 08:00:00
+RandomizedDelaySec=60
 Persistent=true
 
 [Install]
@@ -456,7 +456,7 @@ fi
 ok "App läuft (startet automatisch nach jedem Neustart)"
 touch "$APP_DIR/.update-installed"   # die Server-Seite zeigt, wann zuletzt eine Version installiert wurde
 ok "Tägliche Sicherung um 4 Uhr nach $BACKUP_DIR (Kopie auf die MyCloud um 7 Uhr, falls eingerichtet)"
-ok "Automatische Updates alle 15 Minuten (nur auf GitHub geprüfte Versionen)"
+ok "Automatische Updates täglich 08:00 und sofort per Webhook (nur auf GitHub geprüfte Versionen)"
 
 [[ $UPDATE == 1 ]] && exit 0
 

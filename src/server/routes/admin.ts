@@ -156,7 +156,10 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
   const day = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
   const when = (d: Date) => (day(d) === day(ctx.now) ? html`um <strong>${formatTime(d, tz)} Uhr</strong>` : html`am <strong>${formatDateTime(d, tz)} Uhr</strong>`);
   return html`<section class="panel">
-  <h2>Version &amp; Update</h2>
+  <div class="panel-head">
+    <h2>Version &amp; Update</h2>
+    <a class="refresh-link" href="/admin?bereich=system" title="Seite aktualisieren" aria-label="Seite aktualisieren"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></a>
+  </div>
   <p>Aktuelle Version: <strong>${build.version}</strong>.<br>
   ${checked ? html`Letzte Updatesuche ${when(checked)}.` : html`<span class="muted">Letzte Updatesuche: noch nicht bekannt.</span>`}<br>
   ${installed ? html`Letztes Update installiert ${when(installed)}.` : html`<span class="muted">Letztes Update installiert: noch nicht bekannt.</span>`}</p>
@@ -168,7 +171,7 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
 </section>
 <section class="panel">
   <h2>Server</h2>
-  <p class="muted">So ausgelastet ist der Raspberry Pi gerade. Die Seite zeigt den Stand beim Laden – zum Aktualisieren neu laden.</p>
+  <p class="muted">So ausgelastet ist der Raspberry Pi gerade. Die Seite zeigt den Stand beim Laden – mit dem Symbol oben bei „Version &amp; Update“ lässt sie sich aktualisieren.</p>
   <div class="sys-grid">
     ${sys.disk ? gauge('Speicherplatz', percent(sys.disk), levelOf(percent(sys.disk), LIMITS.disk), `${formatBytes(sys.disk.used)} von ${formatBytes(sys.disk.total)} belegt – ${formatBytes(sys.disk.total - sys.disk.used)} frei`, `Rot ab ${LIMITS.disk.hot} % – dann droht, dass Datenbank und Sicherungen keinen Platz mehr haben.`) : nothing}
     ${sys.memory ? gauge('Arbeitsspeicher', percent(sys.memory), worst(levelOf(percent(sys.memory), LIMITS.memory), sys.swap ? levelOf(percent(sys.swap), LIMITS.swap) : 'ok'), `${formatBytes(sys.memory.used)} von ${formatBytes(sys.memory.total)} belegt`, `${sys.swap ? `Auslagerung: ${formatBytes(sys.swap.used)} von ${formatBytes(sys.swap.total)}. ` : ''}Rot ab ${LIMITS.memory.hot} % Speicher oder ${LIMITS.swap.hot} % Auslagerung.`) : nothing}

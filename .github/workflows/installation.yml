@@ -6,6 +6,14 @@ name: Installation
 
 on:
   push:
+    branches: [main]
+    paths:
+      - 'deploy/**'
+      - 'db/migrations/**'
+      - 'src/server/**'
+      - 'package.json'
+      - '.github/workflows/installation.yml'
+  pull_request:
     paths:
       - 'deploy/**'
       - 'db/migrations/**'

@@ -128,7 +128,7 @@ Am Ende steht **„Fertig! Deine App: https://lol-tippspiel.….ts.net“**, und
 
 ## Später
 
-Neue Versionen kommen **automatisch**: Alle 15 Minuten schaut der Pi bei GitHub nach. Er holt nur Versionen,
+Neue Versionen kommen **automatisch**: Der Pi schaut einmal täglich um 08:00 bei GitHub nach – und sofort, wenn GitHub per Webhook meldet, dass es etwas Neues gibt (einmalig einrichten mit `tippspiel webhook-einrichten`). Er holt nur Versionen,
 deren automatische Prüfungen grün sind (Zweig `stabil`), sichert vorher die Daten und geht zur alten Version zurück,
 falls die neue nicht startet. Von Hand geht es genauso mit:
 

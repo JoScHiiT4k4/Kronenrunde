@@ -1,7 +1,9 @@
 name: Tests
 
+# Nur bei Änderungsvorschlägen (PR) und auf main – nicht doppelt für jeden Zweig (spart Rechenzeit/Kosten bei GitHub)
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:

@@ -11,6 +11,7 @@ import { type FetchJson, fetchJson } from './abgleich.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/index.ts';
 import { html } from './html.ts';
+import { handleGithubHook } from './hooks.ts';
 import {
   clientIp,
   HttpError,
@@ -201,6 +202,8 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
       await db.one('select 1');
       return { status: 200, headers: { 'content-type': MIME['.txt'], 'cache-control': 'no-store' }, body: 'ok' };
     }
+
+    if (path === '/hooks/github' && method === 'POST') return handleGithubHook(req, config, new Date());
 
     const cookies = parseCookies(req.headers.cookie);
     const cookieName = sessionCookieName(config);

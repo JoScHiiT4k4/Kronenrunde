@@ -1,7 +1,7 @@
 // Welche Version läuft gerade, und wann hat der Pi zuletzt nach Updates geschaut?
 // Die Version setzt sich zusammen aus Hauptversion.Nebenversion (package.json) und der Anzahl der Commits im Programmordner
 // (zählt von selbst hoch, kein Hochzählen pro Pull Request nötig) – dazu Kurzform der Commit-Nummer und Datum.
-// Den Zeitpunkt der letzten Prüfung schreibt "tippspiel update --auto" (alle 15 Minuten) in die Datei .update-check,
+// Den Zeitpunkt der letzten Prüfung schreibt "tippspiel update --auto" (täglich 08:00 und nach jedem Webhook) in die Datei .update-check,
 // den der letzten Installation deploy/install.sh in die Datei .update-installed.
 
 import { execFileSync } from 'node:child_process';
