@@ -24,6 +24,14 @@ export interface SystemInfo {
   backupCount: number;
   /** Zeitpunkt der neuesten Sicherung */
   backupNewest: Date | null;
+  /** Letzte Kopie auf die MyCloud; null, solange keine eingerichtet ist */
+  nas: NasStatus | null;
+}
+
+export interface NasStatus {
+  ok: boolean;
+  at: Date;
+  message: string;
 }
 
 export type Level = 'ok' | 'warm' | 'hot';
@@ -52,6 +60,21 @@ export function levelOf(value: number, limit: { warm: number; hot: number }): Le
 export function backupLevel(count: number, newest: Date | null, now: Date): Level {
   if (count === 0 || !newest) return 'hot';
   return levelOf((now.getTime() - newest.getTime()) / 3_600_000, LIMITS.backupAgeHours);
+}
+
+/** Statusdatei des Servers (`ok|fehler`, Zeitpunkt, Meldung – durch Tabulator getrennt), siehe deploy/tippspiel. */
+export function parseNasStatus(text: string | null): NasStatus | null {
+  if (!text) return null;
+  const [state, time, ...rest] = text.trim().split('\t');
+  const at = new Date(time ?? '');
+  if ((state !== 'ok' && state !== 'fehler') || Number.isNaN(at.getTime())) return null;
+  return { ok: state === 'ok', at, message: rest.join(' ') };
+}
+
+/** Rot, wenn die letzte Kopie auf die MyCloud fehlschlug oder zu lange her ist; sonst wie bei den Sicherungen. */
+export function nasLevel(s: NasStatus, now: Date): Level {
+  if (!s.ok) return 'hot';
+  return levelOf((now.getTime() - s.at.getTime()) / 3_600_000, LIMITS.backupAgeHours);
 }
 
 /** Rot, wenn der freie Platz nicht mehr für drei Kopien der Datenbank reicht (Sicherungen, Wartung), gelb unter sechs. */
@@ -150,5 +173,6 @@ export function readSystemInfo(backupDir = '/var/backups/lol-tippspiel'): System
     backupBytes: b.bytes,
     backupCount: b.count,
     backupNewest: b.newest,
+    nas: parseNasStatus(read(join(backupDir, '.nas-status'))),
   };
 }

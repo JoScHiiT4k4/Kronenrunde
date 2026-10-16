@@ -5,7 +5,7 @@ import { stageLabel } from '../../domain/bracket.ts';
 import { resultOptions } from '../../domain/results.ts';
 import type { BestOf } from '../../domain/types.ts';
 import { existsSync, writeFileSync } from 'node:fs';
-import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, percent, readSystemInfo } from '../system-info.ts';
+import { backupLevel, databaseLevel, formatBytes, formatUptime, LIMITS, type Level, levelOf, nasLevel, percent, readSystemInfo } from '../system-info.ts';
 import { buildInfo, lastUpdateCheck } from '../version.ts';
 import { clearChat } from './chat.ts';
 import { hideTestLeague, loadTestState, showTestLeague, syncTestLeague } from '../testspiel.ts';
@@ -180,6 +180,8 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
     <div class="sys-fact-${databaseLevel(dbBytes, sys.disk ? sys.disk.total - sys.disk.used : null)}"><span class="muted">Datenbank</span><strong>${formatBytes(dbBytes)}</strong></div>
     ${sys.backupBytes !== null ? html`<div class="sys-fact-${backupLevel(sys.backupCount, sys.backupNewest, ctx.now)}"><span class="muted">Sicherungen</span><strong>${formatBytes(sys.backupBytes)} (${sys.backupCount})</strong>
       <small class="muted">${sys.backupNewest ? `Neueste: ${formatDateTime(sys.backupNewest, tz)} Uhr` : 'Noch keine Sicherung'} · rot, wenn älter als ${LIMITS.backupAgeHours.hot} Std.</small></div>` : nothing}
+    ${sys.nas ? html`<div class="sys-fact-${nasLevel(sys.nas, ctx.now)}"><span class="muted">Kopie auf der MyCloud</span><strong>${sys.nas.ok ? 'in Ordnung' : 'fehlgeschlagen'}</strong>
+      <small class="muted">${formatDateTime(sys.nas.at, tz)} Uhr${sys.nas.ok ? '' : ` · ${sys.nas.message}`} · rot bei Fehler oder älter als ${LIMITS.backupAgeHours.hot} Std.</small></div>` : nothing}
   </div>
   <h3 class="small-title">Größte Tabellen der Datenbank</h3>
   <ul class="sys-tables">
