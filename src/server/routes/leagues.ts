@@ -73,7 +73,7 @@ function byPointsDesc(a: { points: number | null }, b: { points: number | null }
 }
 
 function leagueNav(access: { league: League; canManage: boolean }, active: 'tippen' | 'alle-tipps' | 'rangliste' | 'sonderfragen' | 'verwalten' | 'spiel') {
-  return { slug: access.league.slug, name: access.league.name, canManage: access.canManage, active };
+  return { slug: access.league.slug, name: access.league.name, canManage: access.canManage, recap: access.league.ended, active };
 }
 
 // ---------------------------------------------------------------------

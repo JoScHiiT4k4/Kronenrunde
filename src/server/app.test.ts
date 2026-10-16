@@ -781,6 +781,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const rank = await ben.get(`/r/${slug}/rangliste`);
     assert.match(rank.text, new RegExp(`href="/r/${slug}/spieler/${annaId}"`));
     const prof = await ben.get(`/r/${slug}/spieler/${annaId}`);
+    assert.match(prof.text, /<h2>Abzeichen <span class="progress">\d+ von 8<\/span><\/h2>/);
+    assert.equal((prof.text.match(/class="badge-card badge-l\d"/g) ?? []).length, 8, "alle acht Abzeichen");
+    assert.match(prof.text, /<svg class="badge-icon badge-l\d"/);
     assert.equal(prof.status, 200);
     assert.match(prof.text, /Anna-Lena/);
     assert.match(prof.text, /Platz in der Rangliste/);
@@ -788,6 +791,31 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await stranger.get(`/r/${slug}/spieler/${annaId}`)).status, 404, 'Fremde ohne Mitgliedschaft');
     assert.equal((await new Client().get(`/r/${slug}/spieler/${annaId}`)).status, 303, 'ohne Anmeldung');
     assert.equal((await ben.get(`/r/${slug}/spieler/${randomUUID()}`)).status, 404);
+  });
+
+  test('Rückblick: Reiter und Seite erst, wenn alle Spiele gespielt sind', async () => {
+    const before = await ben.get(`/r/${slug}/rangliste`);
+    const open = (await db.one<{ n: number }>(`select count(*)::int as n from matches where status not in ('finished', 'cancelled')`))!.n;
+    assert.ok(open > 0, 'Voraussetzung: es gibt noch offene Spiele');
+    assert.doesNotMatch(before.text, /rueckblick/);
+    assert.equal((await ben.get(`/r/${slug}/rueckblick`)).status, 404);
+
+    // Alle Spiele als gespielt eintragen (danach den alten Stand wiederherstellen)
+    const saved = await db.query<{ id: string; status: string; wins_a: number | null; wins_b: number | null }>(`select id, status, wins_a, wins_b from matches`);
+    await db.run(`update matches set status = 'finished', wins_a = (best_of + 1) / 2, wins_b = 0 where status not in ('finished', 'cancelled')`);
+    try {
+      const page = await ben.get(`/r/${slug}/rueckblick`);
+      assert.equal(page.status, 200);
+      assert.match(page.text, /<h1>Rückblick<\/h1>/);
+      assert.match(page.text, /class="rc-card/);
+      assert.match(page.text, /rueckblick" aria-current="page">Rückblick</);
+      assert.match((await ben.get(`/r/${slug}/rangliste`)).text, /rueckblick/, 'Reiter erscheint überall');
+      assert.equal((await stranger.get(`/r/${slug}/rueckblick`)).status, 404, 'Fremde ohne Mitgliedschaft');
+      assert.equal((await new Client().get(`/r/${slug}/rueckblick`)).status, 303, 'ohne Anmeldung');
+    } finally {
+      for (const m of saved) await db.run(`update matches set status = $2, wins_a = $3, wins_b = $4 where id = $1`, [m.id, m.status, m.wins_a, m.wins_b]);
+    }
+    assert.doesNotMatch((await ben.get(`/r/${slug}/rangliste`)).text, /rueckblick/);
   });
 
   test('Chat: nur für Mitglieder, Nachrichten senden und abholen, nach 7 Tagen gelöscht', async () => {

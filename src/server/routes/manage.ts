@@ -384,7 +384,7 @@ ${
       title: `Verwalten – ${league.name}`,
       body,
       error,
-      league: { slug: league.slug, name: league.name, canManage: true, active: 'verwalten' },
+      league: { slug: league.slug, name: league.name, canManage: true, recap: league.ended, active: 'verwalten' },
     }),
     error ? 400 : 200,
   );
