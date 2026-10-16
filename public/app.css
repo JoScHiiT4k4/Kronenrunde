@@ -869,20 +869,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
   .tbar { order: 3; flex-basis: 100%; }
 }
 
-/* Werbeflächen links und rechts (nur auf breiten Bildschirmen) */
+/* Seitenspalten links (Platzhalter) und rechts (Rangliste), nur auf breiten Bildschirmen */
 .sidecol { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
-.sidecol-box {
-  position: sticky;
-  top: 16px;
-  min-height: 600px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--frame);
-  background-color: var(--surface);
-  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-}
-.sidecol-label { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.6; }
 /* Überschrift über einer Liste von Einstellungen (z. B. Sonderfragen) */
 .small-title { margin: 20px 0 6px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
 /* Abmelden oben rechts */

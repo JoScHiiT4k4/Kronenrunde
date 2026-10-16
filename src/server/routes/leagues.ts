@@ -323,7 +323,7 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
 }
 
 /** Kopf einer Spielkarte: Zeit, Bo, Phase, Live-Hinweis und die Teams mit (verdecktem) Ergebnis – für Tippen und Alle Tipps gleich. */
-function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?: Shares | null, tipped?: string): { meta: Html; teams: Html } {
+function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?: Shares | null, tipped?: string, reveal = false): { meta: Html; teams: Html } {
   const tz = ctx.deps.config.timeZone;
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
   // Bei "automatisch" schließen die weiteren Spiele eines Tages, sobald das Spiel davor vorbei ist
@@ -345,7 +345,7 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
   const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
   // Ein gemeinsamer Block: Ergebnis links, Schrägstrich, Ergebnis rechts – verdeckt mit durchgestrichenem Auge
   const EYE_OFF = html`<svg class="score-eye" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7c2 0 3.7.6 5.2 1.500M22 12s-3.6 7-10 7c-2 0-3.7-.6-5.2-1.5"/><path d="M9.5 9.500a3.5 3.5 0 0 0 5 5"/><path d="M3 3l18 18"/></svg>`;
-  const protect = ctx.sidebar?.spoilerProtection ?? true;
+  const protect = !reveal && (ctx.sidebar?.spoilerProtection ?? true);
   const slash = html`<svg class="score-slash" viewBox="0 0 12 28" width="12" height="28" aria-hidden="true"><path d="M10 2 2 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const score = hasScore
     ? protect
@@ -724,8 +724,6 @@ ${
 // Alle Tipps: jedes Spiel, dessen Tippschluss vorbei ist, mit den Tipps aller Mitglieder
 // ---------------------------------------------------------------------
 
-const ALL_TIPS_STATUS = [['alle', 'Alle Spiele'], ['gespielt', 'Gespielt'], ['laeuft', 'Läuft gerade'], ['offen', 'Noch nicht gespielt']] as const;
-
 async function allTipsPage(ctx: Ctx): Promise<Res> {
   if (!ctx.user) return loginRedirect(ctx);
   const access = await loadLeague(ctx, ctx.params.slug);
@@ -764,7 +762,6 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   const phaseParam = ctx.query.get('phase') ?? '';
   const phase = phaseParam === 'alle' ? 'alle' : (phases.find((p) => p.slug === phaseParam) ?? phases.find((p) => latest && p.name === phaseName(latest)))?.slug ?? 'alle';
   const teamId = [...teams.keys()].includes(ctx.query.get('team') ?? '') ? ctx.query.get('team')! : '';
-  const status = ALL_TIPS_STATUS.some(([k]) => k === ctx.query.get('status')) ? ctx.query.get('status')! : 'alle';
   // Zeitraum: frühestens der Tag des ersten, spätestens der Tag des letzten Spiels (Finale) des Turniers
   const dayOf = (d: Date) => d.toLocaleDateString('sv', { timeZone: tz });
   const times = matches.map((m) => m.scheduled_at).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime());
@@ -777,11 +774,10 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   let von = dateParam('von');
   let bis = dateParam('bis');
   if (von && bis && von > bis) [von, bis] = [bis, von];
-  const filterActive = ['phase', 'team', 'status', 'von', 'bis'].some((k) => ctx.query.has(k) && ctx.query.get(k) !== '');
+  const filterActive = ['phase', 'team', 'von', 'bis'].some((k) => ctx.query.has(k) && ctx.query.get(k) !== '');
   const shown = visible.filter((m) => {
     if (phase !== 'alle' && phaseSlug(phaseName(m)) !== phase) return false;
     if (teamId && m.team_a_id !== teamId && m.team_b_id !== teamId) return false;
-    if (status !== 'alle' && ({ gespielt: 'finished', laeuft: 'live', offen: 'scheduled' } as Record<string, string>)[status] !== m.status) return false;
     const day = m.scheduled_at ? dayOf(m.scheduled_at) : '';
     return (!von || (day !== '' && day >= von)) && (!bis || (day !== '' && day <= bis));
   });
@@ -791,7 +787,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   const card = (m: MatchRow) => {
     const match = toDomainMatch(m);
     const own = tips.get(m.id)!;
-    const { meta, teams: teamRow } = matchHead(ctx, league, m, false);
+    const { meta, teams: teamRow } = matchHead(ctx, league, m, false, null, undefined, true);
     return html`<article class="match match-tips" id="tipps-${m.id}">
   ${meta}${teamRow}
   <table class="table compact tips-table">
@@ -815,13 +811,12 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
   const select = (name: string, label: string, options: [string, string][], value: string) => html`<label><span class="muted">${label}</span>
       <select name="${name}">${options.map(([k, text]) => html`<option value="${k}"${attr(k === value, 'selected')}>${text}</option>`)}</select></label>`;
   const filter = html`<form method="get" action="/r/${league.slug}/alle-tipps" class="list-filter" data-auto-filter>
-    ${phases.length > 1 ? select('phase', 'Phase', [['alle', 'Alle Phasen'], ...phases.map((p): [string, string] => [p.slug, p.name])], phase) : nothing}
-    ${select('team', 'Team', [['', 'Alle Teams'], ...[...teams].sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]): [string, string] => [id, name])], teamId)}
-    ${select('status', 'Spiel', ALL_TIPS_STATUS.map(([k, label]): [string, string] => [k, label]), status)}
     <label><span class="muted">Von</span>
       <input type="date" name="von" value="${von}" min="${minDay}" max="${bis || maxDay}"></label>
     <label><span class="muted">Bis</span>
       <input type="date" name="bis" value="${bis}" min="${von || minDay}" max="${maxDay}"></label>
+    ${select('team', 'Team', [['', 'Alle Teams'], ...[...teams].sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]): [string, string] => [id, name])], teamId)}
+    ${phases.length > 1 ? select('phase', 'Phase', [['alle', 'Alle Phasen'], ...phases.map((p): [string, string] => [p.slug, p.name])], phase) : nothing}
     <noscript><button type="submit" class="btn btn-quiet">Filtern</button></noscript>
     ${filterActive ? html`<a class="btn btn-quiet" href="/r/${league.slug}/alle-tipps">Zurücksetzen</a>` : nothing}
   </form>`;
