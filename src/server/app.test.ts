@@ -612,7 +612,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post('/konto/anzeige', { spoiler: 'an' });
     assert.doesNotMatch(tips.text, /class="match-foot"[^>]*>[^]*?Ergebnis:/, 'Ergebnis steht nur hinter dem Spoilerschutz');
     assert.match(tips.text, /class="foot-version">Version: [^]*?<br>Letztes Update: /);
-    assert.equal((tips.text.match(/class="pct /g) ?? []).length, 4);
+    // Die %-Spanne steht jetzt bei jedem Spiel (auch offenen, ohne Zahl) – das hält VS/Ergebnis immer mittig
+    assert.equal((tips.text.match(/class="pct pct-[ab] pct-\w+"/g) ?? []).length, 4, 'vier mit echtem Wert (zwei geschlossene Spiele)');
     assert.equal((tips.text.match(/<details class="tips-fold">/g) ?? []).length, 2, 'aufklappbare Tipps nur bei den zwei begonnenen Spielen');
     assert.match(tips.text, /<summary>Alle Tipps<\/summary>[^]*?<td>Ben<\/td>/);
     // Rangliste in der Seitenleiste, klickbar zur Rangliste
@@ -1666,6 +1667,47 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       assert.ok(positions.every((p) => p.i > vorbeiAt), 'beide Spiele liegen im "Vorbei"-Bereich');
       // Das noch nicht gespielte (aber schon gesperrte) Spiel steht auch unter "Vorbei" oben, das gespielte darunter
       assert.deepEqual(positions.sort((a, b) => a.i - b.i).map((p) => p.id), [next, done]);
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+    }
+  });
+
+  test('Tippen: laufendes Spiel bekommt ein grünes VS statt des "läuft"-Texts, die %-Spalten stehen immer (auch ohne Zahl)', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Live-VS-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    try {
+      const { id: live } = (await db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, $4, 'live') returning id`,
+        [tid, team.GEN, team.T1, hours(-1 / 6)],
+      ))!;
+      const { id: open } = (await db.one<{ id: string }>(
+        `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, $4, 'scheduled') returning id`,
+        [tid, team.G2, team.KC, hours(1)],
+      ))!;
+
+      const created = await admin.post('/neu', { name: 'Live-VS-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+      assert.equal(created.status, 303, created.text);
+      const rslug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+      const page = await admin.get(`/r/${rslug}/tippen`);
+      assert.equal(page.status, 200);
+      assert.doesNotMatch(page.text, /läuft/, 'der separate "läuft"-Text entfällt, das VS zeigt es jetzt an');
+      const section = (id: string) => {
+        const start = page.text.indexOf(`id="spiel-${id}"`);
+        const next = page.text.indexOf('id="spiel-', start + 1);
+        return page.text.slice(start, next === -1 ? undefined : next);
+      };
+      const liveRow = section(live);
+      const openRow = section(open);
+      assert.match(liveRow, /<span class="vs vs-live"[^>]*>VS<\/span>/, 'laufendes Spiel: VS mit grüner Live-Kennzeichnung');
+      // Das offene (nicht laufende) Spiel bekommt kein grünes VS
+      assert.match(openRow, /<span class="vs">VS<\/span>/);
+      // Beide Spiele (mit und ohne Tipps bisher) reservieren die %-Spalten, damit VS/Ergebnis immer mittig bleibt
+      for (const row of [liveRow, openRow]) {
+        assert.match(row, /<span class="pct pct-a"[^>]*>/, '%-Spalte links reserviert');
+        assert.match(row, /<span class="pct pct-b"[^>]*>/, '%-Spalte rechts reserviert');
+      }
     } finally {
       await db.run('delete from tournaments where id = $1', [tid]);
     }

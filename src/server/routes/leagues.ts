@@ -12,7 +12,7 @@ import { computeStandings, scorePrediction } from '../../domain/scoring.ts';
 import type { Ctx } from '../app.ts';
 import { PgError } from '../db/index.ts';
 import { dayKey, formatDate, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
-import { attr, type Html, html, nothing } from '../html.ts';
+import { attr, type Html, html, nothing, raw } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
 import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
@@ -336,14 +336,16 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
     <span class="bo">Bo${m.best_of}</span>
     ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
     ${tipped ? html`<span class="tipped">(${tipped})</span>` : nothing}
-    ${m.status === 'live' ? html`<span class="live">läuft</span>` : nothing}
   </div>
   ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
-  // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind
-  const pct = (mine: number | undefined, other: number | undefined, side: 'a' | 'b') =>
-    shares && mine !== undefined && other !== undefined
-      ? html`<span class="pct pct-${side} ${mine > other ? 'pct-up' : mine < other ? 'pct-down' : 'pct-even'}" title="${shares.total} ${shares.total === 1 ? 'Tipp' : 'Tipps'}">${mine} %</span>`
-      : nothing;
+  // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind. Die Spanne
+  // bleibt immer stehen (auch ohne Zahl), damit die Mitte (VS/Ergebnis) nicht je nach Tippschluss wandert.
+  const pct = (mine: number | undefined, other: number | undefined, side: 'a' | 'b') => {
+    const known = shares && mine !== undefined && other !== undefined;
+    const trend = known ? (mine! > other! ? ' pct-up' : mine! < other! ? ' pct-down' : ' pct-even') : '';
+    const title = known ? raw(` title="${shares!.total} ${shares!.total === 1 ? 'Tipp' : 'Tipps'}"`) : nothing;
+    return html`<span class="pct pct-${side}${trend}"${title}>${known ? html`${mine} %` : nothing}</span>`;
+  };
   // Gewonnene Spiele je Team – mit Spoilerschutz: erst nach einem Klick sichtbar
   const hasScore = teamsKnown && m.wins_a !== null && m.wins_b !== null;
   // Ein gemeinsamer Block: Ergebnis links, Schrägstrich, Ergebnis rechts – verdeckt mit durchgestrichenem Auge
@@ -358,11 +360,13 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
       </button>`
       : html`<span class="score revealed plain" role="img" aria-label="${shortA(m)} ${m.wins_a} zu ${m.wins_b} ${shortB(m)}"><span class="score-num">${m.wins_a}</span>${slash}<span class="score-num">${m.wins_b}</span></span>`
     : null;
-  // Innen: Gewinnchance, in der Mitte „VS“ bzw. das verdeckte Ergebnis
+  // Innen: Gewinnchance, in der Mitte „VS“ bzw. das verdeckte Ergebnis. Läuft das Spiel noch ohne
+  // Ergebnis, bekommt das Medaillon einen grünen Schimmer statt des separaten "läuft"-Texts.
+  const vs = html`<span class="vs${m.status === 'live' ? ' vs-live' : ''}"${attr(m.status === 'live', 'aria-label="Läuft"')}>VS</span>`;
   const teams = html`<div class="teams">
     <span class="team team-a${m.team_a ? '' : ' tbd'}">${m.team_a ? shortA(m) : 'Steht noch nicht fest'}</span>
     <span class="mid">
-      ${pct(shares?.a, shares?.b, 'a')}${score ?? html`<span class="vs">VS</span>`}${pct(shares?.b, shares?.a, 'b')}
+      ${pct(shares?.a, shares?.b, 'a')}${score ?? vs}${pct(shares?.b, shares?.a, 'b')}
     </span>
     <span class="team team-b${m.team_b ? '' : ' tbd'}">${m.team_b ? shortB(m) : 'Steht noch nicht fest'}</span>
   </div>`;

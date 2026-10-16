@@ -470,7 +470,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   line-height: 1.15;
   margin-bottom: 12px;
 }
-.teams .mid { display: inline-flex; align-items: center; justify-content: center; gap: 16px; }
+/* Feste Spalten statt Flex: so steht das VS-Medaillon/Ergebnis in jeder Zeile exakt mittig, und die
+   %-Zahlen (Gewinnchance) stehen in allen Zeilen bündig untereinander – unabhängig von Ziffernanzahl
+   (auch "100 %") und unabhängig davon, ob gerade eine Zahl dasteht oder (vor Tippschluss) noch nicht. */
+.teams .mid { display: grid; grid-template-columns: 58px 92px 58px; column-gap: 16px; align-items: center; }
+.teams .mid .pct-b { text-align: left; }
+.teams .mid .vs, .teams .mid .score { justify-self: center; }
 /* Ergebnis mit Spoilerschutz: ein Block, Zahl – Schrägstrich – Zahl; verdeckt zeigt er ein durchgestrichenes Auge */
 .score {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -520,9 +525,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
   border: 1px solid rgb(200 170 110 / 35%);
 }
 .versus .vs { display: inline-grid; vertical-align: middle; }
-/* Das VS-Medaillon ist schmaler als der Ergebnis-Block (92px) – außen genauso breit, damit die
-   Gewinnchance bei noch ausstehenden Spielen denselben Abstand hat wie bei Spielen mit Spoilerschutz. */
-.teams .mid .vs { margin: 0 27px; }
+/* Läuft ein Spiel noch ohne Ergebnis: grüner statt goldener Schimmer, ersetzt den separaten "läuft"-Text */
+.vs.vs-live {
+  color: #e9fff1;
+  background: radial-gradient(circle at 50% 35%, rgb(61 220 132 / 32%) 0%, rgb(61 220 132 / 10%) 70%);
+  border-color: #3ddc84;
+  box-shadow: 0 0 0 1px var(--frame) inset, 0 0 12px rgb(61 220 132 / 35%);
+}
+.vs.vs-live::before { border-color: rgb(61 220 132 / 40%); }
 
 .picks {
   display: grid;
@@ -1290,10 +1300,9 @@ td.bad { color: var(--red); }
 .foot .foot-role .role-switch { position: relative; display: inline-block; }
 .foot .foot-role .role-menu { top: auto; bottom: calc(100% + 6px); left: 50%; right: auto; transform: translateX(-50%); text-align: left; }
 @media (max-width: 420px) {
-  .teams .mid { gap: 8px; }
+  .teams .mid { grid-template-columns: 46px 76px 46px; column-gap: 8px; }
   .teams .pct { font-size: 0.9em; }
   .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
-  .teams .mid .vs { margin: 0 19px; }
 }
 
 /* Sonderfragen: einzelne Fragen auf- und einklappbar */
