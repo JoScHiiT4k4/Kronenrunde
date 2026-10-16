@@ -1,0 +1,75 @@
+LoL-Tippspiel
+Copyright (c) 2026 JoScHiiT4k4 (https://github.com/JoScHiiT4k4)
+Alle Rechte vorbehalten. / All rights reserved.
+
+------------------------------------------------------------------------------
+DEUTSCH (maßgeblich)
+------------------------------------------------------------------------------
+
+Dieser Quellcode ist öffentlich einsehbar, er ist aber KEINE Open-Source-Software.
+Es wird keine Lizenz und kein Nutzungsrecht erteilt, weder ausdrücklich noch
+stillschweigend.
+
+Ohne vorherige schriftliche Zustimmung des Rechteinhabers ist insbesondere
+nicht erlaubt:
+
+  1. den Code, die Gestaltung (CSS, Grafiken, Texte) oder die Dokumentation
+     ganz oder in Teilen zu kopieren, zu vervielfältigen oder weiterzugeben;
+  2. ihn zu verändern, zu bearbeiten oder als Grundlage eigener Software
+     zu verwenden;
+  3. ihn selbst zu betreiben oder anderen zugänglich zu machen (z. B. als
+     eigene Website, App oder Dienst), auch nicht kostenlos;
+  4. ihn kommerziell zu nutzen;
+  5. ihn als eigenes Werk auszugeben oder diesen Hinweis zu entfernen;
+  6. ihn für Text- und Data-Mining oder zum Training von KI-Modellen zu
+     verwenden (Nutzungsvorbehalt nach § 44b Abs. 3 UrhG).
+
+Erlaubt ist nur, was die Nutzungsbedingungen von GitHub für öffentliche
+Repositories zwingend vorsehen: den Code auf GitHub anzusehen und innerhalb
+von GitHub zu forken. Ein Fork gibt keine weiteren Rechte.
+
+Fremde Bestandteile behalten ihre eigene Lizenz: Die Schriften Barlow und
+Cinzel (public/*.woff) stehen unter der SIL Open Font License 1.1, siehe
+docs/LIZENZ-Barlow-OFL.txt und docs/LIZENZ-Cinzel-OFL.txt.
+
+Anfragen zur Nutzung: über das GitHub-Profil https://github.com/JoScHiiT4k4.
+
+Der Code wird ohne jede Gewähr bereitgestellt.
+
+League of Legends ist eine Marke von Riot Games, Inc. Dieses Projekt wird
+von Riot Games weder unterstützt noch gefördert.
+
+------------------------------------------------------------------------------
+ENGLISH (translation; the German version prevails)
+------------------------------------------------------------------------------
+
+This source code is publicly visible, but it is NOT open-source software.
+No license or right of use is granted, either expressly or by implication.
+
+Without the copyright holder's prior written consent you may not, in
+particular:
+
+  1. copy, reproduce or distribute the code, the design (CSS, graphics,
+     texts) or the documentation, in whole or in part;
+  2. modify or adapt it, or use it as the basis of your own software;
+  3. run it yourself or make it available to others (e.g. as your own
+     website, app or service), even free of charge;
+  4. use it commercially;
+  5. present it as your own work or remove this notice;
+  6. use it for text and data mining or for training AI models
+     (reservation of rights under Art. 4(3) of Directive (EU) 2019/790).
+
+The only permitted use is what GitHub's Terms of Service require for public
+repositories: viewing the code on GitHub and forking it within GitHub.
+A fork grants no further rights.
+
+Third-party components keep their own license: the Barlow and Cinzel fonts
+(public/*.woff) are licensed under the SIL Open Font License 1.1, see
+docs/LIZENZ-Barlow-OFL.txt and docs/LIZENZ-Cinzel-OFL.txt.
+
+Permission requests: via the GitHub profile https://github.com/JoScHiiT4k4.
+
+The code is provided "as is", without warranty of any kind.
+
+League of Legends is a trademark of Riot Games, Inc. This project is not
+endorsed or sponsored by Riot Games.

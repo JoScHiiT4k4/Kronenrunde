@@ -25,10 +25,8 @@ Was die App kann:
 - **Sonderfragen** mit automatischer Frist (Start des ersten Spiels): Die Leitung wählt per Checkbox aus einem festen Katalog (Antwortart fest: Team, Spieler, Champion); nach Turnierstart gesperrt, Löschen nur über die Einstellungen der Frage. Neue Fragen werden per E-Mail vorgeschlagen (`SUGGESTIONS_TO`, sonst `MAIL_FROM`). Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Kopfzeile:** Countdown bis zum Turnierstart, danach Links zu Twitch/YouTube (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`) und grünes „Live“, wenn gespielt wird.
-- **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin unter im Administrator-Bereich (Reiter Impressum und Datenschutz).
+- **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin im Administrator-Bereich (Reiter Impressum und Datenschutz).
 - **Profilbild:** unter „Dein Konto“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.
-- **Gewinnchance:** Ab Tippschluss steht hinter jedem Team in Klammern der Anteil der Tipps (grün = höher, rot = niedriger).
-- **Verwalten** (Leitung der Tipprunde): Einladungslink, Punkte, Tippschluss, Turniere, Sonderfragen, Mitglieder.
 - **Gewinnchance:** Ab Tippschluss steht hinter jedem Team in Klammern der Anteil der Tipps (grün = höher, rot = niedriger).
 - **Verwalten** (Spielleiter der Tipprunde) mit Untermenü: Übersicht (Einladungslink, wer noch nicht getippt hat – ohne Tipp-Inhalte), Einstellungen, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
@@ -94,3 +92,14 @@ public/           Gestaltung (CSS), kleines JavaScript, App-Symbole
 db/migrations/    Datenbank-Aufbau
 db/seed/          Beispieldaten
 ```
+
+## Lizenz und Urheberrecht
+
+© 2026 [JoScHiiT4k4](https://github.com/JoScHiiT4k4). **Alle Rechte vorbehalten.**
+Der Code ist öffentlich einsehbar, aber **keine Open-Source-Software**: Kopieren, Verändern, eigenes Betreiben
+und jede andere Nutzung sind ohne schriftliche Zustimmung nicht erlaubt. Details in [LICENSE](LICENSE).
+Die Schriften Barlow und Cinzel stehen unter der SIL Open Font License (`docs/LIZENZ-*.txt`).
+
+Sicherheitslücken bitte vertraulich melden, siehe [SECURITY.md](SECURITY.md).
+
+League of Legends ist eine Marke von Riot Games, Inc. Dieses Projekt wird von Riot Games weder unterstützt noch gefördert.
