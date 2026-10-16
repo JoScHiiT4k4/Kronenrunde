@@ -142,7 +142,7 @@ p { margin: 0 0 0.9em; }
 .top-nav a:hover { color: var(--gold-bright); }
 
 .league-nav {
-  padding: 16px 16px 0;
+  padding: 0;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, rgb(12 25 38 / 0%), rgb(12 25 38 / 90%));
 }
@@ -151,21 +151,21 @@ p { margin: 0 0 0.9em; }
   font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: 0.03em;
-  max-width: 720px;
-  margin: 0 auto;
 }
+/* Reiter-Leiste hat dieselben Spalten wie der Inhalt (Platzhalter + .main), so springt nichts auseinander */
+.nav-page { align-items: flex-start; }
+.nav-main.main { padding: 16px 16px 0; }
 .tabs {
   display: flex;
-  gap: 6px;
-  max-width: 1000px;
-  margin: 8px auto 0;
+  gap: 4px;
+  margin: 8px 0 0;
   /* Viele Reiter: auf dem Handy in einer zweiten Zeile statt abgeschnitten */
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .tabs a {
   flex: 0 1 auto;
-  padding: 8px 8px 10px;
+  padding: 8px 6px 10px;
   color: var(--muted);
   text-decoration: none;
   border-bottom: 2px solid transparent;
@@ -937,8 +937,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .foot .foot-version { max-width: none; margin: 14px 0 0; font-size: 0.75rem; color: var(--muted); text-align: left; opacity: 0.8; }
 
 /* Aufklappbare Tipps der Mitspieler bei Spielen, die schon begonnen haben */
-.tips-fold { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-.tips-fold > summary { display: flex; align-items: center; gap: 8px; margin-left: 0; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
+.tips-fold { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 4px; }
+.tips-fold > summary { display: flex; align-items: center; gap: 8px; min-height: 0; padding: 2px 0; margin-left: 0; text-align: left; cursor: pointer; color: var(--gold-text); font-weight: 600; font-size: 0.92rem; }
 .tips-fold summary:hover { color: var(--gold-bright); }
 .tips-fold[open] summary { margin-bottom: 8px; }
 
@@ -1230,3 +1230,7 @@ td.bad { color: var(--red); }
 .question-result > :not(summary) { margin-left: 0; }
 .score.plain { cursor: default; }
 .score.plain:hover { border-color: #26384a; }
+
+/* Spielkarte mit aufklappbaren Tipps: unten weniger Luft unter "Tipps der Mitspieler" */
+.match:has(> .tips-fold:last-child) { padding-bottom: 8px; }
+.match > .tips-fold:not([open]) { margin-top: 4px; }
