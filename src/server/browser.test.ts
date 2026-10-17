@@ -437,4 +437,58 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     }
     assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
   });
+
+  test('Kopf-Suche: Eingabefeld wird mit dem Fenster schmaler, bei wenig Platz bleibt nur die Lupe (am Handy direkt neben "Kronenrunde")', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Suche-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+
+    const me = new Client();
+    await me.request('GET', '/anmelden');
+    assert.equal((await me.request('POST', '/anmelden', { email: 'admin@example.de', password: PASSWORT })).status, 303);
+    await me.request('GET', '/konto');
+    const created = await me.request('POST', '/neu', { name: 'Such-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+    assert.equal(created.status, 303, created.text);
+    const slug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+    const { chromium } = playwright!;
+    const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+    const problems: string[] = [];
+    try {
+      const context = await browser.newContext({ locale: 'de-DE' });
+      await context.addCookies([...me.cookies].map(([name, value]) => ({ name, value, url: base })));
+      for (const width of [390, 700, 1300]) {
+        const page = await context.newPage();
+        await page.setViewportSize({ width, height: 900 });
+        const where = `${width}px`;
+        await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
+        const m = await page.evaluate(() => {
+          const box = (sel: string) => {
+            const el = document.querySelector(sel) as HTMLElement | null;
+            if (!el || getComputedStyle(el).display === 'none') return null;
+            const r = el.getBoundingClientRect();
+            return r.width > 0 ? { top: r.top, left: r.left, right: r.right } : null;
+          };
+          return { scroll: document.documentElement.scrollWidth, inner: window.innerWidth, brand: box('.brand'), input: box('.top-search-q'), btn: box('.top-search-btn') };
+        });
+        if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
+        if (width > 860) {
+          // Viel Platz (PC): das richtige Eingabefeld ist da, die Lupe (Ersatz bei wenig Platz) ist verborgen.
+          if (!m.input) problems.push(`${where}: Eingabefeld fehlt (sollte bei viel Platz sichtbar sein)`);
+          if (m.btn) problems.push(`${where}: Lupen-Knopf sollte bei viel Platz verborgen sein`);
+        } else {
+          // Wenig Platz (Tablet-Breite und Handy): nur die Lupe, kein Eingabefeld – am Handy direkt neben "Kronenrunde".
+          if (m.input) problems.push(`${where}: Eingabefeld sollte bei wenig Platz verborgen sein`);
+          if (!m.btn) problems.push(`${where}: Lupen-Knopf fehlt`);
+          if (width <= 640 && m.brand && m.btn && Math.abs(m.brand.top - m.btn.top) > 10) {
+            problems.push(`${where}: Lupe steht nicht in derselben Zeile wie "Kronenrunde" (${m.brand.top} vs. ${m.btn.top})`);
+          }
+        }
+        await page.close();
+      }
+    } finally {
+      await browser.close();
+    }
+    assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
+  });
 });

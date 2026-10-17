@@ -46,6 +46,8 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   'runde-geloescht': { text: 'Die Tipprunde ist gelöscht.', kind: 'ok' },
   'ergebnis-gespeichert': { text: 'Ergebnis gespeichert.', kind: 'ok' },
   'spiel-geloescht': { text: 'Spiel gelöscht.', kind: 'ok' },
+  'favorit-gespeichert': { text: 'Team als Favorit gespeichert. Du bekommst (bei aktiviertem Push) 1 Stunde vor dem nächsten Spiel einen Hinweis.', kind: 'ok' },
+  'favorit-entfernt': { text: 'Team ist kein Favorit mehr.', kind: 'ok' },
 };
 
 export interface LeagueNav {
@@ -91,6 +93,7 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
 <body${ctx.user ? html` data-angemeldet="1"` : nothing}>
 <header class="top">
   <a class="brand" href="${ctx.user && ctx.sidebar ? `/r/${ctx.sidebar.slug}/tippen` : '/'}"><img src="${ctx.deps.asset('logo.svg')}" alt="" width="30" height="30">${appName}</a>
+  ${searchBox(ctx)}
   ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${leagueSwitch(ctx)}
@@ -151,6 +154,22 @@ function chatWidget(ctx: Ctx): Html {
 function versionNote(ctx: Ctx): Html {
   const b = buildInfo();
   return html`<p class="foot-version">Version: ${b.version}${b.commit ? html` (${b.commit})` : nothing}${b.committedAt ? html`<br>Letztes Update: ${formatDateTime(b.committedAt, ctx.deps.config.timeZone)} Uhr` : nothing}</p>`;
+}
+
+const ICON_SEARCH = html`<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>`;
+
+/**
+ * Globale Suche im Kopf (Teams, Spieler, Teilnehmer, Champions), zwischen Logo und Turnier-Leiste – nur mit
+ * angemeldeter Tipprunde (ctx.sidebar), da die Suche innerhalb der aktuellen Tipprunde läuft. Am PC wird das
+ * Eingabefeld (CSS) schmaler, je weniger Platz da ist; wird es zu eng (auch am Handy), bleibt nur die Lupe –
+ * zum Tippen öffnet sie die eigene Such-Seite mit einem vollwertigen Eingabefeld.
+ */
+function searchBox(ctx: Ctx): Html {
+  if (!ctx.user || !ctx.sidebar) return nothing;
+  return html`<form class="top-search" method="get" action="/r/${ctx.sidebar.slug}/suchen" role="search">
+  <input type="search" name="q" class="top-search-q" placeholder="Suchen" aria-label="Suchen" autocomplete="off">
+  <button type="submit" class="top-search-btn" aria-label="Suchen">${ICON_SEARCH}</button>
+</form>`;
 }
 
 const TWITCH_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 2.5 7v13H7v3h3l3-3h4l5-5V3H4Zm15 11-3 3h-4l-3 3v-3H6V5h13v9Zm-3-6h-2v5h2V8Zm-5 0H9v5h2V8Z"/></svg>`;

@@ -12,6 +12,7 @@ import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createDb, migrate } from './db/index.ts';
 import { createMailer } from './mail.ts';
+import { startFavoriteMatchSchedule } from './team-erinnerung.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
@@ -41,6 +42,8 @@ if (config.dataSync) startSyncSchedule(db, (m) => console.log(m));
 
 // Erinnerungen an fehlende Tipps (E-Mail, Push)
 startNotifySchedule(db, config, mailer, (m) => console.log(m));
+// Erinnerungen für Lieblingsteams: 1 Stunde vor deren nächstem Spiel (Push)
+startFavoriteMatchSchedule(db, config, (m) => console.log(m));
 startChatCleanup(db, (m) => console.log(m));
 
 let stopping = false;

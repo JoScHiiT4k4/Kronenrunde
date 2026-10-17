@@ -1566,6 +1566,77 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await admin.get(`${path}?turnier=${tid}&phase=gibt-es-nicht`)).status, 200);
   });
 
+  test('Globale Suche: Teams, Spieler, Teilnehmer, Champions; Team-Seite mit Statistik und Favorit', async () => {
+    const mvkId = (await db.one<{ id: string }>(`select id from teams where short_name = 'MVK'`))!.id;
+
+    // Ein Spieler im Kader von MVK und ein Champion, damit auch diese Kategorien Treffer liefern
+    const playerId = (await db.one<{ id: string }>(`insert into players (team_id, name, role) values ($1, 'Such-Testspieler', 'mid') returning id`, [mvkId]))!.id;
+    await db.run(`insert into champions (id, name) values ('TestChamp', 'Such-Testchampion') on conflict (id) do nothing`);
+
+    // Ohne Suchbegriff: nur der Hinweis, einen einzugeben
+    const empty = await admin.get(`/r/${slug}/suchen`);
+    assert.equal(empty.status, 200);
+    assert.match(empty.text, /Bitte einen Suchbegriff eingeben/);
+
+    // Team-Treffer führt zur Team-Seite
+    const teamHit = await admin.get(`/r/${slug}/suchen?q=MVK`);
+    assert.equal(teamHit.status, 200);
+    assert.match(teamHit.text, new RegExp(`href="/r/${slug}/team/${mvkId}"`));
+
+    // Spieler-Treffer führt (noch) nur auf "Demnächst"
+    const playerHit = await admin.get(`/r/${slug}/suchen?q=Such-Testspieler`);
+    assert.match(playerHit.text, new RegExp(`href="/r/${slug}/demnaechst\\?titel=Such-Testspieler&amp;art=spieler"`));
+
+    // Champion-Treffer ebenso
+    const champHit = await admin.get(`/r/${slug}/suchen?q=Such-Testchampion`);
+    assert.match(champHit.text, new RegExp(`href="/r/${slug}/demnaechst\\?titel=Such-Testchampion&amp;art=champion"`));
+    const demnaechst = await admin.get(`/r/${slug}/demnaechst?titel=Such-Testchampion&art=champion`);
+    assert.equal(demnaechst.status, 200);
+    assert.match(demnaechst.text, /Such-Testchampion/);
+    assert.match(demnaechst.text, /noch nicht fertig/);
+
+    // Teilnehmer-Treffer (Mitspieler "Ben") führt zum Spielerprofil
+    const league = (await db.one<{ id: string }>(`select id from leagues where slug = $1`, [slug]))!.id;
+    const benId = (await db.one<{ id: string }>(
+      `select u.id from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 and u.display_name = 'Ben'`,
+      [league],
+    ))!.id;
+    const memberHit = await admin.get(`/r/${slug}/suchen?q=Ben`);
+    assert.match(memberHit.text, new RegExp(`href="/r/${slug}/spieler/${benId}"`));
+
+    // Fremde (keine Mitglieder) und nicht angemeldete Personen sehen die Suche nicht
+    assert.equal((await stranger.get(`/r/${slug}/suchen?q=MVK`)).status, 404);
+    assert.equal((await new Client().get(`/r/${slug}/suchen?q=MVK`)).status, 303);
+
+    // Team-Seite: Bilanz, Kader und Favoriten-Knopf
+    const teamPage = await admin.get(`/r/${slug}/team/${mvkId}`);
+    assert.equal(teamPage.status, 200);
+    assert.match(teamPage.text, /Bilanz in dieser Tipprunde/);
+    assert.match(teamPage.text, /Such-Testspieler/);
+    assert.match(teamPage.text, /☆ Als Favorit markieren/);
+    assert.doesNotMatch(teamPage.text, /★ Favorit/);
+    assert.equal((await stranger.get(`/r/${slug}/team/${mvkId}`)).status, 404);
+    assert.equal((await admin.get(`/r/${slug}/team/${randomUUID()}`)).status, 404);
+
+    // Ein Team außerhalb dieser Tipprunde (anderes Turnier) gibt es hier nicht
+    const otherTeam = (await db.one<{ id: string }>(`insert into teams (name, short_name) values ('Außerhalb-Team', 'AHT') returning id`))!.id;
+    assert.equal((await admin.get(`/r/${slug}/team/${otherTeam}`)).status, 404);
+
+    // Als Favorit markieren: Hinweis, Knopf wechselt, Push-Hinweistext erscheint; erneut Klicken entfernt ihn wieder
+    const fav = await admin.post(`/r/${slug}/team/${mvkId}/favorit`);
+    assert.equal(fav.status, 303);
+    assert.match(fav.location!, /hinweis=favorit-gespeichert/);
+    const favoritedPage = await admin.get(fav.location!);
+    assert.match(favoritedPage.text, /★ Favorit/);
+    assert.match(favoritedPage.text, /1 Stunde vor dem nächsten Spiel dieses Teams eine Push-Benachrichtigung/);
+    const unfav = await admin.post(`/r/${slug}/team/${mvkId}/favorit`);
+    assert.match(unfav.location!, /hinweis=favorit-entfernt/);
+    assert.equal((await db.one('select 1 from team_favorites where team_id = $1', [mvkId])), null);
+
+    await db.run('delete from players where id = $1', [playerId]);
+    await db.run('delete from teams where id = $1', [otherTeam]);
+  });
+
   test('matchdayRunning: lolesports-Turniere mit offenem Spieltag werden erkannt, bis das letzte Ergebnis da ist', async () => {
     // Eigenes, isoliertes Turnier mit lolesports-Quelle (nur solche zählen für den Datenabgleich-Takt)
     const { id: tid } = (await db.one<{ id: string }>(
