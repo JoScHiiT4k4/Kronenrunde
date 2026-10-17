@@ -474,7 +474,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
    %-Zahlen (Gewinnchance) stehen in allen Zeilen bündig untereinander – unabhängig von Ziffernanzahl
    (auch "100 %") und unabhängig davon, ob gerade eine Zahl dasteht oder (vor Tippschluss) noch nicht. */
 .teams .mid { display: grid; grid-template-columns: 58px 92px 58px; column-gap: 16px; align-items: center; }
-.teams .mid .pct-b { text-align: left; }
 .teams .mid .vs, .teams .mid .score { justify-self: center; }
 /* Grid-Spalten (team-a/team-b) dürfen über ihren Inhalt hinaus nicht breiter werden, sonst verschiebt
    ein langer Teamname (ohne Kürzel) die mittlere Spalte (VS/%) und sprengt die Zeilenbreite. */
@@ -973,8 +972,9 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .sub-tabs:has(> a:nth-child(8)) a { padding: 7px 8px; font-size: 0.9rem; }
 @media (min-width: 641px) and (max-width: 700px) { .sub-tabs:has(> a:nth-child(8)) a { padding: 7px 5px; font-size: 0.85rem; } }
 
-/* Gewinnchance aus den Tipps: so groß wie der Team-Name und auf gleicher Höhe, nicht zu nah am VS/Ergebnis */
-.pct-a { text-align: right; }
+/* Gewinnchance aus den Tipps: so groß wie der Team-Name und auf gleicher Höhe, mittig zwischen Team-Name
+   und VS/Ergebnis (nicht an eine der beiden Seiten geklebt) */
+.pct-a, .pct-b { text-align: center; }
 .pct { font-family: var(--font-display); font-size: 1em; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pct-up { color: #3ddc84; }
 .pct-down { color: #ff6b6b; }

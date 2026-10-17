@@ -338,4 +338,103 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     }
     assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
   });
+
+  test('%-Zahl steht mittig zwischen Team-Name und VS/Ergebnis – bei laufendem Spiel (VS) wie bei Spoilerschutz gleich', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Mittig-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    const mkTeam = async (name: string) => (await db.one<{ id: string }>(`insert into teams (name, short_name, region) values ($1, $1, 'X') returning id`, [name]))!.id;
+    const [a1, a2, b1, b2] = await Promise.all([mkTeam('MA'), mkTeam('MB'), mkTeam('MC'), mkTeam('MD')]);
+    // Ein laufendes Spiel (grünes VS) und ein beendetes mit Spoilerschutz (Auge-Symbol) – beide mit Tipps,
+    // damit auf beiden Seiten eine echte %-Zahl steht.
+    const liveMatch = (await db.one<{ id: string }>(
+      `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, now() - interval '5 minutes', 'live') returning id`,
+      [tid, a1, a2],
+    ))!.id;
+    const scoreMatch = (await db.one<{ id: string }>(
+      `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status, wins_a, wins_b) values ($1, $2, $3, 1, now() - interval '2 hours', 'finished', 1, 0) returning id`,
+      [tid, b1, b2],
+    ))!.id;
+
+    const me = new Client();
+    await me.request('GET', '/anmelden');
+    assert.equal((await me.request('POST', '/anmelden', { email: 'admin@example.de', password: PASSWORT })).status, 303);
+    await me.request('GET', '/konto');
+    const created = await me.request('POST', '/neu', { name: 'Mittig-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+    assert.equal(created.status, 303, created.text);
+    const slug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+    const { id: leagueId } = (await db.one<{ id: string }>(`select id from leagues where slug = $1`, [slug]))!;
+
+    const pwHash = await hashPassword(PASSWORT);
+    const voters: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      const { id } = (await db.one<{ id: string }>(
+        `insert into users (email, display_name, first_name, password_hash, password_changed_at) values ($1, $2, $3, $4, now()) returning id`,
+        [`mittig-v${i}@example.de`, `V${i}`, `V${i}`, pwHash],
+      ))!;
+      await db.run(`insert into league_members (league_id, user_id) values ($1, $2)`, [leagueId, id]);
+      voters.push(id);
+    }
+    await db.tx(async (q) => {
+      await q.exec(`set local app.bypass_lock = 'on'`);
+      for (let i = 0; i < 20; i++) {
+        await q.run(`insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins) values ($1, $2, $3, 'A', null, null)`, [leagueId, liveMatch, voters[i]]);
+      }
+      for (let i = 0; i < 20; i++) {
+        // Dieselbe Gewinnchance wie beim VS-Spiel (100 %/0 %) – so lässt sich die Position der %-Zahl 1:1
+        // vergleichen, ohne dass unterschiedliche Ziffernzahlen das Ergebnis verfälschen.
+        await q.run(`insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins) values ($1, $2, $3, 'A', null, null)`, [leagueId, scoreMatch, voters[i]]);
+      }
+    });
+
+    const { chromium } = playwright!;
+    const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+    const problems: string[] = [];
+    try {
+      const context = await browser.newContext({ locale: 'de-DE' });
+      await context.addCookies([...me.cookies].map(([name, value]) => ({ name, value, url: base })));
+      for (const width of [390, 1300]) {
+        const page = await context.newPage();
+        await page.setViewportSize({ width, height: 900 });
+        const where = `${width}px`;
+        await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
+        const r = await page.evaluate(
+          ({ idLive, idScore }: { idLive: string; idScore: string }) => {
+            // Position des %-Zeichens selbst (wie beim Test für 1-/2-/3-stellige Zahlen oben) – so lässt sich
+            // vergleichen, ob die Zahl bei "VS" exakt an derselben Stelle steht wie beim Spoilerschutz.
+            const percentX = (matchId: string, cls: string) => {
+              const span = document.querySelector(`#spiel-${matchId} .${cls}`);
+              const last = span?.lastChild;
+              if (!last || last.nodeType !== Node.TEXT_NODE || !last.textContent) return null;
+              const i = last.textContent.lastIndexOf('%');
+              if (i < 0) return null;
+              const range = document.createRange();
+              range.setStart(last, i);
+              range.setEnd(last, last.textContent.length);
+              return range.getBoundingClientRect().left;
+            };
+            return {
+              aLive: percentX(idLive, 'pct-a'),
+              bLive: percentX(idLive, 'pct-b'),
+              aScore: percentX(idScore, 'pct-a'),
+              bScore: percentX(idScore, 'pct-b'),
+            };
+          },
+          { idLive: liveMatch, idScore: scoreMatch },
+        );
+        if (r.aLive === null || r.bLive === null || r.aScore === null || r.bScore === null) {
+          problems.push(`${where}: %-Zeichen nicht gefunden`);
+        } else {
+          // Beide Spiele haben dieselbe Gewinnchance (100 % / 0 %) und gleich lange Teamnamen – die Position
+          // der %-Zahl darf sich also nicht unterscheiden, egal ob in der Mitte "VS" oder das Ergebnis steht.
+          if (Math.abs(r.aLive - r.aScore) > 1) problems.push(`${where}: % links bei VS (${r.aLive}) und Spoilerschutz (${r.aScore}) unterschiedlich`);
+          if (Math.abs(r.bLive - r.bScore) > 1) problems.push(`${where}: % rechts bei VS (${r.bLive}) und Spoilerschutz (${r.bScore}) unterschiedlich`);
+        }
+        await page.close();
+      }
+    } finally {
+      await browser.close();
+    }
+    assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
+  });
 });
