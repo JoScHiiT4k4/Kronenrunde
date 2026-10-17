@@ -348,6 +348,77 @@ document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
   bar.hidden = false;
 });
 
+// Suche im Kopf: beim Aufklappen das Eingabefeld fokussieren, beim Tippen Live-Treffer anzeigen (/suche.json).
+// Ohne JavaScript bleibt nur das Formular übrig, das zur vollständigen Such-Seite führt.
+document.querySelectorAll('details.top-search[data-search]').forEach((details) => {
+  const input = details.querySelector('[data-search-input]');
+  const results = details.querySelector('[data-search-results]');
+  const panel = details.querySelector('.top-search-panel');
+  const btn = details.querySelector('.top-search-btn');
+  const slug = details.dataset.slug;
+  // Das Panel hängt per CSS fix am Viewport (nicht an der Lupe), damit es am linken Rand nie herausragt.
+  // Am Handy soll es als Overlay über die volle Breite erscheinen, am PC dicht unter der Lupe als schmale
+  // Box – deshalb hier statt in CSS berechnet, wo die Lupe gerade tatsächlich sitzt.
+  const place = () => {
+    const r = btn.getBoundingClientRect();
+    panel.style.top = `${Math.round(r.bottom + 8)}px`;
+    if (window.innerWidth <= 640) {
+      panel.style.left = '16px';
+      panel.style.right = '16px';
+      panel.style.width = 'auto';
+    } else {
+      const width = Math.min(352, window.innerWidth - 32);
+      const left = Math.min(Math.round(r.left), window.innerWidth - 16 - width);
+      panel.style.left = `${Math.max(16, left)}px`;
+      panel.style.right = 'auto';
+      panel.style.width = `${width}px`;
+    }
+  };
+  window.addEventListener('resize', () => {
+    if (details.open) place();
+  });
+  const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const group = (title, items) => {
+    if (!items || !items.length) return '';
+    const rows = items.map((i) => `<li><a class="search-hit" href="${esc(i.href)}"><span>${esc(i.title)}</span>${i.sub ? `<span class="muted">${esc(i.sub)}</span>` : ''}</a></li>`).join('');
+    return `<div><p class="ts-group-title">${title}</p><ul class="st-list search-hits">${rows}</ul></div>`;
+  };
+  const clear = () => {
+    results.hidden = true;
+    results.innerHTML = '';
+  };
+  details.addEventListener('toggle', () => {
+    if (details.open) {
+      place();
+      input.focus();
+    } else clear();
+  });
+  let timer = null;
+  let controller = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (!q) {
+      clear();
+      return;
+    }
+    timer = setTimeout(async () => {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      try {
+        const r = await fetch(`/r/${slug}/suche.json?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!r.ok) return;
+        const data = await r.json();
+        const found = [group('Teams', data.teams), group('Spieler', data.players), group('Teilnehmer', data.members), group('Champions', data.champions)].join('');
+        results.innerHTML = found || '<p class="ts-empty">Keine Treffer.</p>';
+        results.hidden = false;
+      } catch {
+        /* Abgebrochen (neue Eingabe) oder Netzwerkfehler – dann bleiben die vorigen Treffer einfach stehen */
+      }
+    }, 200);
+  });
+});
+
 // Push-Benachrichtigungen im Konto: dieses Gerät an- und abmelden
 (function () {
   const box = document.querySelector('[data-push]');
@@ -404,9 +475,9 @@ document.querySelectorAll('.filter-bar[data-filter]').forEach((bar) => {
   });
 })();
 
-// Dropdowns (Handy-Menüs, Spielleiter/Administrator): Tipp daneben schließt sie wieder
+// Dropdowns (Handy-Menüs, Spielleiter/Administrator, Suche): Tipp daneben schließt sie wieder
 document.addEventListener('click', (e) => {
-  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open]').forEach((d) => {
+  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open], details.top-search[open]').forEach((d) => {
     if (!d.contains(e.target)) d.removeAttribute('open');
   });
 });
