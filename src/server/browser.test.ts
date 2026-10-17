@@ -225,6 +225,8 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
               inner: window.innerWidth,
               kurzX: midLeft(kurzId),
               langX: midLeft(langId),
+              teamAText: document.querySelector(`#spiel-${langId} .team-a`)?.textContent ?? null,
+              teamBText: document.querySelector(`#spiel-${langId} .team-b`)?.textContent ?? null,
             };
           },
           { kurzId: kurzMatch, langId: langMatch },
@@ -232,6 +234,9 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
         if (m.kurzX === null || m.langX === null) problems.push(`${where}: Zeile(n) nicht gefunden`);
         else if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
+        // Ohne Kürzel: der volle Teamname muss stehen bleiben (umbrechen statt mit "…" abschneiden).
+        if (m.teamAText !== 'Ein ziemlich langer Teamname ohne Kürzel') problems.push(`${where}: Teamname A abgeschnitten (${m.teamAText})`);
+        if (m.teamBText !== 'Noch ein langer Teamname ohne Kürzel') problems.push(`${where}: Teamname B abgeschnitten (${m.teamBText})`);
         await page.close();
       }
     } finally {
@@ -438,7 +443,7 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
   });
 
-  test('Kopf-Suche: Eingabefeld wird mit dem Fenster schmaler, bei wenig Platz bleibt nur die Lupe (am Handy direkt neben "Kronenrunde")', async () => {
+  test('Kopf-Suche: nur die Lupe, bis man draufklickt – dann öffnet sich darunter das Eingabefeld, ohne die Seite zu verschieben', async () => {
     const { id: tid } = (await db.one<{ id: string }>(
       `insert into tournaments (name, starts_on, ends_on) values ('Suche-Testturnier', current_date - 1, current_date + 30) returning id`,
     ))!;
@@ -462,28 +467,35 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         await page.setViewportSize({ width, height: 900 });
         const where = `${width}px`;
         await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
-        const m = await page.evaluate(() => {
-          const box = (sel: string) => {
-            const el = document.querySelector(sel) as HTMLElement | null;
-            if (!el || getComputedStyle(el).display === 'none') return null;
+        const box = (sel: string) =>
+          page.evaluate((s: string) => {
+            const el = document.querySelector(s) as HTMLElement | null;
+            // checkVisibility() beachtet auch ein geschlossenes <details> – anders als getComputedStyle()
+            // allein, denn Chromium hält den Inhalt eines geschlossenen <details> zwar fürs Layout vor
+            // (getBoundingClientRect() liefert trotzdem eine Box), zeichnet ihn aber nicht.
+            if (!el || (el.checkVisibility ? !el.checkVisibility() : getComputedStyle(el).display === 'none')) return null;
             const r = el.getBoundingClientRect();
             return r.width > 0 ? { top: r.top, left: r.left, right: r.right } : null;
-          };
-          return { scroll: document.documentElement.scrollWidth, inner: window.innerWidth, brand: box('.brand'), input: box('.top-search-q'), btn: box('.top-search-btn') };
-        });
-        if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
-        if (width > 860) {
-          // Viel Platz (PC): das richtige Eingabefeld ist da, die Lupe (Ersatz bei wenig Platz) ist verborgen.
-          if (!m.input) problems.push(`${where}: Eingabefeld fehlt (sollte bei viel Platz sichtbar sein)`);
-          if (m.btn) problems.push(`${where}: Lupen-Knopf sollte bei viel Platz verborgen sein`);
-        } else {
-          // Wenig Platz (Tablet-Breite und Handy): nur die Lupe, kein Eingabefeld – am Handy direkt neben "Kronenrunde".
-          if (m.input) problems.push(`${where}: Eingabefeld sollte bei wenig Platz verborgen sein`);
-          if (!m.btn) problems.push(`${where}: Lupen-Knopf fehlt`);
-          if (width <= 640 && m.brand && m.btn && Math.abs(m.brand.top - m.btn.top) > 10) {
-            problems.push(`${where}: Lupe steht nicht in derselben Zeile wie "Kronenrunde" (${m.brand.top} vs. ${m.btn.top})`);
-          }
+          }, sel);
+
+        // Vorher: nur die Lupe, kein Eingabefeld – am Handy direkt neben "Kronenrunde".
+        const before = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
+        if (before.scroll > before.inner + 1) problems.push(`${where} (zu): Seite ragt seitlich heraus (${before.scroll}px bei ${before.inner}px)`);
+        const brand = await box('.brand');
+        const btnClosed = await box('.top-search-btn');
+        if (await box('.top-search-q')) problems.push(`${where} (zu): Eingabefeld sollte erst nach einem Klick erscheinen`);
+        if (!btnClosed) problems.push(`${where} (zu): Lupen-Knopf fehlt`);
+        if (width <= 640 && brand && btnClosed && Math.abs(brand.top - btnClosed.top) > 10) {
+          problems.push(`${where} (zu): Lupe steht nicht in derselben Zeile wie "Kronenrunde" (${brand.top} vs. ${btnClosed.top})`);
         }
+
+        // Klick auf die Lupe: Eingabefeld klappt auf, ohne die übrige Kopfzeile zu verschieben oder die Seite zu verbreitern.
+        await page.click('.top-search-btn');
+        const after = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
+        if (after.scroll > after.inner + 1) problems.push(`${where} (auf): Seite ragt seitlich heraus (${after.scroll}px bei ${after.inner}px)`);
+        if (!(await box('.top-search-q'))) problems.push(`${where} (auf): Eingabefeld erscheint nach dem Klick nicht`);
+        const brandAfter = await box('.brand');
+        if (brand && brandAfter && Math.abs(brand.top - brandAfter.top) > 1) problems.push(`${where} (auf): Logo verschiebt sich durch das Aufklappen`);
         await page.close();
       }
     } finally {

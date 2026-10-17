@@ -1,14 +1,16 @@
 // Globale Suche (Kopfzeile): Teams, Spieler (Kader), Teilnehmer, Champions – jeweils innerhalb der
 // aktuellen Tipprunde bzw. ihrer Turniere. Team-Treffer führen auf eine eigene Team-Seite mit
 // Statistik und Favoriten-Knopf; Spieler/Champions führen (noch) nur auf eine "Demnächst"-Seite.
+// Im Kopf tippt man direkt los (Live-Suche über /suche.json, siehe app.js); /suchen bleibt die
+// vollständige Trefferliste und die Grundlage ohne JavaScript.
 
 import { teamStats, type StatMatch, type StatTeam } from '../../domain/statistics.ts';
 import type { Ctx } from '../app.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { csrfField, emptyState, layout } from '../views/layout.ts';
+import { csrfField, layout } from '../views/layout.ts';
 import { isUuid, loginRedirect } from './common.ts';
-import { leagueTournaments, loadLeague } from './league-data.ts';
+import { loadLeague } from './league-data.ts';
 
 const tile = (value: string | number, label: string): Html => html`<div class="st-tile"><strong>${value}</strong><span>${label}</span></div>`;
 
@@ -38,16 +40,80 @@ function navOf(access: { league: { slug: string; name: string; ended: boolean };
   return { slug: access.league.slug, name: access.league.name, canManage: access.canManage, recap: access.league.ended, active: 'statistiken' as const };
 }
 
+/** Rollen in der üblichen Reihenfolge einer Startaufstellung, mit großem Anfangsbuchstaben; "bottom" heißt hier ADC. */
+const ROLE_ORDER = ['top', 'jungle', 'mid', 'bottom', 'support'];
+const ROLE_LABEL: Record<string, string> = { top: 'Top', jungle: 'Jungle', mid: 'Mid', bottom: 'ADC', support: 'Support' };
+function roleLabel(role: string | null): string {
+  if (!role) return '';
+  return ROLE_LABEL[role] ?? role[0].toUpperCase() + role.slice(1);
+}
+function roleRank(role: string | null): number {
+  const i = role ? ROLE_ORDER.indexOf(role) : -1;
+  return i < 0 ? ROLE_ORDER.length : i;
+}
+
+async function findHits(db: Ctx['deps']['db'], leagueId: string, q: string, limit: number) {
+  const like = `%${q}%`;
+  const [teams, players, champions, members] = await Promise.all([
+    db.query<TeamHit>(
+      `select distinct t.id, t.name, t.short_name, t.region
+         from teams t
+         join tournament_teams tt on tt.team_id = t.id
+         join league_tournaments lt on lt.tournament_id = tt.tournament_id
+        where lt.league_id = $1 and (t.name ilike $2 or t.short_name ilike $2)
+        order by t.name limit $3`,
+      [leagueId, like, limit],
+    ),
+    db.query<PlayerHit>(
+      `select distinct p.id, p.name, p.role, t.name as team_name, t.short_name as team_short
+         from players p
+         join teams t on t.id = p.team_id
+         join tournament_teams tt on tt.team_id = t.id
+         join league_tournaments lt on lt.tournament_id = tt.tournament_id
+        where lt.league_id = $1 and p.active and p.name ilike $2
+        order by p.name limit $3`,
+      [leagueId, like, limit],
+    ),
+    db.query<ChampionHit>(`select id, name from champions where name ilike $1 order by name limit $2`, [like, limit]),
+    db.query<MemberHit>(
+      `select u.id, u.display_name from league_members lm join users u on u.id = lm.user_id
+        where lm.league_id = $1 and u.display_name ilike $2 order by u.display_name limit $3`,
+      [leagueId, like, limit],
+    ),
+  ]);
+  return { teams, players, champions, members };
+}
+
+const comingHref = (slug: string, art: string, name: string) => `/r/${slug}/demnaechst?titel=${encodeURIComponent(name)}&art=${art}`;
+
 /** Ergebnis-Gruppe als Liste klickbarer Zeilen. */
 function resultList(items: { href: string; title: string; sub?: string }[]): Html {
   return html`<ul class="st-list search-hits">${items.map((i) => html`<li><a class="search-hit" href="${i.href}"><span>${i.title}</span>${i.sub ? html`<span class="muted">${i.sub}</span>` : nothing}</a></li>`)}</ul>`;
+}
+
+/** Live-Suche aus dem Kopf (siehe app.js): kurze JSON-Trefferliste, dieselben Kategorien wie /suchen. */
+async function searchJson(ctx: Ctx): Promise<Res> {
+  const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+  if (!ctx.user) return { status: 401, headers, body: '{}' };
+  const access = await loadLeague(ctx, ctx.params.slug);
+  const { league } = access;
+  const q = (ctx.query.get('q') ?? '').trim().slice(0, 80);
+  if (!q) return { status: 200, headers, body: JSON.stringify({ teams: [], players: [], members: [], champions: [] }) };
+
+  const hits = await findHits(ctx.deps.db, league.id, q, 5);
+  const body = JSON.stringify({
+    teams: hits.teams.map((t) => ({ title: t.short_name ? `${t.name} (${t.short_name})` : t.name, sub: t.region ?? '', href: `/r/${league.slug}/team/${t.id}` })),
+    players: hits.players.map((p) => ({ title: p.name, sub: `${p.team_short || p.team_name}${p.role ? ` · ${roleLabel(p.role)}` : ''}`, href: comingHref(league.slug, 'spieler', p.name) })),
+    members: hits.members.map((m) => ({ title: m.display_name, sub: '', href: `/r/${league.slug}/spieler/${m.id}` })),
+    champions: hits.champions.map((c) => ({ title: c.name, sub: '', href: comingHref(league.slug, 'champion', c.name) })),
+  });
+  return { status: 200, headers, body };
 }
 
 async function searchPage(ctx: Ctx): Promise<Res> {
   if (!ctx.user) return loginRedirect(ctx);
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
-  const { db } = ctx.deps;
   const q = (ctx.query.get('q') ?? '').trim().slice(0, 80);
   const nav = navOf(access);
   const header = html`<form method="get" action="/r/${league.slug}/suchen" class="filter-bar" role="search">
@@ -59,59 +125,30 @@ async function searchPage(ctx: Ctx): Promise<Res> {
     return htmlResponse(layout(ctx, { title: `Suche – ${league.name}`, body, league: nav }));
   }
 
-  const like = `%${q}%`;
-  const [teams, players, champions, members] = await Promise.all([
-    db.query<TeamHit>(
-      `select distinct t.id, t.name, t.short_name, t.region
-         from teams t
-         join tournament_teams tt on tt.team_id = t.id
-         join league_tournaments lt on lt.tournament_id = tt.tournament_id
-        where lt.league_id = $1 and (t.name ilike $2 or t.short_name ilike $2)
-        order by t.name limit 20`,
-      [league.id, like],
-    ),
-    db.query<PlayerHit>(
-      `select distinct p.id, p.name, p.role, t.name as team_name, t.short_name as team_short
-         from players p
-         join teams t on t.id = p.team_id
-         join tournament_teams tt on tt.team_id = t.id
-         join league_tournaments lt on lt.tournament_id = tt.tournament_id
-        where lt.league_id = $1 and p.active and p.name ilike $2
-        order by p.name limit 20`,
-      [league.id, like],
-    ),
-    db.query<ChampionHit>(`select id, name from champions where name ilike $1 order by name limit 20`, [like]),
-    db.query<MemberHit>(
-      `select u.id, u.display_name from league_members lm join users u on u.id = lm.user_id
-        where lm.league_id = $1 and u.display_name ilike $2 order by u.display_name limit 20`,
-      [league.id, like],
-    ),
-  ]);
-
-  const coming = (art: string, name: string) => `/r/${league.slug}/demnaechst?titel=${encodeURIComponent(name)}&art=${art}`;
+  const hits = await findHits(ctx.deps.db, league.id, q, 20);
   const sections: { title: string; body: Html }[] = [
     {
       title: 'Teams',
-      body: teams.length
-        ? resultList(teams.map((t) => ({ href: `/r/${league.slug}/team/${t.id}`, title: t.short_name ? `${t.name} (${t.short_name})` : t.name, sub: t.region ?? undefined })))
+      body: hits.teams.length
+        ? resultList(hits.teams.map((t) => ({ href: `/r/${league.slug}/team/${t.id}`, title: t.short_name ? `${t.name} (${t.short_name})` : t.name, sub: t.region ?? undefined })))
         : html`<p class="muted">Keine Teams gefunden.</p>`,
     },
     {
       title: 'Spieler',
-      body: players.length
-        ? resultList(players.map((p) => ({ href: coming('spieler', p.name), title: p.name, sub: `${p.team_short || p.team_name}${p.role ? ` · ${p.role}` : ''}` })))
+      body: hits.players.length
+        ? resultList(hits.players.map((p) => ({ href: comingHref(league.slug, 'spieler', p.name), title: p.name, sub: `${p.team_short || p.team_name}${p.role ? ` · ${roleLabel(p.role)}` : ''}` })))
         : html`<p class="muted">Keine Spieler gefunden.</p>`,
     },
     {
       title: 'Teilnehmer',
-      body: members.length
-        ? resultList(members.map((m) => ({ href: `/r/${league.slug}/spieler/${m.id}`, title: m.display_name })))
+      body: hits.members.length
+        ? resultList(hits.members.map((m) => ({ href: `/r/${league.slug}/spieler/${m.id}`, title: m.display_name })))
         : html`<p class="muted">Keine Teilnehmer gefunden.</p>`,
     },
     {
       title: 'Champions',
-      body: champions.length
-        ? resultList(champions.map((c) => ({ href: coming('champion', c.name), title: c.name })))
+      body: hits.champions.length
+        ? resultList(hits.champions.map((c) => ({ href: comingHref(league.slug, 'champion', c.name), title: c.name })))
         : html`<p class="muted">Keine Champions gefunden.</p>`,
     },
   ];
@@ -126,8 +163,7 @@ async function comingSoonPage(ctx: Ctx): Promise<Res> {
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
   const titel = (ctx.query.get('titel') ?? '').trim().slice(0, 80) || 'Demnächst verfügbar';
-  const body = html`<p class="muted page-note"><a href="/r/${league.slug}/suchen">← Zur Suche</a></p>
-<section class="panel">
+  const body = html`<section class="panel">
   <h1>${titel}</h1>
   <p class="muted">Diese Funktion ist noch nicht fertig – schau bald wieder vorbei!</p>
 </section>`;
@@ -164,9 +200,10 @@ async function teamPage(ctx: Ctx): Promise<Res> {
         where lt.league_id = $1 and m.status <> 'cancelled' and (m.team_a_id = $2 or m.team_b_id = $2)`,
       [league.id, teamId],
     ),
-    db.query<{ id: string; name: string; role: string | null }>(`select id, name, role from players where team_id = $1 and active order by role, name`, [teamId]),
+    db.query<{ id: string; name: string; role: string | null }>(`select id, name, role from players where team_id = $1 and active order by name`, [teamId]),
     db.one(`select 1 from team_favorites where user_id = $1 and team_id = $2`, [ctx.user.id, teamId]),
   ]);
+  players.sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name, 'de'));
 
   const asTeam = (id: string | null, name: string | null, short: string | null, region: string | null): StatTeam | null => (id && name ? { id, name, short, region } : null);
   const matches: StatMatch[] = matchRows.map((r) => ({
@@ -181,8 +218,7 @@ async function teamPage(ctx: Ctx): Promise<Res> {
   const stat = teamStats(matches, [{ id: team.id, name: team.name, short: team.short_name, region: team.region }]).find((r) => r.team.id === team.id)!;
 
   const title = team.short_name ? `${team.name} (${team.short_name})` : team.name;
-  const body = html`<p class="muted page-note"><a href="/r/${league.slug}/suchen">← Zur Suche</a></p>
-<section class="panel profile-head">
+  const body = html`<section class="panel profile-head">
   <div class="profile-head-info">
     <h1>${title}</h1>
     <p class="muted">${team.region ?? 'Region unbekannt'}</p>
@@ -205,7 +241,7 @@ async function teamPage(ctx: Ctx): Promise<Res> {
   <h2>Kader</h2>
   ${
     players.length
-      ? html`<ul class="st-list">${players.map((p) => html`<li><span>${p.name}</span><span class="muted">${p.role ?? ''}</span></li>`)}</ul>`
+      ? html`<ul class="st-list">${players.map((p) => html`<li><span>${p.name}</span><span class="muted">${roleLabel(p.role)}</span></li>`)}</ul>`
       : html`<p class="muted">Der Kader ist noch nicht abgeglichen.</p>`
   }
 </section>`;
@@ -226,6 +262,7 @@ async function toggleFavorite(ctx: Ctx): Promise<Res> {
 }
 
 export function registerSearchRoutes(router: Router<Ctx>) {
+  router.get('/r/:slug/suche.json', searchJson);
   router.get('/r/:slug/suchen', searchPage);
   router.get('/r/:slug/demnaechst', comingSoonPage);
   router.get('/r/:slug/team/:teamId', teamPage);

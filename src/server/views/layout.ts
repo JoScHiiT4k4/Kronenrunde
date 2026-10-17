@@ -160,16 +160,22 @@ const ICON_SEARCH = html`<svg class="ico" viewBox="0 0 24 24" width="18" height=
 
 /**
  * Globale Suche im Kopf (Teams, Spieler, Teilnehmer, Champions), zwischen Logo und Turnier-Leiste – nur mit
- * angemeldeter Tipprunde (ctx.sidebar), da die Suche innerhalb der aktuellen Tipprunde läuft. Am PC wird das
- * Eingabefeld (CSS) schmaler, je weniger Platz da ist; wird es zu eng (auch am Handy), bleibt nur die Lupe –
- * zum Tippen öffnet sie die eigene Such-Seite mit einem vollwertigen Eingabefeld.
+ * angemeldeter Tipprunde (ctx.sidebar), da die Suche innerhalb der aktuellen Tipprunde läuft. Zunächst steht
+ * nur die Lupe da (am PC wie am Handy); ein Klick klappt das Eingabefeld darunter auf (<details>, geht also
+ * auch ohne JavaScript). Mit JavaScript zeigt app.js dort schon beim Tippen Treffer an (/suche.json); ohne
+ * JavaScript übernimmt das Absenden des Formulars und führt zur vollständigen Such-Seite.
  */
 function searchBox(ctx: Ctx): Html {
   if (!ctx.user || !ctx.sidebar) return nothing;
-  return html`<form class="top-search" method="get" action="/r/${ctx.sidebar.slug}/suchen" role="search">
-  <input type="search" name="q" class="top-search-q" placeholder="Suchen" aria-label="Suchen" autocomplete="off">
-  <button type="submit" class="top-search-btn" aria-label="Suchen">${ICON_SEARCH}</button>
-</form>`;
+  return html`<details class="top-search" data-search data-slug="${ctx.sidebar.slug}">
+  <summary class="top-search-btn" aria-label="Suchen">${ICON_SEARCH}</summary>
+  <div class="top-search-panel">
+    <form method="get" action="/r/${ctx.sidebar.slug}/suchen" role="search">
+      <input type="search" name="q" class="top-search-q" placeholder="Teams, Spieler, Teilnehmer, Champions …" aria-label="Suchen" autocomplete="off" data-search-input>
+    </form>
+    <div class="top-search-results" data-search-results hidden></div>
+  </div>
+</details>`;
 }
 
 const TWITCH_ICON = html`<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3 2.5 7v13H7v3h3l3-3h4l5-5V3H4Zm15 11-3 3h-4l-3 3v-3H6V5h13v9Zm-3-6h-2v5h2V8Zm-5 0H9v5h2V8Z"/></svg>`;
