@@ -1313,7 +1313,7 @@ td.bad { color: var(--red); }
 @media (max-width: 420px) {
   /* 54px statt 46px: erst bei dieser Breite passt "Zahl + %" (auch "100 %") am Handy wirklich hinein,
      sonst ragt die %-Zahl trotz Zentrierung in Richtung VS/Ergebnis heraus und klebt optisch daran. */
-  .teams .mid { grid-template-columns: 54px 76px 54px; column-gap: 4px; }
+  .teams .mid { grid-template-columns: 54px 76px 54px; column-gap: 12px; }
   .teams .pct { font-size: 0.9em; }
   .score { min-width: 76px; height: 40px; padding: 0 8px; font-size: 1.15rem; gap: 6px; }
 }
