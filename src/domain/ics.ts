@@ -21,6 +21,9 @@ function stamp(d: Date): string {
   );
 }
 
+/** Offizielle LoL-Esports-Streams, stehen in den Notizen jedes Termins. */
+export const STREAM_LINKS = { youtube: 'https://www.youtube.com/@lolesports', twitch: 'https://www.twitch.tv/riotgames' };
+
 /** Ungefähre Dauer je nach Spielmodus (für das Ende des Termins; die tatsächliche Dauer variiert). */
 function durationMinutes(bestOf: 1 | 3 | 5): number {
   return bestOf === 1 ? 45 : bestOf === 3 ? 90 : 150;
@@ -67,7 +70,12 @@ export function buildIcs(o: { calendarName: string; matches: IcsMatch[]; matchUr
   for (const m of o.matches) {
     const end = new Date(m.scheduledAt.getTime() + durationMinutes(m.bestOf) * 60_000);
     const summary = `${m.teamA} vs ${m.teamB} (Bo${m.bestOf})`;
-    const desc = [m.tournament, m.stage].filter(Boolean).join(' · ');
+    const desc = [
+      [m.tournament, m.stage].filter(Boolean).join(' · '),
+      '',
+      `YouTube: ${STREAM_LINKS.youtube}`,
+      `Twitch: ${STREAM_LINKS.twitch}`,
+    ].join('\n');
     lines.push(
       'BEGIN:VEVENT',
       line('UID', `${m.id}@kronenrunde`),
@@ -75,8 +83,14 @@ export function buildIcs(o: { calendarName: string; matches: IcsMatch[]; matchUr
       line('DTSTART', stamp(m.scheduledAt)),
       line('DTEND', stamp(end)),
       line('SUMMARY', escapeText(summary)),
-      ...(desc ? [line('DESCRIPTION', escapeText(desc))] : []),
+      line('DESCRIPTION', escapeText(desc)),
       line('URL', o.matchUrl(m.id)),
+      // Erinnerung 1 Stunde vor Spielbeginn
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      line('DESCRIPTION', escapeText(summary)),
+      'TRIGGER:-PT1H',
+      'END:VALARM',
       'END:VEVENT',
     );
   }

@@ -139,11 +139,6 @@ export async function calendarToken(db: Db, userId: string): Promise<string> {
   return token;
 }
 
-/** Setzt den Token zurück (neuer Link, alter funktioniert danach nicht mehr). */
-export async function resetCalendarToken(db: Db, userId: string): Promise<void> {
-  await db.run('update users set calendar_token = $2 where id = $1', [userId, newToken()]);
-}
-
 /** Nutzer anhand des Kalender-Tokens (für die login-freie Abo-URL). */
 export async function userByCalendarToken(db: Db, token: string): Promise<{ id: string } | null> {
   if (!token) return null;
