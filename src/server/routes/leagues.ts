@@ -20,6 +20,8 @@ import { standingsShareCard } from '../views/standings-share-card.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
 import {
   canCreateLeague,
+  INVITE_EXPIRED,
+  inviteExpiresAt,
   type League,
   leagueMatches,
   leagueTournaments,
@@ -239,6 +241,11 @@ function extractCode(value: string): string {
   return (m ? m[1] : v).toLowerCase();
 }
 
+async function assertInviteOpen(ctx: Ctx, leagueId: string): Promise<void> {
+  const expires = await inviteExpiresAt(ctx.deps.db, leagueId);
+  if (expires && expires <= ctx.now) throw new HttpError(410, INVITE_EXPIRED);
+}
+
 async function joinPage(ctx: Ctx): Promise<Res> {
   // Eingeladene sind meist neu: gleich zum Konto-Erstellen (dort gibt es auch „Anmelden“)
   if (!ctx.user) return redirect(`/registrieren?weiter=${encodeURIComponent(ctx.path)}`);
@@ -254,6 +261,7 @@ async function joinPage(ctx: Ctx): Promise<Res> {
     throw new HttpError(404, 'Dieser Einladungslink ist ungültig. Vielleicht wurde er erneuert – frag nach dem aktuellen Link.');
   }
   if (league.is_member) return redirect(`/r/${league.slug}/tippen`);
+  await assertInviteOpen(ctx, league.id);
   const body = html`<section class="panel narrow">
   <h1>${league.name}</h1>
   <p>Du wurdest in diese Tipprunde eingeladen. Sie hat ${league.members} ${league.members === 1 ? 'Mitglied' : 'Mitglieder'}.</p>
@@ -271,6 +279,7 @@ async function join(ctx: Ctx): Promise<Res> {
   const code = ctx.params.code.toLowerCase();
   const league = await ctx.deps.db.one<{ id: string; slug: string }>('select id, slug from leagues where invite_code = $1', [code]);
   if (!league) throw new HttpError(404, 'Dieser Einladungslink ist ungültig. Vielleicht wurde er erneuert – frag nach dem aktuellen Link.');
+  await assertInviteOpen(ctx, league.id);
   const added = await ctx.deps.db.run(
     `insert into league_members (league_id, user_id) values ($1, $2) on conflict do nothing`,
     [league.id, ctx.user.id],

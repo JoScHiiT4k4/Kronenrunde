@@ -84,6 +84,20 @@ export function leagueTournaments(db: Queryable, leagueId: string): Promise<Leag
   );
 }
 
+/**
+ * Einladungslinks gelten nur bis zum Anstoß des ersten Spiels der Turniere einer Tipprunde.
+ * null, solange noch kein Spiel mit Termin feststeht (dann gilt der Link).
+ */
+export async function inviteExpiresAt(db: Queryable, leagueId: string): Promise<Date | null> {
+  const row = await db.one<{ at: Date | null }>(
+    'select min(tournament_start(tournament_id)) as at from league_tournaments where league_id = $1',
+    [leagueId],
+  );
+  return row?.at ?? null;
+}
+
+export const INVITE_EXPIRED = 'Dieser Einladungslink ist abgelaufen: Das Turnier hat schon begonnen, ein Beitritt ist nicht mehr möglich.';
+
 export interface MatchRow {
   id: string;
   tournament_id: string;
