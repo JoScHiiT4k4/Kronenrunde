@@ -223,15 +223,14 @@
   toggle.addEventListener('click', () => setOpen(!open));
   root.querySelector('[data-chat-close]').addEventListener('click', () => { setOpen(false); toggle.focus(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) setOpen(false); });
-  // Eingabefeld wächst mit (bis 5 Zeilen); am PC sendet Enter (Umschalt+Enter = neue Zeile), am Handy macht Enter eine neue Zeile
+  // Eingabefeld wächst mit langen Texten (bis 5 Zeilen); Enter sendet (am PC macht Umschalt+Enter eine neue Zeile)
   const grow = () => {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight + 2, 5 * 22 + 20) + 'px';
   };
   input.addEventListener('input', grow);
-  const touch = window.matchMedia('(pointer: coarse)');
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !touch.matches) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       form.requestSubmit();
     }
