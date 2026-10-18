@@ -7,7 +7,7 @@
 .chat-badge { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--red); color: #fff; font-size: 0.75rem; font-weight: 700; line-height: 22px; text-align: center; }
 .chat-badge[hidden] { display: none; }
 .chat-unread .chat-toggle { border-color: var(--red); }
-.chat-panel { width: 340px; max-width: calc(100vw - 32px); height: 440px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--frame); box-shadow: 0 8px 28px rgb(0 0 0 / 55%); }
+.chat-panel { width: 340px; max-width: calc(100vw - 32px); height: 440px; max-height: calc(100vh - 110px); max-height: calc(100dvh - 110px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--frame); box-shadow: 0 8px 28px rgb(0 0 0 / 55%); }
 .chat-panel[hidden] { display: none; }
 .chat-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .chat-head .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
