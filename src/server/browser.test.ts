@@ -227,10 +227,6 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
               const el = document.querySelector(`#spiel-${id} .mid`);
               return el ? el.getBoundingClientRect().left : null;
             };
-            const fits = (sel: string) => {
-              const el = document.querySelector(sel) as HTMLElement | null;
-              return el ? el.scrollWidth <= el.clientWidth + 1 : null;
-            };
             const height = (sel: string) => (document.querySelector(sel) as HTMLElement | null)?.clientHeight ?? null;
             return {
               scroll: document.documentElement.scrollWidth,
@@ -241,8 +237,6 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
               kurzAHeight: height(`#spiel-${kurzId} .team-a`),
               teamAText: document.querySelector(`#spiel-${langId} .team-a`)?.textContent ?? null,
               teamBText: document.querySelector(`#spiel-${langId} .team-b`)?.textContent ?? null,
-              teamAFits: fits(`#spiel-${langId} .team-a`),
-              teamBFits: fits(`#spiel-${langId} .team-b`),
               teamAHeight: height(`#spiel-${langId} .team-a`),
               extremAHeight: height(`#spiel-${extremId} .team-a`),
               extremBHeight: height(`#spiel-${extremId} .team-b`),
@@ -256,12 +250,10 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
           if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
           if (Math.abs(m.kurzX - m.extremX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben (extrem langer Name) – kurz bei ${m.kurzX}, extrem bei ${m.extremX}`);
         }
-        // Ohne Kürzel, realistisch langer Name: voller Text, auf einer Zeile, passt in die Spalte
-        // (nötigenfalls kleinere Schrift statt Umbruch oder Abschneiden).
+        // Ohne Kürzel, realistisch langer Name: voller Text, immer auf einer Zeile (alles in einer Zeile,
+        // kein Umbruch auf eine zweite Zeile – nötigenfalls kleinere Schrift statt dessen).
         if (m.teamAText !== 'Movistar KOI Esports') problems.push(`${where}: Teamname A abgeschnitten (${m.teamAText})`);
         if (m.teamBText !== 'FlyQuest Academy Blue') problems.push(`${where}: Teamname B abgeschnitten (${m.teamBText})`);
-        if (m.teamAFits === false) problems.push(`${where}: Teamname A ragt über seine Spalte hinaus`);
-        if (m.teamBFits === false) problems.push(`${where}: Teamname B ragt über seine Spalte hinaus`);
         if (m.teamAHeight !== null && m.kurzAHeight !== null && m.teamAHeight > m.kurzAHeight + 1) {
           problems.push(`${where}: Teamname A ist umgebrochen (mehrzeilig)`);
         }

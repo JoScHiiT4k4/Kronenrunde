@@ -475,16 +475,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
    (auch "100 %") und unabhängig davon, ob gerade eine Zahl dasteht oder (vor Tippschluss) noch nicht. */
 .teams .mid { display: grid; grid-template-columns: 58px 92px 58px; column-gap: 16px; align-items: center; }
 .teams .mid .vs, .teams .mid .score { justify-self: center; }
-/* Am Handy ist neben VS/Ergebnis kaum noch Platz für die Teamnamen (die mittlere Spalte braucht für
-   Gewinnchance + Medaillon/Ergebnis allein schon einen Großteil der Zeilenbreite) – deshalb dort zwei
-   Zeilen: oben die beiden Namen über die volle Breite, darunter zentriert VS/Ergebnis. So bekommt auch
-   ein langer Name ohne Kürzel (siehe .team-a/.team-b) genug Raum, ohne umzubrechen oder zu schrumpfen. */
-@media (max-width: 640px) {
-  .teams { grid-template-columns: 1fr 1fr; row-gap: 4px; }
-  .teams .team-a { grid-column: 1; grid-row: 1; text-align: left; }
-  .teams .team-b { grid-column: 2; grid-row: 1; }
-  .teams .mid { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
-}
 /* Grid-Spalten (team-a/team-b) dürfen über ihren Inhalt hinaus nicht breiter werden, sonst verschiebt
    ein langer Teamname (ohne Kürzel) die mittlere Spalte (VS/%) und sprengt die Zeilenbreite. Umbrechen
    soll der Name dabei nicht (eine Zeile) – app.js verkleinert die Schrift stattdessen passend, falls der
