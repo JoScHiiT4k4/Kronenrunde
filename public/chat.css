@@ -10,7 +10,7 @@
 .chat-panel { width: 340px; max-width: calc(100vw - 32px); height: 440px; max-height: calc(100vh - 110px); max-height: calc(100dvh - 110px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--frame); box-shadow: 0 8px 28px rgb(0 0 0 / 55%); }
 .chat-panel[hidden] { display: none; }
 .chat-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-.chat-head .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
+.chat-head .chat-hint { flex: 1; min-width: 0; font-size: 0.72rem; line-height: 1.2; }
 .chat-close { border: 0; background: none; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0 4px; }
 .chat-close:hover { color: var(--gold-bright); }
 .chat-log { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }
@@ -22,15 +22,15 @@
 .chat-own .chat-text { background: var(--blue-soft); border-color: var(--blue); }
 .chat-form { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
 .chat-form input { flex: 1; min-width: 0; }
-.chat-note { margin: 0; padding: 0 12px 8px; font-size: 0.72rem; }
 /* Platz für die Sprechblase am Seitenende */
 body[data-angemeldet] .foot { padding-bottom: 76px; }
-/* Handy: nur die Sprechblase, das Fenster füllt die Breite und lässt oben Platz */
+/* Handy: nur die Sprechblase; offen füllt das Fenster den sichtbaren Bereich (chat.js setzt --chat-top/--chat-h nach visualViewport, also auch passend zur Tastatur) */
 @media (max-width: 700px) {
   .chat { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
   .chat-toggle { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 26px; }
   .chat-label { display: none; }
-  .chat-panel { position: fixed; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); width: auto; max-width: none; height: min(70vh, 480px); max-height: calc(100dvh - 120px); }
+  .chat-open .chat-toggle { display: none; }
+  .chat-panel { position: fixed; left: 8px; right: 8px; top: calc(var(--chat-top, 0px) + 8px + env(safe-area-inset-top)); width: auto; max-width: none; height: calc(var(--chat-h, 100dvh) - 16px - env(safe-area-inset-top) - var(--chat-bottom, env(safe-area-inset-bottom))); max-height: none; }
 }
 .chat-mute { border: 0; background: none; color: var(--gold-text); cursor: pointer; padding: 2px 4px; display: inline-flex; }
 .chat-mute:hover { color: var(--gold-bright); }
