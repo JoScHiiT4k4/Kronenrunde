@@ -1,0 +1,10 @@
+{
+  "_info": [
+    "LEC 2027 (ganze Saison, testweise) – einspielen mit: tippspiel daten lec-2027 (mehrfach ausführbar).",
+    "Nur der Kopf: Spiele, Phasen (Wochen, Playoffs …) und Teams legt der Abgleich mit lolesports.com (Liga lec) selbst an, sobald Riot den Spielplan veröffentlicht (ab 60 Tage vor Beginn).",
+    "Termine vorläufig nach dem Muster von 2026 (17.1.–20.9.); bitte anpassen, sobald Riot sie bekannt gibt."
+  ],
+  "tournament": {"key": "lec-2027", "name": "LEC 2027", "game": "lol", "starts_on": "2027-01-16", "ends_on": "2027-09-19", "source": "lolesports:lec"},
+  "teams": [],
+  "matches": []
+}

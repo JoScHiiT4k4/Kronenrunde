@@ -1,6 +1,7 @@
 // Datenabgleich mit Riot: Paarungen und Ergebnisse, Champion-Liste, Spielerkader der Turnier-Teams.
 //
-// - Spielplan: lolesports.com für Turniere mit source = 'lolesports:<liga>' – Paarungen, Ergebnisse, Anstoßzeiten.
+// - Spielplan: lolesports.com für Turniere mit source = 'lolesports:<liga>' – Paarungen, Ergebnisse, Anstoßzeiten;
+//              Turniere ohne eigenen Spielplan (nur Kopf in db/daten) bekommen Spiele, Phasen und Teams von dort.
 // - Champions: Data Dragon, Riots offizielle, frei nutzbare Datenquelle (deutsche Namen).
 // - Spieler:   lolesports.com (inoffizielle Schnittstelle der Seite – kann sich ändern; siehe docs/ARCHITEKTUR.md).
 //
@@ -256,7 +257,7 @@ export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<s
     const to = tour.ends_on ? Date.parse(`${tour.ends_on}T00:00:00Z`) + 2 * day : Date.now() + 60 * day;
     const events = await fetchLeagueEvents(get, league.id, from, to);
 
-    const stats = { linked: 0, teams: 0, results: 0, times: 0, live: 0, unknown: 0, conflicts: 0 };
+    const stats = { linked: 0, added: 0, created: 0, teams: 0, results: 0, times: 0, live: 0, unknown: 0, conflicts: 0 };
     await db.tx(async (q) => {
       const ours = await q.query<{
         id: string; source_id: string | null; team_a_id: string | null; team_b_id: string | null;
@@ -271,6 +272,36 @@ export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<s
              or t.external_id is not null`,
         [tour.id],
       );
+      // Turniere ohne eigene, noch nicht verknüpfte Spiele (z. B. MSI, First Stand, LEC: nur Kopf in db/daten)
+      // füllt der Abgleich selbst: fehlende Spiele, Phasen und Teams werden angelegt.
+      const autoFill = ours.every((x) => x.source_id);
+      const stages = await q.query<{ id: string; name: string; position: number }>(
+        'select id, name, position from stages where tournament_id = $1',
+        [tour.id],
+      );
+      let allTeams: { id: string; name: string; short_name: string | null }[] | undefined;
+      const teamFor = async (api: { name?: string; code?: string }): Promise<string | null> => {
+        const found = matchScheduleTeam(api, teams);
+        if (found || !autoFill || !api.name?.trim() || norm(api.name) === 'tbd' || norm(api.code) === 'tbd') return found;
+        // Schon bekannt aus einem anderen Turnier (z. B. von den Worlds)?
+        allTeams ??= await q.query<{ id: string; name: string; short_name: string | null }>(`select id, name, short_name from teams where game = 'lol'`);
+        const known = matchScheduleTeam(api, allTeams);
+        if (known) {
+          teams.push(allTeams.find((t) => t.id === known)!);
+          return known;
+        }
+        const name = api.name.trim();
+        const code = api.code?.trim() || null;
+        const row = await q.one<{ id: string }>(
+          `insert into teams (game, name, short_name) values ('lol', $1, $2)
+           on conflict (game, name) do update set short_name = coalesce(teams.short_name, excluded.short_name)
+           returning id`,
+          [name, code],
+        );
+        teams.push({ id: row!.id, name, short_name: code });
+        stats.created++;
+        return row!.id;
+      };
       for (const e of events) {
         const ev = e.match!;
         const start = Date.parse(e.startTime);
@@ -278,17 +309,38 @@ export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<s
         if (!m) {
           // Erster Abgleich: über Anstoßzeit und Format verknüpfen (nur wenn eindeutig)
           const candidates = ours.filter((x) => !x.source_id && x.scheduled_at?.getTime() === start && x.best_of === ev.strategy?.count);
-          if (candidates.length !== 1) {
+          if (candidates.length === 1) {
+            m = candidates[0];
+            m.source_id = ev.id;
+            await q.run('update matches set source_id = $2 where id = $1', [m.id, ev.id]);
+            stats.linked++;
+          } else if (autoFill && [1, 3, 5].includes(ev.strategy?.count ?? 0) && !Number.isNaN(start)) {
+            const stageName = e.blockName?.trim() || null;
+            let stage = stageName ? stages.find((x) => x.name === stageName) : undefined;
+            if (stageName && !stage) {
+              const position = Math.max(0, ...stages.map((x) => x.position)) + 1;
+              const row = await q.one<{ id: string }>(
+                'insert into stages (tournament_id, name, position) values ($1, $2, $3) returning id',
+                [tour.id, stageName, position],
+              );
+              stage = { id: row!.id, name: stageName, position };
+              stages.push(stage);
+            }
+            const row = await q.one<{ id: string }>(
+              `insert into matches (tournament_id, stage_id, best_of, scheduled_at, source_id) values ($1, $2, $3, $4, $5) returning id`,
+              [tour.id, stage?.id ?? null, ev.strategy!.count, new Date(start), ev.id],
+            );
+            m = { id: row!.id, source_id: ev.id, team_a_id: null, team_b_id: null, best_of: ev.strategy!.count!, scheduled_at: new Date(start), wins_a: null, status: 'scheduled' };
+            ours.push(m);
+            stats.added++;
+          } else {
             stats.unknown++;
             continue;
           }
-          m = candidates[0];
-          m.source_id = ev.id;
-          await q.run('update matches set source_id = $2 where id = $1', [m.id, ev.id]);
-          stats.linked++;
         }
         const api = (ev.teams ?? []).slice(0, 2);
-        const ids = api.map((t) => matchScheduleTeam(t, teams));
+        const ids: (string | null)[] = [];
+        for (const t of api) ids.push(await teamFor(t));
 
         // Teams eintragen, wo sie noch fehlen (gesetzte Teams aus dem Admin-Bereich bleiben)
         if (ids[0] && ids[1] && ids[0] !== ids[1]) {
@@ -342,6 +394,8 @@ export async function syncMatches(db: Db, get: FetchJson = fetchJson): Promise<s
     });
     const parts = [
       `${events.length} Spiele bei lolesports`,
+      stats.added && `${stats.added} Spiele angelegt`,
+      stats.created && `${stats.created} Teams angelegt`,
       stats.linked && `${stats.linked} neu verknüpft`,
       stats.teams && `${stats.teams} Paarungen eingetragen`,
       stats.results && `${stats.results} Ergebnisse eingetragen`,

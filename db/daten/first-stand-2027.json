@@ -1,0 +1,10 @@
+{
+  "_info": [
+    "LoL First Stand 2027 – einspielen mit: tippspiel daten first-stand-2027 (mehrfach ausführbar).",
+    "Nur der Kopf: Spiele, Phasen und Teams legt der Abgleich mit lolesports.com (Liga first_stand) selbst an, sobald Riot den Spielplan veröffentlicht (ab 60 Tage vor Beginn).",
+    "Termine vorläufig nach dem Muster von 2026 (16.–22.3.); bitte anpassen, sobald Riot sie bekannt gibt."
+  ],
+  "tournament": {"key": "first-stand-2027", "name": "First Stand 2027", "game": "lol", "starts_on": "2027-03-15", "ends_on": "2027-03-21", "source": "lolesports:first_stand"},
+  "teams": [],
+  "matches": []
+}

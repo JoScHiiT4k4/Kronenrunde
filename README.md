@@ -32,6 +32,7 @@ Was die App kann:
 - **Verwalten** (Spielleiter der Tipprunde) mit Untermenü: Übersicht (Einladungslink, wer noch nicht getippt hat – ohne Tipp-Inhalte), Einstellungen, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
 - **Turnierdaten einspielen** statt abtippen: `tippspiel daten worlds-2026` (Dateien in `db/daten/`, mehrfach ausführbar).
+- **Weitere Turniere:** First Stand, MSI und (testweise) LEC 2027 liegen als Kopfdaten in `db/daten/` (`tippspiel daten msi-2027` usw.). Spiele, Phasen und Teams legt der Abgleich selbst von lolesports.com an, sobald Riot den Spielplan veröffentlicht. So geht jede Liga von lolesports (`source: "lolesports:<liga>"`, z. B. `lck`, `lpl`, `lcs`).
 - **Automatischer Abgleich mit Riot**: Paarungen, Ergebnisse und Anstoßzeiten alle 10 Minuten, an Spieltagen alle 2 (lolesports.com), Champion-Liste und Spielerkader alle 6 Stunden – Stand im Admin-Bereich, `tippspiel abgleich` von Hand.
 - **Auto-Update** auf dem Pi sofort per GitHub-Webhook und täglich 08:00, nur auf GitHub geprüfte Versionen (Zweig `stabil`).
 - **Konto löschen** jederzeit, mit allen Daten.
