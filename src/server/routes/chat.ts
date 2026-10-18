@@ -12,6 +12,8 @@ import { loadLeague } from './league-data.ts';
 export const CHAT_DAYS = 7;
 const MAX_LEN = 500;
 const PER_MINUTE = 15;
+/** Erlaubte Emoji-Reaktionen (feste Auswahl, damit niemand beliebigen Text anheftet) */
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 const json = (body: unknown, status = 200): Res => ({
   status,
@@ -27,7 +29,40 @@ interface Row {
   body: string;
 }
 
-const view = (r: Row, filter: boolean) => ({ id: Number(r.id), u: r.user_id, n: r.name, t: r.created_at.toISOString(), x: filter ? maskProfanity(r.body) : r.body });
+/** Reaktion für die Anzeige: Emoji, Anzahl, ob man selbst dabei ist */
+type Reaction = { e: string; n: number; me: boolean };
+
+const view = (r: Row, filter: boolean, reactions: Reaction[] = []) => ({ id: Number(r.id), u: r.user_id, n: r.name, t: r.created_at.toISOString(), x: filter ? maskProfanity(r.body) : r.body, r: reactions });
+
+/** Reaktionen zu den Nachrichten, sortiert in der Reihenfolge der Auswahl */
+async function loadReactions(db: Db, ids: string[], me: string): Promise<Map<string, Reaction[]>> {
+  const map = new Map<string, Reaction[]>();
+  if (!ids.length) return map;
+  const rows = await db.query<{ message_id: string; emoji: string; n: number; me: boolean }>(
+    `select message_id::text, emoji, count(*)::int as n, bool_or(user_id = $2) as me
+       from chat_reactions where message_id = any($1::bigint[]) group by message_id, emoji`,
+    [ids, me],
+  );
+  for (const r of rows) {
+    const list = map.get(r.message_id) ?? [];
+    list.push({ e: r.emoji, n: r.n, me: r.me });
+    map.set(r.message_id, list);
+  }
+  for (const list of map.values()) list.sort((a, b) => REACTIONS.indexOf(a.e) - REACTIONS.indexOf(b.e));
+  return map;
+}
+
+/** Text bereinigen: Zeilenumbrüche bleiben (höchstens eine Leerzeile), sonst keine Steuerzeichen und keine doppelten Leerzeichen */
+export function cleanChatText(raw: string): string {
+  return raw
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 /** Schimpfwortfilter des Teilnehmers (Standard: an) */
 async function wantsFilter(ctx: Ctx): Promise<boolean> {
@@ -87,13 +122,14 @@ export function registerChatRoutes(router: Router<Ctx>) {
         ? (await ctx.deps.db.query<Row>(`${select} where m.league_id = $1 order by m.id desc limit 50`, [league.id])).reverse()
         : await ctx.deps.db.query<Row>(`${select} where m.league_id = $1 and m.id > $2 order by m.id limit 100`, [league.id, after]);
     const filter = await wantsFilter(ctx);
-    return json({ me: ctx.user.id, messages: rows.map((r) => view(r, filter)) });
+    const reactions = await loadReactions(ctx.deps.db, rows.map((r) => r.id), ctx.user.id);
+    return json({ me: ctx.user.id, messages: rows.map((r) => view(r, filter, reactions.get(r.id))) });
   });
 
   router.post('/r/:slug/chat', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const { league } = await loadLeague(ctx, ctx.params.slug);
-    const text = (ctx.form.get('text') ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const text = cleanChatText(ctx.form.get('text') ?? '');
     if (!text || text.length > MAX_LEN) throw new HttpError(400, `Bitte schreibe 1 bis ${MAX_LEN} Zeichen.`);
     const { db } = ctx.deps;
     const recent = await db.one<{ n: number }>(`select count(*)::int as n from chat_messages where user_id = $1 and created_at > now() - interval '1 minute'`, [ctx.user.id]);
@@ -103,7 +139,7 @@ export function registerChatRoutes(router: Router<Ctx>) {
        select ins.id::text, ins.user_id, u.display_name as name, ins.created_at, ins.body from ins join users u on u.id = ins.user_id`,
       [league.id, ctx.user.id, text],
     );
-    pushToMembers(ctx, league, ctx.user.id, ctx.user.display_name, maskProfanity(text)).catch(() => {});
+    pushToMembers(ctx, league, ctx.user.id, ctx.user.display_name, maskProfanity(text.replace(/\n+/g, ' '))).catch(() => {});
     return json({ message: view(row!, await wantsFilter(ctx)) }, 201);
   });
 
@@ -115,5 +151,20 @@ export function registerChatRoutes(router: Router<Ctx>) {
     const n = await ctx.deps.db.run('delete from chat_messages where id = $1 and league_id = $2 and user_id = $3', [ctx.params.id, league.id, ctx.user.id]);
     if (!n) throw new HttpError(404, 'Diese Nachricht gibt es nicht (mehr) oder sie ist nicht von dir.');
     return json({ ok: true });
+  });
+
+  // Reaktion setzen oder wieder wegnehmen (Umschalter)
+  router.post('/r/:slug/chat/:id/reaktion', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { league } = await loadLeague(ctx, ctx.params.slug);
+    if (!/^\d{1,15}$/.test(ctx.params.id)) throw new HttpError(404, 'Diese Seite gibt es nicht.');
+    const emoji = ctx.form.get('emoji') ?? '';
+    if (!REACTIONS.includes(emoji)) throw new HttpError(400, 'Diese Reaktion gibt es nicht.');
+    const { db } = ctx.deps;
+    const msg = await db.one<{ id: string }>('select id::text from chat_messages where id = $1 and league_id = $2', [ctx.params.id, league.id]);
+    if (!msg) throw new HttpError(404, 'Diese Nachricht gibt es nicht (mehr).');
+    const removed = await db.run('delete from chat_reactions where message_id = $1 and user_id = $2 and emoji = $3', [msg.id, ctx.user.id, emoji]);
+    if (!removed) await db.run('insert into chat_reactions (message_id, user_id, emoji) values ($1, $2, $3) on conflict do nothing', [msg.id, ctx.user.id, emoji]);
+    return json({ r: (await loadReactions(db, [msg.id], ctx.user.id)).get(msg.id) ?? [] });
   });
 }

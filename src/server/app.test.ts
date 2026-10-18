@@ -1048,6 +1048,25 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await anna.post('/konto/chat', { chat: 'aus', filter: 'an' });
     assert.doesNotMatch((await anna.get('/konto?bereich=benachrichtigungen')).text, /Chat-Nachrichten/, 'Chat-Einstellungen sind im Reiter Chat');
 
+    // Mehrzeilig: Zeilenumbrüche bleiben, mehr als eine Leerzeile und Leerzeichen am Rand nicht
+    const multi = JSON.parse((await anna.post(`/r/${slug}/chat`, { text: '  Zeile 1  \r\n\n\n\nZeile   2 ' })).text).message;
+    assert.equal(multi.x, 'Zeile 1\n\nZeile 2');
+    assert.deepEqual(multi.r, []);
+
+    // Reaktionen: nur aus der festen Auswahl, Umschalter je Nutzer, alle sehen die Anzahl
+    const r1 = await ben.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: '👍' });
+    assert.equal(r1.status, 200);
+    assert.deepEqual(JSON.parse(r1.text).r, [{ e: '👍', n: 1, me: true }]);
+    await anna.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: '👍' });
+    await anna.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: '❤️' });
+    const seenByBen = JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text).messages.find((m: { id: number }) => m.id === multi.id);
+    assert.deepEqual(seenByBen.r, [{ e: '👍', n: 2, me: true }, { e: '❤️', n: 1, me: false }]);
+    assert.deepEqual(JSON.parse((await ben.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: '👍' })).text).r, [{ e: '👍', n: 1, me: false }, { e: '❤️', n: 1, me: false }], 'zweites Tippen nimmt sie weg');
+    assert.equal((await ben.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: 'hallo' })).status, 400);
+    assert.equal((await ben.post(`/r/${slug}/chat/999999999/reaktion`, { emoji: '👍' })).status, 404);
+    assert.equal((await stranger.post(`/r/${slug}/chat/${multi.id}/reaktion`, { emoji: '👍' })).status, 404, 'Fremde reagieren nicht');
+    assert.equal((await anna.post(`/r/${slug}/chat/${multi.id}/loeschen`)).status, 200, 'Nachricht samt Reaktionen löschen');
+
     // Eigene Nachricht löschen: nur die eigene
     const last = JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1);
     assert.equal((await anna.post(`/r/${slug}/chat/${last.id}/loeschen`)).status, 404, 'fremde Nachricht bleibt');
