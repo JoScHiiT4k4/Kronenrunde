@@ -804,7 +804,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
   <h2>Kalender-Abo</h2>
   ${
     myLeagues.length
-      ? html`<p class="muted">Abonniere den Spielplan in Google/Apple Kalender & Co. – neue oder geänderte Termine (z. B. neu feststehende Turnierbaum-Spiele) holt sich dein Kalender danach von selbst. Jeder Termin erinnert dich 1 Stunde vorher und enthält Links zum Stream auf YouTube und Twitch.</p>
+      ? html`<p class="muted">Abonniere den Spielplan, um kein Spiel und keinen Tipp mehr zu verpassen.</p>
   <div class="stack">
     ${myLeagues.map(
       (l) => html`<a class="btn btn-primary" href="${calUrl(l.slug).replace(/^https?:/, 'webcal:')}">${myLeagues.length > 1 ? `${l.name}: ` : ''}Kalender abonnieren</a>`,
