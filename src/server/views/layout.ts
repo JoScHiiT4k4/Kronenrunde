@@ -139,7 +139,7 @@ function chatWidget(ctx: Ctx): Html {
       <button type="button" class="chat-close" data-chat-close aria-label="Chat schließen">×</button></header>
     <div class="chat-log" data-chat-log role="log" aria-live="polite"><p class="muted chat-empty">Noch keine Nachrichten.</p></div>
     <form class="chat-form" data-chat-form autocomplete="off">
-      <textarea name="text" rows="1" maxlength="500" placeholder="Nachricht schreiben …" aria-label="Nachricht" required></textarea>
+      <textarea name="text" rows="1" enterkeyhint="send" maxlength="500" placeholder="Nachricht schreiben …" aria-label="Nachricht" required></textarea>
       <button type="submit" class="btn btn-primary">Senden</button>
     </form>
   </section>
