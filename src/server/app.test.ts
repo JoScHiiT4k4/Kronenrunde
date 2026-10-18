@@ -1771,7 +1771,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     }
   });
 
-  test('Tippen: bei Tippschluss "automatisch" gilt die Reihenfolge auch unter "Vorbei" (Tippschluss ist für alle schon vorbei, gespielt ist aber nicht alles)', async () => {
+  test('Tippen: ein Spieltag mit noch nicht entschiedenem Spiel steht nicht unter "Vorbei", auch wenn bei "automatisch" nichts mehr tippbar ist', async () => {
     // Eigenes, isoliertes Turnier und eigene Runde, damit die Reihenfolge nicht von anderen Tests abhängt
     const { id: tid } = (await db.one<{ id: string }>(
       `insert into tournaments (name, starts_on, ends_on) values ('Reihenfolge-Automatisch-Testturnier', current_date - 1, current_date + 30) returning id`,
@@ -1784,8 +1784,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       );
     try {
       // Derselbe Spieltag: GEN–T1 vor zwei Stunden entschieden, T1–KC startet erst in einer Stunde – aber bei
-      // "automatisch" ist der Tippschluss dafür schon vorbei, sobald das Spiel davor vorbei ist. Beide Begegnungen
-      // landen also unter "Vorbei" (kein Spiel des Tages ist mehr tippbar), obwohl T1–KC noch gar nicht läuft.
+      // "automatisch" ist der Tippschluss dafür schon vorbei, sobald das Spiel davor vorbei ist. Der Spieltag läuft
+      // aber noch, also bleibt er oben und nicht unter "Vorbei".
       const done = (await addMatch('GEN', 'T1', hours(-2), { status: 'finished', winsA: 1, winsB: 0 }))!.id;
       const next = (await addMatch('T1', 'KC', hours(1)))!.id;
 
@@ -1796,12 +1796,42 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
 
       const page = await admin.get(`/r/${rslug}/tippen`);
       assert.equal(page.status, 200);
-      const vorbeiAt = page.text.indexOf('>Vorbei<');
-      assert.ok(vorbeiAt >= 0, 'beide Spiele sollten unter "Vorbei" stehen, da der Tippschluss für den ganzen Tag vorbei ist');
+      assert.doesNotMatch(page.text, />Vorbei</, 'der laufende Spieltag gehört nicht unter "Vorbei"');
       const positions = [next, done].map((id) => ({ id, i: page.text.indexOf(`id="spiel-${id}"`) }));
-      assert.ok(positions.every((p) => p.i > vorbeiAt), 'beide Spiele liegen im "Vorbei"-Bereich');
-      // Das noch nicht gespielte (aber schon gesperrte) Spiel steht auch unter "Vorbei" oben, das gespielte darunter
+      assert.ok(positions.every((p) => p.i >= 0), 'beide Spiele werden angezeigt');
+      // Das noch nicht gespielte (aber schon gesperrte) Spiel steht oben, das gespielte darunter
       assert.deepEqual(positions.sort((a, b) => a.i - b.i).map((p) => p.id), [next, done]);
+      // Nichts tippbar: kein Speichern-Knopf
+      assert.doesNotMatch(page.text, /Tipps speichern/);
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+    }
+  });
+
+  test('Tippen: ohne Auswahl wird die Phase des laufenden Spiels gezeigt, nicht die nächste mit tippbaren Spielen', async () => {
+    const { id: tid } = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on) values ('Phase-Live-Testturnier', current_date - 1, current_date + 30) returning id`,
+    ))!;
+    try {
+      // Play-In läuft gerade (gesperrt), Swiss-Paarung steht schon fest und ist noch tippbar
+      const stage = async (name: string, position: number) =>
+        (await db.one<{ id: string }>(`insert into stages (tournament_id, name, position) values ($1, $2, $3) returning id`, [tid, name, position]))!.id;
+      await db.run(
+        `insert into matches (tournament_id, stage_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, $4, 1, $5, 'live')`,
+        [tid, await stage('Play-In: Runde 1', 1), team.GEN, team.T1, hours(-1 / 2)],
+      );
+      await db.run(
+        `insert into matches (tournament_id, stage_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, $4, 1, $5, 'scheduled')`,
+        [tid, await stage('Swiss: Runde 1', 2), team.G2, team.KC, hours(72)],
+      );
+      const created = await admin.post('/neu', { name: 'Phase-Live-Runde', tournament_id: tid, points_winner: '1', points_exact: '1', lock_mode: 'match' });
+      assert.equal(created.status, 303, created.text);
+      const rslug = /\/r\/([^/]+)\//.exec(created.location!)![1];
+
+      const page = await admin.get(`/r/${rslug}/tippen`);
+      assert.equal(page.status, 200);
+      assert.match(page.text, /tippen\?phase=play-in" aria-current="page">Play-In/);
+      assert.doesNotMatch(page.text, />Vorbei</);
     } finally {
       await db.run('delete from tournaments where id = $1', [tid]);
     }

@@ -480,6 +480,10 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const known = (m: MatchRow) => !!(m.team_a_id && m.team_b_id);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? Number.MAX_SAFE_INTEGER;
   const isDone = (m: MatchRow) => m.status === 'finished' || m.status === 'cancelled';
+  // Noch nicht entschieden und nicht veraltet: läuft gerade, ist schon gesperrt oder steht noch an.
+  // Ältere Spiele ohne Ergebnis (z. B. nie abgeglichen) zählen nicht, sonst hingen sie ewig oben.
+  const STALE_MS = 12 * 60 * 60 * 1000;
+  const pending = (m: MatchRow) => known(m) && !isDone(m) && !!m.scheduled_at && time(m) > ctx.now.getTime() - STALE_MS;
   // Am aktuellen Spieltag (noch nicht jedes Spiel vorbei – auch wenn der Tippschluss, z. B. bei
   // "automatisch", schon für alle verstrichen ist): das Laufende/als Nächstes Kommende immer oben,
   // bereits gespielte Begegnungen darunter, neueste zuerst. Ein Spieltag, an dem schon alles vorbei
@@ -500,8 +504,11 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
     if (known(m) && beforeLock(m) && !own.has(m.id)) p.missing++;
   }
   phases.sort((a, b) => a.first - b.first);
-  // Ohne Auswahl: die Phase mit dem nächsten tippbaren Spiel, sonst dem nächsten Spiel, sonst die letzte
-  const upcoming = [...matches].filter((m) => known(m) && beforeLock(m)).sort((a, b) => time(a) - time(b))[0]
+  // Ohne Auswahl: die Phase mit dem laufenden bzw. nächsten noch nicht entschiedenen Spiel (auch wenn
+  // dessen Tippschluss schon vorbei ist – sonst spränge es mitten im Play-In auf Swiss), sonst dem
+  // nächsten tippbaren, sonst dem nächsten Spiel, sonst die letzte
+  const upcoming = [...matches].filter(pending).sort((a, b) => time(a) - time(b))[0]
+    ?? [...matches].filter((m) => known(m) && beforeLock(m)).sort((a, b) => time(a) - time(b))[0]
     ?? [...matches].filter((m) => time(m) > ctx.now.getTime() && time(m) < Number.MAX_SAFE_INTEGER).sort((a, b) => time(a) - time(b))[0];
   const current = phases.find((p) => p.slug === ctx.query.get('phase')) ?? phases.find((p) => upcoming && p.name === phaseName(upcoming)) ?? phases.at(-1);
   // Nur Begegnungen, deren Teams schon feststehen
@@ -514,7 +521,8 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
   const unscheduled: Matchday[] = [];
   for (const d of days) {
     if (!d.start) unscheduled.push(d);
-    else if (d.matches.some(beforeLock)) openDays.push(d);
+    // Ein Spieltag mit laufendem oder noch ausstehendem Spiel ist nicht "vorbei", auch wenn nichts mehr tippbar ist
+    else if (d.matches.some((m) => beforeLock(m) || pending(m))) openDays.push(d);
     else closedDays.push(d);
   }
   closedDays.reverse();
@@ -583,7 +591,7 @@ ${
   ${current ? html`<input type="hidden" name="phase" value="${current.slug}">` : nothing}
   ${openDays.map(
     (d) => html`<section class="day">
-    ${dayHeader(d, false)}
+    ${dayHeader(d, !d.matches.some(beforeLock))}
     ${tournamentNames ? html`<p class="muted">${tournamentNames.get(d.matches[0].tournament_id)}</p>` : nothing}
     ${orderCurrentDay(d.matches).map((m) => matchCard(ctx, league, m, own.get(m.id), beforeLock(m), sharesOf(m), tippedOf(m), foldOf(m)))}
   </section>`,
