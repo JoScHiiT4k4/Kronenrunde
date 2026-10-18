@@ -36,13 +36,20 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable; /* Seiten mit und ohne Scrollleiste springen am PC nicht mehr seitlich */
+  scroll-padding-top: 12px;
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 
 body {
   margin: 0;
   color: var(--text);
   font: 17px/1.5 var(--font-body);
+  touch-action: manipulation;
   min-height: 100vh;
+  min-height: 100dvh; /* Handy: Adressleiste nicht mitrechnen, sonst scrollt auch eine kurze Seite */
   display: flex;
   flex-direction: column;
   background-color: var(--bg);
@@ -220,6 +227,10 @@ p { margin: 0 0 0.9em; }
 /* Reiter (nav) und Inhalt (main) liegen im selben Raster, also immer in derselben Spalte; Seitenspalten stehen in Zeile 2 */
 .page > .league-nav { grid-row: 1; grid-column: 1; }
 .page > .main { grid-row: 2; grid-column: 1; min-width: 0; padding: 20px 16px 32px; }
+/* Der letzte Block braucht keinen eigenen Abstand nach unten: das Seitenende hat schon Luft */
+.page > .main > :last-child { margin-bottom: 0; }
+/* Der erste Block sitzt direkt unter dem Seitenabstand */
+.page > .main > :first-child { margin-top: 0; }
 .page > .sidecol { grid-row: 2; }
 /* Breiter Inhalt (Turnierbaum): eigene Zeile unter Inhalt und Seitenspalten, mittig und bis 1320px breit */
 .page > .below { grid-row: 3; grid-column: 1 / -1; justify-self: center; width: 100%; max-width: 1320px; min-width: 0; padding: 0 16px 32px; }
@@ -241,6 +252,7 @@ p { margin: 0 0 0.9em; }
   margin-bottom: 18px;
 }
 .panel.narrow { max-width: 480px; margin-left: auto; margin-right: auto; }
+.panel:not(.narrow) > h1 { font-size: 1.5rem; }
 .panel.quiet { background: none; border: 0; clip-path: none; padding: 0; text-align: center; }
 .panel > :last-child { margin-bottom: 0; }
 
@@ -266,7 +278,7 @@ p { margin: 0 0 0.9em; }
 
 /* ---------- Start ---------- */
 
-.hero { padding: 24px 0 12px; }
+.hero { padding: 4px 0 12px; }
 .hero h1 {
   font-size: clamp(2.2rem, 8.5vw, 3.3rem);
   font-weight: 700;
@@ -398,7 +410,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 }
 
 /* Phasen: Play-In, Swiss, … */
-.phase-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 14px; padding: 2px 16px 4px; }
+.phase-tabs { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px 16px; padding: 2px 16px 4px; }
 .phase-tabs a {
   --c: 6px;
   flex: none;
@@ -613,6 +625,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .save-bar .btn { min-width: 220px; }
 .save-bar.dirty .btn::after { content: "(geändert)"; font-weight: 400; margin-left: 0.35em; }
 @media (max-width: 520px) { .save-bar .btn { width: 100%; } }
+/* Handy: rechts Platz für die Chat-Sprechblase lassen, sonst verdeckt sie den Speichern-Knopf */
+@media (max-width: 700px) { body[data-angemeldet] .save-bar { padding-right: 76px; } body[data-angemeldet] .save-bar .btn { min-width: 0; } }
 
 details.day-closed {
   background: none;
@@ -752,7 +766,7 @@ details > summary > span:first-of-type:not(:only-child) { flex: 1; }
 }
 
 /* ---------- Turnierbaum ---------- */
-.bk-title { margin: 0 0 10px; font-size: 1.4rem; }
+.bk-title { margin: 0 0 12px; font-size: 1.5rem; }
 .bk-note { margin: 0 0 10px; color: var(--muted); font-size: 0.92rem; }
 .bk-hint { margin: 4px 0 0; font-size: 0.88rem; }
 .bk-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 14px; font-size: 0.85rem; color: var(--muted); }
@@ -783,6 +797,8 @@ details > summary > span:first-of-type:not(:only-child) { flex: 1; }
   padding: 2px 16px 14px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--frame) transparent;
 }
@@ -935,7 +951,7 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 /* Seitenspalten links (Platzhalter) und rechts (Rangliste), nur auf breiten Bildschirmen */
 .sidecol { display: none; align-self: stretch; padding-top: 20px; min-width: 0; }
 /* Überschrift über einer Liste von Einstellungen (z. B. Sonderfragen) */
-.small-title { margin: 20px 0 6px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
+.small-title { margin: 20px 0 8px; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--muted); }
 /* Abmelden oben rechts */
 .top-nav { align-items: center; }
 .top-logout { margin: 0; }
@@ -1191,7 +1207,6 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 }
 
 /* Filter / Live-Suche */
-[hidden] { display: none !important; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 .75rem; }
 .filter-bar[hidden] { display: none !important; }
 .filter-bar .filter-q, .filter-bar .filter-region {
@@ -1293,8 +1308,10 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
 @media (max-width: 640px) {
   /* Reiter-Leisten ersetzt das Dropdown */
   .league-nav .tabs, .sub-tabs, .phase-tabs { display: none; }
-  .m-menu { display: block; position: relative; max-width: 720px; margin: 8px auto 14px; }
+  .m-menu { display: block; position: relative; max-width: 720px; margin: 0 auto 16px; }
   .league-nav .m-menu { margin: 8px auto 12px; }
+  /* Unter dem Reiter-Menü der Tipprunde reicht ein kleinerer Abstand zum Inhalt */
+  .page > .main { padding-top: 14px; }
 
   .m-menu > summary {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
