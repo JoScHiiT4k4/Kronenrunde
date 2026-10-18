@@ -21,7 +21,22 @@
 .chat-text { padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--line); overflow-wrap: anywhere; white-space: pre-wrap; }
 .chat-own .chat-text { background: var(--blue-soft); border-color: var(--blue); }
 .chat-form { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
-.chat-form input { flex: 1; min-width: 0; }
+.chat-form { align-items: flex-end; }
+.chat-form textarea { flex: 1; min-width: 0; resize: none; overflow-y: auto; min-height: 44px; max-height: 132px; font: inherit; line-height: 22px; }
+.chat-log { position: relative; }
+.chat-day { align-self: center; margin: 4px 0; padding: 2px 10px; font-size: 0.72rem; color: var(--muted); border: 1px solid var(--line); background: var(--surface-2); }
+.chat-new { position: sticky; bottom: 0; align-self: center; margin-top: auto; padding: 6px 14px; border: 1px solid var(--gold); background: var(--surface-2); color: var(--gold-bright); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgb(0 0 0 / 45%); }
+.chat-new[hidden] { display: none; }
+.chat-reacts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
+.chat-own .chat-reacts { justify-content: flex-end; }
+.chat-react { min-height: 26px; padding: 0 7px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; font-size: 0.8rem; line-height: 1; cursor: pointer; border-radius: 13px; }
+.chat-react:hover { border-color: var(--gold); }
+.chat-react-me { border-color: var(--blue); background: var(--blue-soft); }
+.chat-react-add { margin-left: 6px; padding: 2px 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 0.8rem; line-height: 1; cursor: pointer; opacity: 0.75; }
+.chat-react-add:hover, .chat-react-add[aria-expanded="true"] { color: var(--gold-bright); opacity: 1; }
+.chat-pick { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--frame); background: var(--surface); }
+.chat-pick-e { min-width: 36px; min-height: 36px; border: 0; background: none; font-size: 1.2rem; cursor: pointer; border-radius: 4px; }
+.chat-pick-e:hover { background: var(--surface-2); }
 /* Platz für die Sprechblase am Seitenende */
 body[data-angemeldet] .foot { padding-bottom: 76px; }
 /* Handy: nur die Sprechblase; offen füllt das Fenster den sichtbaren Bereich (chat.js setzt --chat-top/--chat-h nach visualViewport, also auch passend zur Tastatur) */

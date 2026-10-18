@@ -9,7 +9,7 @@
   const log = root.querySelector('[data-chat-log]');
   const badge = root.querySelector('[data-chat-badge]');
   const form = root.querySelector('[data-chat-form]');
-  const input = form.querySelector('input[name="text"]');
+  const input = form.querySelector('textarea[name="text"]');
   const key = 'chat-gesehen-' + slug;
   let me = '';
   let list = [];
@@ -21,13 +21,61 @@
   const lastId = () => (list.length ? list[list.length - 1].id : 0);
   let seen = store.get() === null ? null : Number(store.get());
 
-  const fmt = (iso) => {
-    const d = new Date(iso);
-    const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    return d.toDateString() === new Date().toDateString() ? time : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + time;
+  const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+  let picker = null; // Nachricht, deren Emoji-Auswahl offen ist
+  let fresh = false; // neue Nachrichten, während man weiter oben liest
+  const time = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const day = (d) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Heute';
+    if (d.toDateString() === yesterday.toDateString()) return 'Gestern';
+    return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  };
+  const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const newBtn = document.createElement('button');
+  newBtn.type = 'button';
+  newBtn.className = 'chat-new';
+  newBtn.textContent = '↓ Neue Nachrichten';
+  newBtn.hidden = true;
+  newBtn.addEventListener('click', () => { log.scrollTop = log.scrollHeight; });
+  const showNew = () => { newBtn.hidden = !fresh; };
+  log.addEventListener('scroll', () => { if (fresh && atBottom()) { fresh = false; showNew(); } });
+  const button = (cls, text, label, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = text;
+    if (label) { b.title = label; b.setAttribute('aria-label', label); }
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const addButton = (m) => {
+    const add = button('chat-react-add', '☺+', 'Reagieren', () => { picker = picker === m.id ? null : m.id; const top = log.scrollTop; render(); log.scrollTop = top; });
+    add.setAttribute('aria-expanded', String(picker === m.id));
+    return add;
+  };
+  // Reaktionen unter der Nachricht (nur wenn es welche gibt oder die Auswahl offen ist)
+  const reactions = (m) => {
+    if (!(m.r || []).length && picker !== m.id) return null;
+    const box = document.createElement('div');
+    box.className = 'chat-reacts';
+    for (const r of m.r || []) {
+      const chip = button('chat-react' + (r.me ? ' chat-react-me' : ''), r.e + ' ' + r.n, r.e + ' ' + r.n + (r.me ? ', deine Reaktion entfernen' : ', auch reagieren'), () => react(m.id, r.e));
+      chip.setAttribute('aria-pressed', String(r.me));
+      box.append(chip);
+    }
+    if (picker === m.id) {
+      const pick = document.createElement('div');
+      pick.className = 'chat-pick';
+      for (const e of REACTIONS) pick.append(button('chat-pick-e', e, 'Mit ' + e + ' reagieren', () => { picker = null; react(m.id, e); }));
+      box.append(pick);
+    }
+    return box;
   };
   const render = () => {
-    const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    const stick = atBottom();
     log.replaceChildren();
     if (!list.length) {
       const p = document.createElement('p');
@@ -36,30 +84,51 @@
       log.append(p);
       return;
     }
+    let lastDay = '';
     for (const m of list) {
       const own = m.u === me;
+      const d = new Date(m.t);
+      if (d.toDateString() !== lastDay) {
+        lastDay = d.toDateString();
+        const sep = document.createElement('div');
+        sep.className = 'chat-day';
+        sep.textContent = day(d);
+        log.append(sep);
+      }
       const row = document.createElement('div');
       row.className = 'chat-msg' + (own ? ' chat-own' : '');
       const meta = document.createElement('span');
       meta.className = 'chat-meta';
-      meta.textContent = (own ? 'Du' : m.n) + ' · ' + fmt(m.t);
+      meta.textContent = (own ? 'Du' : m.n) + ' · ' + time(d);
       const text = document.createElement('span');
       text.className = 'chat-text';
       text.textContent = m.x;
       row.append(meta, text);
-      if (own) {
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'chat-del';
-        del.textContent = '×';
-        del.title = 'Meine Nachricht löschen';
-        del.setAttribute('aria-label', 'Meine Nachricht löschen');
-        del.addEventListener('click', () => remove(m.id));
-        text.append(del);
-      }
+      if (own) text.append(button('chat-del', '×', 'Meine Nachricht löschen', () => remove(m.id)));
+      meta.append(addButton(m));
+      const box = reactions(m);
+      if (box) row.append(box);
       log.append(row);
     }
-    if (stick || open) log.scrollTop = log.scrollHeight;
+    log.append(newBtn);
+    showNew();
+    if (stick) log.scrollTop = log.scrollHeight;
+  };
+  const react = async (id, emoji) => {
+    try {
+      const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat/' + id + '/reaktion', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+        body: new URLSearchParams({ _csrf: csrf, emoji }),
+      });
+      if (!r.ok) return;
+      const m = list.find((x) => x.id === id);
+      if (m) m.r = (await r.json()).r;
+      const top = log.scrollTop;
+      render();
+      log.scrollTop = top;
+    } catch { /* später noch einmal */ }
   };
   const unread = () => (seen === null ? 0 : list.filter((m) => m.id > seen && m.u !== me).length);
   const update = () => {
@@ -81,7 +150,7 @@
     return true;
   };
   // Gelöschte Nachrichten verschwinden bei allen: die Liste wird bei jedem Abruf ersetzt
-  const sig = (l) => l.map((m) => m.id + ':' + m.x).join('|');
+  const sig = (l) => l.map((m) => m.id + ':' + m.x + ':' + (m.r || []).map((r) => r.e + r.n + (r.me ? '!' : '')).join(',')).join('|');
   const remove = async (id) => {
     try {
       const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat/' + id + '/loeschen', {
@@ -105,6 +174,8 @@
       me = data.me;
       const first = !list.length && seen === null;
       const changed = sig(list) !== sig(data.messages);
+      const prevLast = lastId();
+      if (open && list.length && !atBottom() && data.messages.some((m) => m.id > prevLast && m.u !== me)) fresh = true;
       list = data.messages;
       if (first) {
         // Neue Sitzung: bisherige Nachrichten gelten als gelesen
@@ -152,10 +223,23 @@
   toggle.addEventListener('click', () => setOpen(!open));
   root.querySelector('[data-chat-close]').addEventListener('click', () => { setOpen(false); toggle.focus(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) setOpen(false); });
+  // Eingabefeld wächst mit (bis 5 Zeilen); am PC sendet Enter (Umschalt+Enter = neue Zeile), am Handy macht Enter eine neue Zeile
+  const grow = () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight + 2, 5 * 22 + 20) + 'px';
+  };
+  input.addEventListener('input', grow);
+  const touch = window.matchMedia('(pointer: coarse)');
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !touch.matches) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text) return;
+    if (!text || input.disabled) return;
     input.disabled = true;
     try {
       const r = await fetch('/r/' + encodeURIComponent(slug) + '/chat', {
@@ -167,7 +251,10 @@
       if (r.ok) {
         merge([(await r.json()).message]);
         input.value = '';
+        grow();
+        fresh = false;
         render();
+        toBottom();
         update();
       }
     } catch { /* bleibt im Feld stehen */ }
