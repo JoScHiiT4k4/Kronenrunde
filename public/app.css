@@ -446,6 +446,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .lock { margin: 0; color: var(--gold-text); font-weight: 600; }
 .lock .muted { font-weight: 400; }
 .section-title { margin-top: 28px; color: var(--muted); }
+/* Zwischen „Tipps speichern“ und „Vorbei“ kein doppelter Abstand */
+.tip-form > .day:last-of-type { margin-bottom: 8px; }
+.tip-form + .section-title { margin-top: 16px; }
 
 /* Die Spielkarte als Duell: blaue Seite links, rote rechts, das „VS“ als goldene Raute in der Mitte */
 .match {
@@ -625,6 +628,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .save-bar .btn { min-width: 220px; }
 .save-bar.dirty .btn::after { content: "(geändert)"; font-weight: 400; margin-left: 0.35em; }
 @media (max-width: 520px) { .save-bar .btn { width: 100%; } }
+/* Handy: Leiste fest am unteren Rand statt „sticky“ – sticky springt beim Ein-/Ausblenden der Adressleiste
+   je nach Scrollrichtung hoch und runter. Unten Platz lassen, damit sie den letzten Inhalt nicht verdeckt. */
+@media (max-width: 700px) {
+  .save-bar { position: fixed; left: 0; right: 0; margin: 0; z-index: 30; }
+  body:has(.save-bar) { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .tip-form > .day:last-of-type { margin-bottom: 0; }
+}
 /* Handy: rechts Platz für die Chat-Sprechblase lassen, sonst verdeckt sie den Speichern-Knopf */
 @media (max-width: 700px) { body[data-angemeldet] .save-bar { padding-right: 76px; } body[data-angemeldet] .save-bar .btn { min-width: 0; } }
 
