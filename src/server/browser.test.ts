@@ -181,9 +181,15 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     const kurzA = await mkTeam('KC', 'KC');
     const kurzB = await mkTeam('C9', 'C9');
     // Ohne gepflegtes Kürzel fällt die Anzeige auf den vollen Namen zurück (siehe shortA/shortB) – der
-    // darf die mittlere Spalte (VS/%) nicht verschieben und die Zeile nicht breiter als den Bildschirm machen.
-    const langA = await mkTeam('Ein ziemlich langer Teamname ohne Kürzel', null);
-    const langB = await mkTeam('Noch ein langer Teamname ohne Kürzel', null);
+    // darf die mittlere Spalte (VS/%) nicht verschieben, die Zeile nicht breiter als den Bildschirm machen
+    // und nicht umbrechen. Ein realistisch langer Name (wie er bei einem echten Team ohne Kürzel vorkommt)
+    // muss trotzdem vollständig und auf einer Zeile lesbar bleiben (nötigenfalls kleinere Schrift).
+    const langA = await mkTeam('Movistar KOI Esports', null);
+    const langB = await mkTeam('FlyQuest Academy Blue', null);
+    // Ein absurd langer Name (mehr, als jede echte Organisation hätte) darf zumindest das Layout nicht
+    // sprengen – lesbar muss er dabei nicht mehr sein, einzig: nicht umbrechen, Mitte bleibt bündig.
+    const extremA = await mkTeam('Ein ziemlich langer Teamname ohne Kürzel, der jedes vernünftige Maß sprengt', null);
+    const extremB = await mkTeam('Noch ein langer Teamname ohne Kürzel, der ebenfalls jedes vernünftige Maß sprengt', null);
     const addMatch = (a: string, b: string, at: Date) =>
       db.one<{ id: string }>(
         `insert into matches (tournament_id, team_a_id, team_b_id, best_of, scheduled_at, status) values ($1, $2, $3, 1, $4, 'scheduled') returning id`,
@@ -192,6 +198,7 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
     const kurzMatch = (await addMatch(kurzA, kurzB, hours(1)))!.id;
     const langMatch = (await addMatch(langA, langB, hours(2)))!.id;
+    const extremMatch = (await addMatch(extremA, extremB, hours(3)))!.id;
 
     const me = new Client();
     // Nur der Administrator (ADMIN_EMAILS = admin@example.de, aus dem vorigen Test schon registriert) darf
@@ -215,28 +222,57 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         const where = `${width}px`;
         await page.goto(`${base}/r/${slug}/tippen`, { waitUntil: 'load' });
         const m = await page.evaluate(
-          ({ kurzId, langId }: { kurzId: string; langId: string }) => {
+          ({ kurzId, langId, extremId }: { kurzId: string; langId: string; extremId: string }) => {
             const midLeft = (id: string) => {
               const el = document.querySelector(`#spiel-${id} .mid`);
               return el ? el.getBoundingClientRect().left : null;
             };
+            const fits = (sel: string) => {
+              const el = document.querySelector(sel) as HTMLElement | null;
+              return el ? el.scrollWidth <= el.clientWidth + 1 : null;
+            };
+            const height = (sel: string) => (document.querySelector(sel) as HTMLElement | null)?.clientHeight ?? null;
             return {
               scroll: document.documentElement.scrollWidth,
               inner: window.innerWidth,
               kurzX: midLeft(kurzId),
               langX: midLeft(langId),
+              extremX: midLeft(extremId),
+              kurzAHeight: height(`#spiel-${kurzId} .team-a`),
               teamAText: document.querySelector(`#spiel-${langId} .team-a`)?.textContent ?? null,
               teamBText: document.querySelector(`#spiel-${langId} .team-b`)?.textContent ?? null,
+              teamAFits: fits(`#spiel-${langId} .team-a`),
+              teamBFits: fits(`#spiel-${langId} .team-b`),
+              teamAHeight: height(`#spiel-${langId} .team-a`),
+              extremAHeight: height(`#spiel-${extremId} .team-a`),
+              extremBHeight: height(`#spiel-${extremId} .team-b`),
             };
           },
-          { kurzId: kurzMatch, langId: langMatch },
+          { kurzId: kurzMatch, langId: langMatch, extremId: extremMatch },
         );
         if (m.scroll > m.inner + 1) problems.push(`${where}: Seite ragt seitlich heraus (${m.scroll}px bei ${m.inner}px)`);
-        if (m.kurzX === null || m.langX === null) problems.push(`${where}: Zeile(n) nicht gefunden`);
-        else if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
-        // Ohne Kürzel: der volle Teamname muss stehen bleiben (umbrechen statt mit "…" abschneiden).
-        if (m.teamAText !== 'Ein ziemlich langer Teamname ohne Kürzel') problems.push(`${where}: Teamname A abgeschnitten (${m.teamAText})`);
-        if (m.teamBText !== 'Noch ein langer Teamname ohne Kürzel') problems.push(`${where}: Teamname B abgeschnitten (${m.teamBText})`);
+        if (m.kurzX === null || m.langX === null || m.extremX === null) problems.push(`${where}: Zeile(n) nicht gefunden`);
+        else {
+          if (Math.abs(m.kurzX - m.langX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben – kurz bei ${m.kurzX}, lang bei ${m.langX}`);
+          if (Math.abs(m.kurzX - m.extremX) > 1) problems.push(`${where}: Mitte (VS/%) verschoben (extrem langer Name) – kurz bei ${m.kurzX}, extrem bei ${m.extremX}`);
+        }
+        // Ohne Kürzel, realistisch langer Name: voller Text, auf einer Zeile, passt in die Spalte
+        // (nötigenfalls kleinere Schrift statt Umbruch oder Abschneiden).
+        if (m.teamAText !== 'Movistar KOI Esports') problems.push(`${where}: Teamname A abgeschnitten (${m.teamAText})`);
+        if (m.teamBText !== 'FlyQuest Academy Blue') problems.push(`${where}: Teamname B abgeschnitten (${m.teamBText})`);
+        if (m.teamAFits === false) problems.push(`${where}: Teamname A ragt über seine Spalte hinaus`);
+        if (m.teamBFits === false) problems.push(`${where}: Teamname B ragt über seine Spalte hinaus`);
+        if (m.teamAHeight !== null && m.kurzAHeight !== null && m.teamAHeight > m.kurzAHeight + 1) {
+          problems.push(`${where}: Teamname A ist umgebrochen (mehrzeilig)`);
+        }
+        // Absurd langer Name: muss wenigstens einzeilig bleiben (Layout darf nicht brechen), auch wenn
+        // die Schrift dafür sehr klein wird.
+        if (m.extremAHeight !== null && m.kurzAHeight !== null && m.extremAHeight > m.kurzAHeight + 1) {
+          problems.push(`${where}: extrem langer Teamname A ist umgebrochen (mehrzeilig)`);
+        }
+        if (m.extremBHeight !== null && m.kurzAHeight !== null && m.extremBHeight > m.kurzAHeight + 1) {
+          problems.push(`${where}: extrem langer Teamname B ist umgebrochen (mehrzeilig)`);
+        }
         await page.close();
       }
     } finally {
