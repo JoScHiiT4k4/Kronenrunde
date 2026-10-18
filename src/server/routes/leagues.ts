@@ -551,7 +551,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
       ${
         !closed && league.lock_mode === 'auto' && d.start
           ? nextOpen && !nextOpen.has_prev && nextOpen.scheduled_at
-            ? html`<p class="lock">Tippschluss je Spiel – das erste um ${formatTime(nextOpen.scheduled_at, tz)} Uhr <span class="muted">(${formatRemaining(nextOpen.scheduled_at, ctx.now)})</span></p>`
+            ? html`<p class="lock">Tippschluss je Spiel – Start ${formatTime(nextOpen.scheduled_at, tz)} Uhr <span class="muted">(${formatRemaining(nextOpen.scheduled_at, ctx.now)})</span></p>`
             : html`<p class="lock">Tippschluss je Spiel, sobald das Spiel davor vorbei ist</p>`
           : !closed && lock && league.lock_mode !== 'match'
           ? html`<p class="lock">Tippschluss ${formatTime(lock, tz)} Uhr <span class="muted">(${formatRemaining(lock, ctx.now)})</span></p>`
