@@ -115,6 +115,24 @@
       update();
     } catch { /* offline: später wieder */ }
   };
+  const toBottom = () => { log.scrollTop = log.scrollHeight; };
+  // Handy: Fenster an den sichtbaren Bereich anpassen (Tastatur auf/zu, Seite verschoben)
+  const phone = window.matchMedia('(max-width: 700px)');
+  const vv = window.visualViewport;
+  const fit = () => {
+    if (!open || !phone.matches || !vv) return;
+    const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    panel.style.setProperty('--chat-top', vv.offsetTop + 'px');
+    panel.style.setProperty('--chat-h', vv.height + 'px');
+    // Mit offener Tastatur braucht es unten keinen Abstand für den Home-Balken
+    panel.style.setProperty('--chat-bottom', vv.height < window.innerHeight - 120 ? '0px' : 'env(safe-area-inset-bottom)');
+    if (stick) toBottom();
+  };
+  if (vv) {
+    vv.addEventListener('resize', fit);
+    vv.addEventListener('scroll', fit);
+  }
+  phone.addEventListener?.('change', fit);
   const setOpen = (value) => {
     open = value;
     panel.hidden = !open;
@@ -122,7 +140,12 @@
     root.classList.toggle('chat-open', open);
     if (open) {
       render();
+      fit();
+      toBottom();
       input.focus({ preventScroll: true });
+      // nach dem Aufbau (und der Tastatur) noch einmal ganz nach unten zur neuesten Nachricht
+      requestAnimationFrame(toBottom);
+      setTimeout(() => { fit(); toBottom(); }, 350);
     }
     update();
   };

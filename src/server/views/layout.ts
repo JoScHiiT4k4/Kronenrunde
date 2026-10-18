@@ -134,7 +134,7 @@ function chatWidget(ctx: Ctx): Html {
   if (!ctx.user || !ctx.sidebar) return nothing;
   return html`<div class="chat" data-chat data-slug="${ctx.sidebar.slug}" data-csrf="${ctx.csrf}" data-muted="${ctx.sidebar.chatMuted ? '1' : '0'}" hidden>
   <section class="chat-panel" id="chat-panel" aria-label="Chat" hidden>
-    <header class="chat-head"><strong>Chat</strong><span class="muted">${ctx.sidebar.leagueName}</span>
+    <header class="chat-head"><strong>Chat</strong><span class="muted chat-hint">Nachrichten werden nach 7 Tagen gelöscht.</span>
       <button type="button" class="chat-mute" data-chat-mute aria-pressed="${ctx.sidebar.chatMuted ? 'true' : 'false'}" title="${ctx.sidebar.chatMuted ? 'Stumm – Benachrichtigungen einschalten' : 'Laut – stummschalten'}" aria-label="${ctx.sidebar.chatMuted ? 'Chat ist stumm, Benachrichtigungen einschalten' : 'Chat-Benachrichtigungen an, stummschalten'}">${SPEAKER_ON}${SPEAKER_OFF}</button>
       <button type="button" class="chat-close" data-chat-close aria-label="Chat schließen">×</button></header>
     <div class="chat-log" data-chat-log role="log" aria-live="polite"><p class="muted chat-empty">Noch keine Nachrichten.</p></div>
@@ -142,7 +142,6 @@ function chatWidget(ctx: Ctx): Html {
       <input type="text" name="text" maxlength="500" placeholder="Nachricht schreiben …" aria-label="Nachricht" required>
       <button type="submit" class="btn btn-primary">Senden</button>
     </form>
-    <p class="chat-note muted">Nachrichten werden nach 7 Tagen gelöscht.</p>
   </section>
   <button type="button" class="chat-toggle" data-chat-toggle aria-expanded="false" aria-controls="chat-panel" aria-label="Chat öffnen">
     ${CHAT_ICON}<span class="chat-label">Chat</span><span class="chat-badge" data-chat-badge hidden>0</span>
