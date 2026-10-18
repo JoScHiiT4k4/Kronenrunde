@@ -674,9 +674,19 @@ details > summary > span:first-of-type:not(:only-child) { flex: 1; }
 
 .standings .rank { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
 .standings .total { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--gold-bright); }
-.podium-1 .rank { color: var(--gold); }
-.podium-2 .rank { color: #c3cbd8; }
-.podium-3 .rank { color: #cf9563; }
+/* Plätze 1–3: Medaille hinter der Platzzahl und leichte Tönung der Zeile; geteilte Plätze bekommen dieselbe Medaille */
+.podium-1 { --medal: #e3c77f; --medal-soft: rgb(227 199 127 / 9%); }
+.podium-2 { --medal: #c3cbd8; --medal-soft: rgb(195 203 216 / 7%); }
+.podium-3 { --medal: #cf9563; --medal-soft: rgb(207 149 99 / 8%); }
+.standings tr.podium:not(.me) td { background-color: var(--medal-soft); }
+.standings tr.podium td.rank {
+  text-align: center;
+  color: var(--on-gold);
+  background-image: radial-gradient(circle 15px at 50% 50%, var(--medal) 14px, transparent 15px);
+  min-width: 32px;
+}
+.standings tr.podium td:first-child { box-shadow: inset 3px 0 0 var(--medal); }
+.standings tr.podium.me td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 @media (max-width: 420px) {
   .standings th, .standings td { padding-left: 4px; padding-right: 4px; }
 }
@@ -1096,7 +1106,7 @@ a.rank-box:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .rank-pts { grid-area: pts; font-weight: 700; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
 .rank-row .scale { grid-area: bar; }
 .rank-row.me .rank-n { color: var(--gold-bright); }
-.rank-row.podium-1 .rank-pos { color: var(--gold-bright); }
+.rank-row[class*="podium-"] .rank-pos { justify-self: center; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 0.8rem; text-align: center; color: var(--on-gold); background: var(--medal); }
 .rank-foot { margin-top: 8px; font-size: 0.75rem; color: var(--muted); }
 .rank-more { font-size: 0.82rem; color: var(--gold-text); }
 a.rank-box:hover .rank-more { color: var(--gold-bright); }
