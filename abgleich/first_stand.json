@@ -1,0 +1,283 @@
+{
+  "league": {
+    "id": "113464388705111224",
+    "slug": "first_stand",
+    "name": "First Stand"
+  },
+  "fetchedAt": "2026-10-18T16:53:27.216Z",
+  "matches": [
+    {
+      "id": "115570888977308363",
+      "start": "2026-03-16T13:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "BFX",
+          "name": "BNK FEARX",
+          "wins": 2,
+          "outcome": "loss"
+        },
+        {
+          "code": "BLG",
+          "name": "BILIBILI GAMING",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308369",
+      "start": "2026-03-16T18:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "TSW",
+          "name": "Team Secret Whales",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "G2",
+          "name": "G2 Esports",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308393",
+      "start": "2026-03-17T13:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "JDG",
+          "name": "Beijing JDG Esports",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "GEN",
+          "name": "Gen.G Esports",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308399",
+      "start": "2026-03-17T18:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "LYON",
+          "name": "LYON",
+          "wins": 3,
+          "outcome": "win"
+        },
+        {
+          "code": "LOUD",
+          "name": "LOUD",
+          "wins": 2,
+          "outcome": "loss"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308375",
+      "start": "2026-03-18T13:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "BLG",
+          "name": "BILIBILI GAMING",
+          "wins": 3,
+          "outcome": "win"
+        },
+        {
+          "code": "G2",
+          "name": "G2 Esports",
+          "wins": 0,
+          "outcome": "loss"
+        }
+      ]
+    },
+    {
+      "id": "115846976541810692",
+      "start": "2026-03-18T18:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "TSW",
+          "name": "Team Secret Whales",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "BFX",
+          "name": "BNK FEARX",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308405",
+      "start": "2026-03-19T13:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "LYON",
+          "name": "LYON",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "GEN",
+          "name": "Gen.G Esports",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115846976541941770",
+      "start": "2026-03-19T18:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "JDG",
+          "name": "Beijing JDG Esports",
+          "wins": 3,
+          "outcome": "win"
+        },
+        {
+          "code": "LOUD",
+          "name": "LOUD",
+          "wins": 0,
+          "outcome": "loss"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308387",
+      "start": "2026-03-20T13:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "BFX",
+          "name": "BNK FEARX",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "G2",
+          "name": "G2 Esports",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308417",
+      "start": "2026-03-20T18:00:00Z",
+      "state": "completed",
+      "block": "Gruppenphase",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "JDG",
+          "name": "Beijing JDG Esports",
+          "wins": 3,
+          "outcome": "win"
+        },
+        {
+          "code": "LYON",
+          "name": "LYON",
+          "wins": 1,
+          "outcome": "loss"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308429",
+      "start": "2026-03-21T13:00:00Z",
+      "state": "completed",
+      "block": "Halbfinale",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "G2",
+          "name": "G2 Esports",
+          "wins": 3,
+          "outcome": "win"
+        },
+        {
+          "code": "GEN",
+          "name": "Gen.G Esports",
+          "wins": 0,
+          "outcome": "loss"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308423",
+      "start": "2026-03-21T18:00:00Z",
+      "state": "completed",
+      "block": "Halbfinale",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "JDG",
+          "name": "Beijing JDG Esports",
+          "wins": 0,
+          "outcome": "loss"
+        },
+        {
+          "code": "BLG",
+          "name": "BILIBILI GAMING",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    },
+    {
+      "id": "115570888977308435",
+      "start": "2026-03-22T13:00:00Z",
+      "state": "completed",
+      "block": "Finale",
+      "bestOf": 5,
+      "teams": [
+        {
+          "code": "G2",
+          "name": "G2 Esports",
+          "wins": 1,
+          "outcome": "loss"
+        },
+        {
+          "code": "BLG",
+          "name": "BILIBILI GAMING",
+          "wins": 3,
+          "outcome": "win"
+        }
+      ]
+    }
+  ]
+}
