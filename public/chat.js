@@ -209,6 +209,8 @@
     panel.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
     root.classList.toggle('chat-open', open);
+    document.documentElement.classList.toggle('chat-lock', open && phone.matches);
+    if (!open) picker = null;
     if (open) {
       render();
       fit();
@@ -221,6 +223,22 @@
     update();
   };
   toggle.addEventListener('click', () => setOpen(!open));
+  // Klick irgendwo in den Chat schließt die offene Emoji-Auswahl
+  panel.addEventListener('click', (e) => {
+    if (picker === null || e.target.closest('.chat-pick, .chat-react-add')) return;
+    picker = null;
+    const top = log.scrollTop;
+    render();
+    log.scrollTop = top;
+  });
+  // Scrollen im Chat bewegt nie die Seite dahinter: nur ein Verlauf (oder Eingabefeld) mit Überlänge darf scrollen
+  const scrollable = (el) => el && el.scrollHeight > el.clientHeight + 1;
+  const keep = (e) => {
+    const box = e.target.closest('.chat-log, textarea');
+    if (!scrollable(box)) e.preventDefault();
+  };
+  panel.addEventListener('touchmove', keep, { passive: false });
+  panel.addEventListener('wheel', keep, { passive: false });
   root.querySelector('[data-chat-close]').addEventListener('click', () => { setOpen(false); toggle.focus(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) setOpen(false); });
   // Eingabefeld wächst mit langen Texten (bis 5 Zeilen); Enter sendet (am PC macht Umschalt+Enter eine neue Zeile)
