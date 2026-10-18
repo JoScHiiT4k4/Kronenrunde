@@ -20,7 +20,6 @@ import {
   recordLoginFailure,
   registrationAllowed,
   requestPasswordLink,
-  resetCalendarToken,
   safeNext,
   sessionCookieName,
   SESSION_DAYS,
@@ -450,12 +449,6 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return redirect('/konto?bereich=profil&hinweis=anfrage-zurueckgezogen');
   });
 
-  router.post('/konto/kalender/token-neu', async (ctx) => {
-    if (!ctx.user) return loginRedirect(ctx);
-    await resetCalendarToken(ctx.deps.db, ctx.user.id);
-    return redirect('/konto?bereich=profil&hinweis=kalender-link-neu');
-  });
-
   router.post('/konto/benachrichtigung', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     const h = intField(ctx.form.get('stunden') || '0', 0, 168);
@@ -811,20 +804,13 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
   <h2>Kalender-Abo</h2>
   ${
     myLeagues.length
-      ? html`<p class="muted">Live-Link zum Abonnieren in Google/Apple Kalender & Co. – neue oder geänderte Termine (z. B. neu feststehende Turnierbaum-Spiele) holt sich dein Kalender danach von selbst, ohne dass du erneut etwas herunterladen musst.</p>
+      ? html`<p class="muted">Abonniere den Spielplan in Google/Apple Kalender & Co. – neue oder geänderte Termine (z. B. neu feststehende Turnierbaum-Spiele) holt sich dein Kalender danach von selbst. Jeder Termin erinnert dich 1 Stunde vorher und enthält Links zum Stream auf YouTube und Twitch.</p>
   <div class="stack">
     ${myLeagues.map(
-      (l, i) => html`<div class="copy-row">
-      <input type="text" readonly value="${calUrl(l.slug)}" id="cal-link-${i}" aria-label="Kalender-Link für ${l.name}">
-      <button type="button" class="btn" data-copy="cal-link-${i}">Kopieren</button>
-    </div>
-    <p class="muted"><small>${l.name}: <a href="${calUrl(l.slug).replace(/^https?:/, 'webcal:')}">direkt abonnieren</a> (öffnet die Kalender-App) oder den Link oben von Hand als Kalender-Abo eintragen.</small></p>`,
+      (l) => html`<a class="btn btn-primary" href="${calUrl(l.slug).replace(/^https?:/, 'webcal:')}">${myLeagues.length > 1 ? `${l.name}: ` : ''}Kalender abonnieren</a>`,
     )}
-  </div>
-  ${postButton(ctx, '/konto/kalender/token-neu', 'Neuen Link erstellen', {
-    cls: 'btn btn-quiet',
-    confirm: 'Die bisherigen Kalender-Links funktionieren danach nicht mehr – schon abonnierte Kalender müssten neu eingerichtet werden. Fortfahren?',
-  })}`
+    <small class="muted">Öffnet die Kalender-App auf diesem Gerät.</small>
+  </div>`
       : html`<p class="muted">Du bist noch in keiner Tipprunde.</p>`
   }
 </section>`;

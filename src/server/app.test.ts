@@ -478,11 +478,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal(viaField.location, `/beitreten/${invite}`);
   });
 
-  test('Kalender-Abo: login-freier Live-Link, nur bekannte Spiele, Fremde/falscher Token abgewiesen, neuer Link sperrt den alten', async () => {
+  test('Kalender-Abo: login-freier Live-Link, nur bekannte Spiele, Fremde/falscher Token abgewiesen', async () => {
     const konto = await anna.get('/konto?bereich=profil');
     assert.match(konto.text, /Kalender-Abo/);
-    const link = /https?:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec(konto.text)![0];
-    assert.match(konto.text, /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/);
+    assert.doesNotMatch(konto.text, /Neuen Link erstellen|cal-link-/);
+    const link = /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec(konto.text)![0];
     const path = new URL(link).pathname;
 
     // Login-frei abrufbar (kein Cookie!), nur Spiele mit bekannten Teams und Termin, nicht "offen"
@@ -498,16 +498,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await fetch(base + path.replace(/kalender\/[^/]+/, 'kalender/falscher-token'))).status, 404);
     const andererClient = new Client();
     await andererClient.login('fremd2@example.de', 'Fremd2');
-    const strangerLink = /https?:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec((await andererClient.get('/konto?bereich=profil')).text);
+    const strangerLink = /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec((await andererClient.get('/konto?bereich=profil')).text);
     assert.equal(strangerLink, null); // Fremde sind in keiner Runde, also kein Link
-
-    // Neuen Link erstellen: alter funktioniert nicht mehr
-    const renewed = await anna.post('/konto/kalender/token-neu');
-    assert.equal(renewed.location, '/konto?bereich=profil&hinweis=kalender-link-neu');
-    assert.equal((await fetch(base + path)).status, 404);
-    const neuerLink = /https?:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec((await anna.get('/konto?bereich=profil')).text)![0];
-    assert.notEqual(neuerLink, link);
-    assert.equal((await fetch(base + new URL(neuerLink).pathname)).status, 200);
   });
 
   test('Tippen: speichern, Format prüfen, Tipps der anderen erst ab Tippschluss', async () => {

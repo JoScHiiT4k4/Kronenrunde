@@ -20,10 +20,13 @@ test('buildIcs: ein Termin je Spiel, UTC-Zeitstempel, CRLF-Zeilenenden', () => {
   // Bo5 → 150 Minuten Dauer
   assert.match(ics, /DTEND:20261114T213000Z\r\n/);
   assert.match(ics, /SUMMARY:Gen\.G vs T1 \(Bo5\)\r\n/);
-  assert.match(ics, /DESCRIPTION:Worlds 2026 · Finale\r\n/);
-  // Ohne Phase keine DESCRIPTION-Zeile mit leerem Trenner
-  assert.doesNotMatch(ics, /DESCRIPTION:Worlds 2026 ·\r\n/);
-  assert.match(ics, /DESCRIPTION:Worlds 2026\r\n/);
+  const unfolded = ics.replace(/\r\n /g, '');
+  assert.match(unfolded, /DESCRIPTION:Worlds 2026 · Finale\\n\\nYouTube: https:\/\/www\.youtube\.com\/@lolesports\\nTwitch: https:\/\/www\.twitch\.tv\/riotgames\r\n/);
+  // Ohne Phase kein leerer Trenner
+  assert.doesNotMatch(unfolded, /DESCRIPTION:Worlds 2026 ·\\n/);
+  assert.match(unfolded, /DESCRIPTION:Worlds 2026\\n\\nYouTube:/);
+  // Erinnerung 1 Stunde vorher, je Termin
+  assert.equal((ics.match(/BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:[^\r]+\r\nTRIGGER:-PT1H\r\nEND:VALARM\r\nEND:VEVENT/g) ?? []).length, 2);
   // Alle Zeilen enden mit \r\n (keine nackten \n)
   assert.ok(!/[^\r]\n/.test(ics), 'nur CRLF, kein nacktes LF');
 });
