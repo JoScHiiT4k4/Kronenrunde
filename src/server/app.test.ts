@@ -16,7 +16,7 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
-import { matchdayRunning, runSync } from './abgleich.ts';
+import { type FetchJson, matchdayRunning, runSync } from './abgleich.ts';
 import { importTournament, type TournamentData } from './daten.ts';
 import { fakeRiot, lolesports, worldsSchedule } from './testdaten/fake-riot.ts';
 import { createDb, type Db, migrate } from './db/index.ts';
@@ -1343,6 +1343,51 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(swissPage.text, /Die Paarungen für Swiss stehen noch nicht fest/);
     assert.match(swissPage.text, /Freitag, 23\. Oktober/);
     assert.doesNotMatch(swissPage.text, /class="match/);
+  });
+
+  test('Spielplan-Abgleich: Turnier ohne eigenen Spielplan (z. B. LEC) bekommt Spiele, Phasen und Teams von lolesports', async () => {
+    const tid = (await db.one<{ id: string }>(
+      `insert into tournaments (name, starts_on, ends_on, source, external_id)
+       values ('LEC Abgleichtest', current_date - 1, current_date + 20, 'lolesports:lec', 'lec-abgleichtest') returning id`,
+    ))!.id;
+    const day = (n: number, h: number) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + n, h)).toISOString();
+    const team = (name: string, code: string, wins: number | null = null) => ({ name, code, result: wins === null ? null : { outcome: null, gameWins: wins } });
+    const lec = [
+      { startTime: day(0, 16), state: 'completed', type: 'match', blockName: 'Woche 1', match: { id: 'lec-1', teams: [team('G2 Esports', 'G2', 1), team('Abgleich Neuling', 'ABN', 0)], strategy: { type: 'bestOf', count: 1 } } },
+      { startTime: day(2, 17), state: 'unstarted', type: 'match', blockName: 'Woche 1', match: { id: 'lec-2', teams: [team('Karmine Corp', 'KC'), team('Abgleich Neuling', 'ABN')], strategy: { type: 'bestOf', count: 1 } } },
+      { startTime: day(9, 17), state: 'unstarted', type: 'match', blockName: 'Playoffs', match: { id: 'lec-3', teams: [team('TBD', 'TBD'), team('TBD', 'TBD')], strategy: { type: 'bestOf', count: 5 } } },
+    ];
+    const base = fakeRiot();
+    const get: FetchJson = async (url, headers) =>
+      url.includes('/getSchedule') && /leagueId=1(&|$)/.test(url)
+        ? { data: { schedule: { pages: { older: null, newer: null }, events: lec } } }
+        : base(url, headers);
+    try {
+      const first = await runSync(db, get, 'haeufig');
+      assert.ok(first[0].ok, first[0].details);
+      assert.match(first[0].details, /LEC Abgleichtest: 3 Spiele bei lolesports, 3 Spiele angelegt, 1 Teams angelegt/);
+      const rows = await db.query<{ stage: string; a: string | null; b: string | null; best_of: number; wins_a: number | null; status: string }>(
+        `select s.name as stage, ta.short_name as a, tb.short_name as b, m.best_of, m.wins_a, m.status
+           from matches m join stages s on s.id = m.stage_id
+           left join teams ta on ta.id = m.team_a_id left join teams tb on tb.id = m.team_b_id
+          where m.tournament_id = $1 order by m.scheduled_at`,
+        [tid],
+      );
+      assert.deepEqual(rows.map((r) => [r.stage, r.a, r.b, r.best_of, r.wins_a, r.status]), [
+        ['Woche 1', 'G2', 'ABN', 1, 1, 'finished'],
+        ['Woche 1', 'KC', 'ABN', 1, null, 'scheduled'],
+        ['Playoffs', null, null, 5, null, 'scheduled'],
+      ]);
+      // G2 und KC kennt die App schon von den Worlds – keine doppelten Teams
+      assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from teams where short_name = 'G2'`))!.n, 1);
+      // Nochmal: nichts doppelt
+      const second = await runSync(db, get, 'haeufig');
+      assert.doesNotMatch(second[0].details, /LEC Abgleichtest: [^·]*angelegt/);
+      assert.equal((await db.one<{ n: number }>('select count(*)::int as n from matches where tournament_id = $1', [tid]))!.n, 3);
+    } finally {
+      await db.run('delete from tournaments where id = $1', [tid]);
+      await db.run(`delete from teams where name = 'Abgleich Neuling'`);
+    }
   });
 
   test('Layout: Werbeflächen links und rechts', async () => {
