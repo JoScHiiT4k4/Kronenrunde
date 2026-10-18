@@ -419,6 +419,29 @@ document.querySelectorAll('details.top-search[data-search]').forEach((details) =
   });
 });
 
+// Teamname in der Spielzeile: auf einer Zeile, nie abgeschnitten. Reicht die Spaltenbreite nicht (kein
+// gepflegtes Kürzel, langer Name), wird die Schrift schrittweise verkleinert statt umzubrechen oder den
+// Namen am Rand abzuschneiden. Ohne JavaScript bleibt die normale Schriftgröße (siehe app.css).
+function fitTeamNames() {
+  document.querySelectorAll('.teams .team-a, .teams .team-b').forEach((el) => {
+    el.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    let size = base;
+    const min = Math.max(base * 0.4, 8);
+    while (el.scrollWidth > el.clientWidth + 1 && size > min) {
+      size -= 1;
+      el.style.fontSize = `${size}px`;
+    }
+  });
+}
+fitTeamNames();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTeamNames);
+let fitTeamNamesTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(fitTeamNamesTimer);
+  fitTeamNamesTimer = setTimeout(fitTeamNames, 100);
+});
+
 // Push-Benachrichtigungen im Konto: dieses Gerät an- und abmelden
 (function () {
   const box = document.querySelector('[data-push]');
