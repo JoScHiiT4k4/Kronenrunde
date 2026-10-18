@@ -455,6 +455,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal(manage.status, 200);
     invite = /\/beitreten\/([0-9a-f]+)/.exec(manage.text)![1];
     assert.match(manage.text, /QR-Code anzeigen/);
+    assert.match(manage.text, /Der Link gilt bis zum Start des ersten Spiels/);
     assert.match(manage.text, /<svg class="qr-code"/);
 
     // Fremde sehen die Runde nicht
@@ -849,6 +850,15 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const renew = await anna.post(`/r/${slug}/verwalten/einladung-neu`);
     assert.match(renew.location ?? "", /bereich=mitglieder&hinweis=link-erneuert/);
     assert.equal((await stranger.get(`/beitreten/${invite}`)).status, 404);
+    // Das Turnier hat begonnen: auch der neue Link ist abgelaufen
+    const members = await anna.get(`/r/${slug}/verwalten?bereich=mitglieder`);
+    assert.match(members.text, /Der Link ist abgelaufen/);
+    const fresh = /\/beitreten\/([0-9a-f]+)/.exec(members.text)![1];
+    const expired = await stranger.get(`/beitreten/${fresh}`);
+    assert.equal(expired.status, 410);
+    assert.match(expired.text, /Einladungslink ist abgelaufen/);
+    assert.equal((await stranger.post(`/beitreten/${fresh}`)).status, 410);
+    assert.equal((await stranger.get(`/r/${slug}/tippen`)).status, 404);
     const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
     await anna.post(`/r/${slug}/verwalten/mitglied/${benId}`, { aktion: 'admin' });
     assert.equal((await ben.get(`/r/${slug}/verwalten`)).status, 200);

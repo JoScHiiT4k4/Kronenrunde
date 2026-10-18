@@ -15,7 +15,7 @@ Tippspiel-Web-App für E-Sport-Turniere, zuerst League of Legends – erst für 
 Was die App kann:
 
 - **Anmelden mit E-Mail und Passwort**; „Passwort vergessen“ schickt einen Link per Mail. Beim Konto-Erstellen wählt man seinen Namen für die Rangliste.
-- **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person.
+- **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person. Der Link gilt nur bis zum Start des ersten Spiels, danach ist er abgelaufen. Das Konto hängt an keiner Tipprunde und bleibt nach deren Ende bestehen.
   Wer neue Tipprunden anlegen darf, stellt der Admin ein (Standard: nur Admins – für alle anderen ist der Knopf ausgeblendet).
 - **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
   Team A steht links auf der blauen Seite, Team B rechts auf der roten.

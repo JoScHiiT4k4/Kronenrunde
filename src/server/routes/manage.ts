@@ -110,6 +110,12 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
     [league.id],
   );
   const inviteLink = `${config.appUrl}/beitreten/${league.invite_code}`;
+  // Einladungslink gilt bis zum Anstoß des ersten Spiels (frühestes Turnier der Tipprunde)
+  const inviteUntil = tournaments.reduce<Date | null>(
+    (min, t) => (t.bonus_deadline_at && (!min || t.bonus_deadline_at < min) ? t.bonus_deadline_at : min),
+    null,
+  );
+  const inviteExpired = !!inviteUntil && inviteUntil <= ctx.now;
   const base = `/r/${league.slug}/verwalten`;
   const available = allTournaments.filter((t) => !tournaments.some((x) => x.id === t.id));
   const roleLabel: Record<string, string> = { owner: 'Spielleiter', admin: 'Mit-Spielleiter', member: 'Mitglied' };
@@ -300,6 +306,9 @@ ${area === 'mitglieder' ? html`
 <section class="panel">
   <h2>Leute einladen</h2>
   <p>Schick diesen Link an alle, die mittippen sollen. Wer ihn öffnet, meldet sich an und ist dabei.</p>
+  ${inviteExpired
+    ? html`<p class="lock">Der Link ist abgelaufen: Das Turnier hat am ${formatDateTime(inviteUntil!, tz)} Uhr begonnen, neue Mitglieder können nicht mehr beitreten.</p>`
+    : html`<p class="muted">Der Link gilt bis zum Start des ersten Spiels${inviteUntil ? ` (${formatDateTime(inviteUntil, tz)} Uhr)` : ''}.</p>`}
   <div class="copy-row">
     <input type="text" readonly value="${inviteLink}" id="invite-link" aria-label="Einladungslink">
     <button type="button" class="btn" data-copy="invite-link">Kopieren</button>
