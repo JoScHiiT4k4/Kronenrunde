@@ -478,7 +478,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
 .match-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.88rem; color: var(--muted); margin-bottom: 6px; }
 .match-meta .bo { font-weight: 700; color: var(--gold-text); }
-.match-lock { margin: -2px 0 8px; font-size: 0.88rem; color: var(--gold-text); }
 .live { color: var(--red); font-weight: 700; }
 
 .teams {
@@ -925,18 +924,42 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .tbar { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; flex: 1 1 auto; font-size: 0.9rem; }
 .tbar-label { color: var(--muted, #a09b8c); white-space: nowrap; }
 .tbar-count { font-family: var(--font-display); font-weight: 700; color: var(--gold-bright); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tbar-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; font-weight: 600; }
-.tbar-link:hover { color: var(--gold-bright); }
-.tbar-link .ico { width: 16px; height: 16px; fill: currentColor; }
 .tbar-live { display: inline-flex; align-items: center; gap: 6px; color: #3ddc84; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; text-shadow: 0 0 10px rgb(61 220 132 / 55%); }
 .tbar-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; animation: tbar-pulse 1.6s ease-in-out infinite; }
 @keyframes tbar-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .tbar-live::before { animation: none; } }
+/* „Live“ im Kopf und grünes „VS“ eines laufenden Spiels: Klick bietet Twitch oder YouTube an */
+.stream-pick { position: relative; }
+.stream-pick > summary { list-style: none; cursor: pointer; }
+.stream-pick > summary::-webkit-details-marker { display: none; }
+.stream-pick > summary::after, .stream-pick[open] > summary::after { content: none; display: none; }
+.vs-pick > summary.vs { padding: 0; gap: 0; display: grid; }
+.tbar-live { padding: 3px 8px; border: 1px solid rgb(61 220 132 / 45%); border-radius: 3px; }
+.stream-pick[open] > .tbar-live, .tbar-live:hover { border-color: #3ddc84; background: rgb(61 220 132 / 12%); }
+.vs-pick > .vs-live:hover, .vs-pick[open] > .vs-live { box-shadow: 0 0 0 1px var(--frame) inset, 0 0 18px rgb(61 220 132 / 70%); }
+.teams .mid .vs-pick { justify-self: center; }
+/* Die abgeschrägten Ecken der Spielkarte (clip-path) würden die Auswahl abschneiden – solange sie offen ist, ohne */
+.match:has(.vs-pick[open]) { clip-path: none; z-index: 5; }
+.stream-menu {
+  position: absolute; left: 50%; top: calc(100% + 8px); z-index: 25; transform: translateX(-50%);
+  display: flex; flex-direction: column; min-width: 150px;
+  background: var(--surface); border: 1px solid var(--frame); box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+.stream-menu a, .stream-link { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.stream-menu a { padding: 10px 14px; font-family: var(--font-body); font-size: 0.95rem; letter-spacing: 0; text-transform: none; }
+.stream-menu a + a { border-top: 1px solid var(--line); }
+.stream-menu a:hover, .stream-link:hover { color: var(--gold-bright); }
+.stream-menu .ico, .stream-link .ico { flex: none; width: 16px; height: 16px; fill: currentColor; }
+/* Livestream-Links in der Fußzeile, über dem Hinweis zum Fan-Projekt */
+.foot .foot-streams { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 20px; margin-bottom: 10px; }
+
 @media (max-width: 640px) {
-  .top { flex-wrap: wrap; }
-  .tbar { order: 3; flex-basis: 100%; }
   /* Am Handy ist das Suchfeld ein Overlay über die volle Breite statt einer schmalen Dropdown-Box. */
-  .top-search-panel { max-width: none; }
+  .top-search-panel { max-width: none; padding: 8px; }
+  .top-search-panel { left: 8px; right: 8px; }
+  .top-search-q { padding-left: 34px; padding-right: 8px; background-position: 9px center; }
+  /* Der Platzhalter („… Champions …“) passt auch auf schmalen Handys ganz hinein */
+  .top-search-q::placeholder { font-size: min(1rem, calc((100vw - 72px) / 21)); }
 }
 
 /* Suche im Kopf: Teams, Spieler, Teilnehmer, Champions – zwischen Logo und Turnier-Leiste, am Handy
@@ -971,6 +994,17 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 }
 .top-search-q::placeholder { color: var(--muted); }
 .top-search-q:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgb(200 170 110 / 30%); }
+/* PC und Desktop-App: Das Feld fährt auf Höhe der Lupe rechts daneben zur Seite aus (Position setzt app.js),
+   die Treffer stehen in einer eigenen Box darunter. */
+@media (min-width: 641px) {
+  .top-search-panel { max-width: none; padding: 0; background: none; border: 0; }
+  .top-search-q { min-height: 34px; height: 34px; padding-top: 0; padding-bottom: 0; }
+  .top-search-panel .top-search-results { margin-top: 6px; padding: 10px; background: var(--surface); border: 1px solid var(--frame); }
+}
+@media (min-width: 641px) and (prefers-reduced-motion: no-preference) {
+  .top-search[open] .top-search-panel form { animation: ts-slide 0.2s ease-out; }
+}
+@keyframes ts-slide { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 .top-search-results { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-height: 60vh; overflow-y: auto; }
 .top-search-results[hidden] { display: none; }
 .ts-group-title { margin: 0 0 4px; font-size: 0.78rem; letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
@@ -993,6 +1027,12 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .foot-links a { color: var(--muted); }
 .foot-links a:hover { color: var(--gold-bright); }
 .legal h2 { margin-top: 1.4em; font-size: 1.05rem; }
+/* FAQ: jede Frage klappt einzeln auf */
+.faq-item { border-top: 1px solid var(--line); }
+.faq-item:last-child { border-bottom: 1px solid var(--line); }
+.faq-item > summary { padding: 12px 0; color: var(--gold-text); }
+.faq-item[open] > summary { color: var(--gold-bright); }
+.faq-item > p { margin: 0 0 14px; }
 .placeholder { background: rgb(200 170 110 / 25%); color: var(--text); padding: 0 4px; }
 /* Profilbilder */
 .avatar { flex: none; border-radius: 50%; object-fit: cover; border: 1px solid var(--frame); background: var(--surface); }
@@ -1374,22 +1414,21 @@ a.rank-n:hover { color: var(--gold-bright); text-decoration: underline; }
     background: var(--red); color: #fff; font-size: 0.75rem; line-height: 1.5;
   }
 
-  /* Kopfzeile: Logo links, Profilname und Abmelden rechts daneben; Spielleiter/Administrator wandert in eine eigene Zeile darunter */
-  .top { flex-wrap: wrap; row-gap: 8px; }
-  .brand { font-size: 1rem; letter-spacing: 0.05em; gap: 8px; }
+  /* Kopfzeile: Zeile 1 „Kronenrunde“ links, rechts Suchen, Mein Konto, Abmelden (alle mit Rahmen, ohne Namen);
+     Zeile 2 mittig Turniername und Countdown bzw. „Live“; ggf. Zeile 3 die Auswahl der Tipprunde. */
+  .top { flex-wrap: wrap; column-gap: 8px; row-gap: 6px; padding: max(6px, env(safe-area-inset-top)) 12px 8px; }
+  .brand { order: 1; margin-right: auto; font-size: 1rem; letter-spacing: 0.05em; gap: 8px; }
   .brand img { width: 26px; height: 26px; }
+  .top-search { order: 2; }
   .top-nav { display: contents; }
-  .top-nav > a:not(.role-single) { order: 1; margin-left: auto; max-width: 30vw; font-size: 0.95rem; }
-  .top-nav > .top-logout { order: 2; flex: none; }
-  .tbar { order: 3; flex-basis: 100%; }
-  .top-nav > .role-switch, .top-nav > .role-single {
-    order: 4; flex: 0 1 auto; position: relative;
-    margin-top: 0;
-  }
-  .top-nav > .role-single { display: block; }
-  .top-nav > .league-switch { margin-right: 8px; }
-  .top-nav > .role-switch > summary { justify-content: flex-start; }
-  .top-nav .role-menu { right: auto; left: 0; top: calc(100% + 2px); }
+  .top-nav > a:not(.role-single) { order: 3; flex: none; font-size: 0.95rem; }
+  .top-nav > a.top-user { justify-content: center; width: 34px; height: 34px; border: 1px solid var(--frame); color: var(--muted); }
+  .top-nav > a.top-user:hover { color: var(--gold-bright); border-color: var(--gold); }
+  .top-user-name { display: none; }
+  .top-nav > .top-logout { order: 4; flex: none; }
+  .tbar { order: 5; flex-basis: 100%; gap: 10px; }
+  .top-nav > .league-switch { order: 6; flex-basis: 100%; display: flex; justify-content: center; position: relative; }
+  .top-nav .role-menu { right: auto; left: 50%; transform: translateX(-50%); top: calc(100% + 2px); }
 }
 
 /* Fortschritt: grün = erledigt, rot = offen */

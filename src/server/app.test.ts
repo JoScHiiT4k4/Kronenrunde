@@ -720,7 +720,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const before = await anna.get(`/r/${slug}/tippen`);
     assert.match(before.text, /class="tbar-label">[^<]+ in<\/span>\s*<time class="tbar-count"/);
     assert.match(before.text, /data-countdown="/);
-    assert.match(before.text, /twitch\.tv/, 'Links gibt es schon vor dem Start');
+    assert.match(before.text, /class="foot-streams">[\s\S]*?twitch\.tv/, 'Links stehen in der Fußzeile, schon vor dem Start');
+    assert.doesNotMatch(before.text, /class="tbar-link"/, 'keine Stream-Links mehr im Kopf');
     await restore();
 
     // Turnier läuft, heute kein Spiel: Countdown bis zu den nächsten Begegnungen, ohne "in" und ohne "Live"
@@ -736,7 +737,8 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await db.run(`update matches set status = 'live' where id = $1`, [open[0].id]);
     try {
       const live = await anna.get(`/r/${slug}/tippen`);
-      assert.match(live.text, /<span class="tbar-live">Live<\/span>/);
+      // „Live“ ist anklickbar und bietet Twitch und YouTube an
+      assert.match(live.text, /<details class="stream-pick" data-stream-pick>\s*<summary class="tbar-live"[^>]*>Live<\/summary>\s*<div class="stream-menu"[^>]*>\s*<a href="https:\/\/www\.twitch\.tv\/riotgames"[\s\S]*?<a href="https:\/\/www\.youtube\.com\/@lolesports"/);
       assert.doesNotMatch(live.text, /data-countdown/);
     } finally {
       await db.run(`update matches set status = 'scheduled' where id = $1`, [open[0].id]);
@@ -761,6 +763,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(pub.text, /Name fehlt noch/);
     assert.match(pub.text, /href="\/datenschutz"/, 'Footer-Links');
     assert.equal((await new Client().get('/datenschutz')).status, 200);
+    assert.match(pub.text, /href="\/datenschutz">Datenschutz<\/a> · <a href="\/faq">FAQ<\/a>/, 'FAQ neben Datenschutz');
+    const faq = await new Client().get('/faq');
+    assert.equal(faq.status, 200);
+    assert.match(faq.text, /<h1>Häufige Fragen<\/h1>/);
+    assert.ok((faq.text.match(/class="faq-item"/g) ?? []).length >= 10);
     assert.equal((await anna.get('/admin/rechtliches')).status, 404, 'normale Nutzer: nicht vorhanden');
     assert.equal((await anna.post('/admin/rechtliches', { name: 'X' })).status, 404);
     const adm = await admin.post('/admin/rechtliches', { name: 'Max <b>Muster', email: 'kontakt@example.de', street: 'Weg 1', city: '12345 Stadt', country: 'Deutschland', hosting: 'Eigener Server' });
@@ -1695,6 +1702,10 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const stats = await admin.get(`/r/${slug}/statistiken?turnier=${tid}`);
     assert.equal(stats.status, 200);
     assert.match(stats.text, /<a href="\/r\/[a-z0-9-]+\/statistiken" aria-current="page">Statistiken<\/a>/);
+    // Handy-Menü: „Mein Konto“ direkt nach Statistiken (nur im Dropdown, nicht in den Reitern am PC)
+    const mMenu = stats.text.slice(stats.text.indexOf('m-menu-league-tabs'));
+    assert.match(mMenu, /Statistiken<\/a><a href="\/konto">Mein Konto<\/a>/);
+    assert.doesNotMatch(stats.text.slice(stats.text.indexOf('class="tabs'), stats.text.indexOf('m-menu-league-tabs')), /Mein Konto/);
     assert.doesNotMatch(stats.text, /Maps gespielt|Maps pro Serie/);
     assert.match(stats.text, /class="filter-bar" data-filter="st-teams"/);
     assert.match(stats.text, /<h1 class="bk-title">Statistiken – Worlds 2026<\/h1>/);
@@ -1940,7 +1951,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
       };
       const liveRow = section(live);
       const openRow = section(open);
-      assert.match(liveRow, /<span class="vs vs-live"[^>]*>VS<\/span>/, 'laufendes Spiel: VS mit grüner Live-Kennzeichnung');
+      assert.match(liveRow, /<details class="stream-pick vs-pick" data-stream-pick>\s*<summary class="vs vs-live"[^>]*>VS<\/summary>[\s\S]*?twitch\.tv[\s\S]*?youtube\.com/, 'laufendes Spiel: grünes VS, anklickbar mit Auswahl Twitch/YouTube');
       // Das offene (nicht laufende) Spiel bekommt kein grünes VS
       assert.match(openRow, /<span class="vs">VS<\/span>/);
       // Beide Spiele (mit und ohne Tipps bisher) reservieren die %-Spalten, damit VS/Ergebnis immer mittig bleibt

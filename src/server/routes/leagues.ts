@@ -14,7 +14,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDate, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing, raw } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, tabMenu } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, streamPick, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { standingsShareCard } from '../views/standings-share-card.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
@@ -338,15 +338,12 @@ function groupMatchdays(matches: MatchRow[], tz: string): Matchday[] {
 function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?: Shares | null, tipped?: string, reveal = false): { meta: Html; teams: Html } {
   const tz = ctx.deps.config.timeZone;
   const teamsKnown = !!(m.team_a_id && m.team_b_id);
-  // Bei "automatisch" schließen die weiteren Spiele eines Tages, sobald das Spiel davor vorbei ist
-  const autoLock = open && league.lock_mode === 'auto' && m.has_prev && m.scheduled_at;
   const meta = html`<div class="match-meta">
     <span>${m.scheduled_at ? formatTime(m.scheduled_at, tz) : 'Termin offen'}</span>
     <span class="bo">Bo${m.best_of}</span>
     ${m.stage ? html`<span>${stageLabel(m.stage)}</span>` : nothing}
     ${tipped ? html`<span class="tipped">(${tipped})</span>` : nothing}
-  </div>
-  ${autoLock ? html`<p class="match-lock">Tippschluss, sobald das Spiel davor vorbei ist – spätestens ${formatTime(m.scheduled_at!, tz)} Uhr</p>` : nothing}`;
+  </div>`;
   // Gewinnchance (aus den Tipps der Runde) – erst ab Tippschluss, wenn alle Tipps sichtbar sind. Die Spanne
   // bleibt immer stehen (auch ohne Zahl), damit die Mitte (VS/Ergebnis) nicht je nach Tippschluss wandert.
   // Die Zahl steht in einer eigenen, fest breiten Spanne (.pct-num): rechtsbündige Textausrichtung allein
@@ -375,7 +372,11 @@ function matchHead(ctx: Ctx, league: League, m: MatchRow, open: boolean, shares?
     : null;
   // Innen: Gewinnchance, in der Mitte „VS“ bzw. das verdeckte Ergebnis. Läuft das Spiel noch ohne
   // Ergebnis, bekommt das Medaillon einen grünen Schimmer statt des separaten "läuft"-Texts.
-  const vs = html`<span class="vs${m.status === 'live' ? ' vs-live' : ''}"${attr(m.status === 'live', 'aria-label="Läuft"')}>VS</span>`;
+  // Ein Klick auf das grüne VS bietet Twitch und YouTube an – vorher ist es nicht anklickbar.
+  const vs =
+    m.status === 'live'
+      ? streamPick(ctx, html`<summary class="vs vs-live" aria-label="Läuft – Livestream ansehen" title="Livestream ansehen">VS</summary>`, 'vs-pick')
+      : html`<span class="vs">VS</span>`;
   // Titel mit vollem Teamnamen: hilfreich, falls der Name (ohne Kürzel) abgeschnitten wird (siehe .team-a/.team-b).
   const teamTitle = (name: string | null) => (name ? html` title="${name}"` : nothing);
   const teams = html`<div class="teams">
