@@ -60,14 +60,29 @@ jobs:
           docker exec pi git config --system --add safe.directory '*'
 
       - name: Homebridge installieren (wie auf Homebridge OS)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          docker exec pi bash -euo pipefail -c '
-            curl -sSfL https://repo.homebridge.io/KEY.gpg | gpg --dearmor > /usr/share/keyrings/homebridge.gpg
+          # Paketquelle von Homebridge (mit Wiederholungen); ist sie nicht erreichbar, dasselbe Paket
+          # aus den GitHub-Releases von homebridge-apt-pkg – sonst wird jeder PR rot, wenn deren Server hängt
+          if ! docker exec pi bash -euo pipefail -c '
+            curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 https://repo.homebridge.io/KEY.gpg | gpg --dearmor > /usr/share/keyrings/homebridge.gpg
             echo "deb [signed-by=/usr/share/keyrings/homebridge.gpg] https://repo.homebridge.io stable main" \
               > /etc/apt/sources.list.d/homebridge.list
             apt-get update -q
             DEBIAN_FRONTEND=noninteractive apt-get install -y -q homebridge >/dev/null
-          '
+          '; then
+            echo "::warning::repo.homebridge.io nicht erreichbar – Homebridge aus den GitHub-Releases"
+            docker exec pi rm -f /etc/apt/sources.list.d/homebridge.list
+            url=$(gh api repos/homebridge/homebridge-apt-pkg/releases/latest \
+              --jq '[.assets[] | select(.name | endswith("_amd64.deb"))][0].browser_download_url')
+            curl -sSfL --retry 3 -o /tmp/homebridge.deb "$url"
+            docker cp /tmp/homebridge.deb pi:/tmp/homebridge.deb
+            docker exec pi bash -euo pipefail -c '
+              apt-get update -q
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -q /tmp/homebridge.deb >/dev/null
+            '
+          fi
           for _ in $(seq 60); do docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581 && break; sleep 2; done
           docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581
           docker exec pi /opt/homebridge/bin/node -v | tee /tmp/homebridge-node-vorher
