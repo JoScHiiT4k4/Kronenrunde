@@ -138,19 +138,25 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
   registerLegalRoutes(router);
   registerAvatarRoutes(router);
 
+  // Symbole mit Versionsnummer in der Adresse: Ändert sich das Bild, holen Browser und installierte Apps das neue.
+  // related_applications: damit die Seite per getInstalledRelatedApps() erkennt, dass sie schon installiert ist.
   const manifest = JSON.stringify({
+    id: '/',
     name: config.appName,
     short_name: config.appName,
     start_url: '/',
+    scope: '/',
     display: 'standalone',
     background_color: '#07111c',
     theme_color: '#07111c',
     lang: 'de',
     icons: [
-      { src: '/static/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/static/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { src: deps.asset('icon.svg'), sizes: 'any', type: 'image/svg+xml' },
+      { src: deps.asset('icon-192.png'), sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: deps.asset('icon-512.png'), sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: deps.asset('icon-maskable-512.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: deps.asset('icon.svg'), sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
     ],
+    related_applications: [{ platform: 'webapp', url: `${config.appUrl}/manifest.webmanifest` }],
   });
 
   // Hinweisseite ohne Internet (der Service Worker hält sie bereit)

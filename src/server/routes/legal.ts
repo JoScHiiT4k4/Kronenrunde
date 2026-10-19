@@ -68,7 +68,7 @@ async function datenschutz(ctx: Ctx): Promise<Res> {
   <p><strong>Server-Protokolle:</strong> Beim Aufruf der Seite können technisch notwendige Daten (IP-Adresse, Zeitpunkt, aufgerufene Seite) kurzzeitig im Protokoll des Servers stehen. Sie dienen dem sicheren Betrieb (Art. 6 Abs. 1 lit. f DSGVO).</p>
 
   <h2>3. Cookies und lokaler Speicher</h2>
-  <p>Wir setzen ein technisch notwendiges Sitzungs-Cookie, damit du angemeldet bleibst. Zusätzlich merkt sich dein Browser lokal, ob du den Hinweis „Zum Startbildschirm hinzufügen“ schon beantwortet hast. Es gibt kein Tracking und keine Werbe-Cookies.</p>
+  <p>Wir setzen ein technisch notwendiges Sitzungs-Cookie, damit du angemeldet bleibst. Zusätzlich merkt sich dein Browser lokal, ob du den Hinweis „Zum Startbildschirm hinzufügen“ schon beantwortet hast und ob die App auf dem Gerät installiert ist. Es gibt kein Tracking und keine Werbe-Cookies.</p>
 
   <h2>4. Hosting</h2>
   <p>${val(l.hosting, 'Hosting-Angabe')}</p>
