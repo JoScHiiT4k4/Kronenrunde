@@ -272,7 +272,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const mismatch = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT + 'x' });
     assert.match(mismatch.text, /nicht gleich/);
     const changed = await reset.post('/konto/passwort', { current: 'ganz-neues-passwort', password: PASSWORT, password2: PASSWORT });
-    assert.equal(changed.location, '/konto?bereich=sicherheit&hinweis=passwort-gespeichert');
+    assert.equal(changed.location, '/konto?bereich=konto&hinweis=passwort-gespeichert');
     anna.cookies.clear();
     assert.equal((await anna.login('anna@example.de')).location, '/');
 
@@ -285,13 +285,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match((await anna.post('/konto/email', { email: 'kaputt', current: PASSWORT })).text, /gültige E-Mail/);
     await db.run(`insert into users (email, display_name) values ('vergeben@example.de', 'Vergeben')`);
     const sentBefore = mailer.sent!.length;
-    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?bereich=sicherheit&hinweis=email-gesendet');
+    assert.equal((await anna.post('/konto/email', { email: 'vergeben@example.de', current: PASSWORT })).location, '/konto?bereich=konto&hinweis=email-gesendet');
     assert.equal(mailer.sent!.length, sentBefore, 'vergebene Adresse: keine Mail, aber auch kein Hinweis darauf');
-    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?bereich=sicherheit&hinweis=email-gesendet');
+    assert.equal((await anna.post('/konto/email', { email: 'anna.neu@example.de', current: PASSWORT })).location, '/konto?bereich=konto&hinweis=email-gesendet');
     const cm = [...mailer.sent!].reverse().find((m) => m.to === 'anna.neu@example.de')!;
     const confirm = new URL(/https?:\/\/[^\s]+\/konto\/email-bestaetigen\?[^\s]+/.exec(cm.text)![0]);
     assert.equal((await new Client().get(confirm.pathname + confirm.search)).status, 303, 'ohne Anmeldung nicht einlösbar');
-    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?bereich=sicherheit&hinweis=email-geaendert');
+    assert.equal((await anna.get(confirm.pathname + confirm.search)).location, '/konto?bereich=konto&hinweis=email-geaendert');
     assert.equal((await anna.get(confirm.pathname + confirm.search)).status, 400, 'Link gilt nur einmal');
     assert.equal((await new Client().post('/anmelden', { email: 'anna.neu@example.de', password: PASSWORT })).status, 303);
     assert.equal((await new Client().post('/anmelden', { email: 'anna@example.de', password: PASSWORT })).status, 400);
@@ -378,7 +378,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Ausschalten
     await two.refresh();
     const off = await two.post('/konto/2fa/deaktivieren', { current: PASSWORT });
-    assert.equal(off.location, '/konto?bereich=sicherheit&hinweis=2fa-deaktiviert');
+    assert.equal(off.location, '/konto?bereich=konto&hinweis=2fa-deaktiviert');
     assert.match((await two.get('/konto?bereich=sicherheit')).text, /action="\/konto\/2fa\/einrichten"/);
     // Ab jetzt wieder normale Anmeldung ohne Code
     await two.post('/abmelden');
@@ -479,7 +479,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
   });
 
   test('Kalender-Abo: login-freier Live-Link, nur bekannte Spiele, Fremde/falscher Token abgewiesen', async () => {
-    const konto = await anna.get('/konto?bereich=profil');
+    const konto = await anna.get('/konto?bereich=app');
     assert.match(konto.text, /Kalender-Abo/);
     assert.doesNotMatch(konto.text, /Neuen Link erstellen|cal-link-/);
     const link = /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec(konto.text)![0];
@@ -498,7 +498,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await fetch(base + path.replace(/kalender\/[^/]+/, 'kalender/falscher-token'))).status, 404);
     const andererClient = new Client();
     await andererClient.login('fremd2@example.de', 'Fremd2');
-    const strangerLink = /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec((await andererClient.get('/konto?bereich=profil')).text);
+    const strangerLink = /webcal:\/\/[^\s"]+\/kalender\/[^\s"]+\/spielplan\.ics/.exec((await andererClient.get('/konto?bereich=app')).text);
     assert.equal(strangerLink, null); // Fremde sind in keiner Runde, also kein Link
   });
 
@@ -908,11 +908,14 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     }
     assert.equal((await db.one<{ n: number }>(`select count(*)::int as n from users where email = 'neu@example.de'`))!.n, 0);
     // Reiter im Konto
-    for (const [k, text] of [['profil', 'Profilbild'], ['benachrichtigungen', 'Benachrichtigungen'], ['sicherheit', 'Passwort ändern'], ['konto', 'Konto löschen']]) {
+    for (const [k, text] of [['profil', 'Profilbild'], ['app', 'data-install'], ['benachrichtigungen', 'Benachrichtigungen'], ['einstellungen', 'Spoilerschutz'], ['konto', 'Konto löschen']]) {
       const r = await anna.get(`/konto?bereich=${k}`);
       assert.match(r.text, new RegExp(text), k);
       assert.match(r.text, new RegExp(`<a href="/konto\\?bereich=${k}" aria-current="page">`), k);
     }
+    // Frühere Reiter Chat/Anzeige landen in den Einstellungen; „Desktop-App“ steht in der Fußzeile
+    assert.match((await anna.get('/konto?bereich=chat')).text, /<a href="\/konto\?bereich=einstellungen" aria-current="page">/);
+    assert.match((await anna.get('/konto')).text, /<a href="\/konto\?bereich=app" data-install>Desktop-App<\/a>/);
     // Namen sind gesperrt: Änderung wird beantragt und vom Spielleiter entschieden
     assert.equal((await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna Lena' })).status, 400);
     const asked = await anna.post('/konto/name', { display_name: 'Anna', first_name: 'Anna-Lena' });
@@ -1044,11 +1047,11 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const starred = JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1);
     assert.equal(starred.x, 'Du *****');
     assert.match((await anna.get('/konto?bereich=chat')).text, /name="filter" value="an" checked/);
-    assert.match((await anna.post('/konto/chat', { chat: 'aus', filter: 'aus' })).location ?? '', /bereich=chat/);
+    assert.match((await anna.post('/konto/chat', { chat: 'aus', filter: 'aus' })).location ?? '', /bereich=einstellungen/);
     assert.equal(JSON.parse((await anna.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1).x, 'Du Arsch');
     assert.equal(JSON.parse((await ben.get(`/r/${slug}/chat/nachrichten`)).text).messages.at(-1).x, 'Du *****', 'Ben behält seinen Filter');
     await anna.post('/konto/chat', { chat: 'aus', filter: 'an' });
-    assert.doesNotMatch((await anna.get('/konto?bereich=benachrichtigungen')).text, /Chat-Nachrichten/, 'Chat-Einstellungen sind im Reiter Chat');
+    assert.doesNotMatch((await anna.get('/konto?bereich=benachrichtigungen')).text, /Chat-Nachrichten/, 'Chat-Einstellungen sind im Reiter Einstellungen');
 
     // Mehrzeilig: Zeilenumbrüche bleiben, mehr als eine Leerzeile und Leerzeichen am Rand nicht
     const multi = JSON.parse((await anna.post(`/r/${slug}/chat`, { text: '  Zeile 1  \r\n\n\n\nZeile   2 ' })).text).message;

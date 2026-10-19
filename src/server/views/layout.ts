@@ -116,7 +116,7 @@ ${chatWidget(ctx)}
   ${ctx.isAdmin && !ctx.sidebar?.isTest ? html`<div class="foot-role">${roleSwitch(ctx, o.league)}</div>` : nothing}
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
-  <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></p>
+  <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a><span class="foot-app"> · <a href="/konto?bereich=app" data-install>Desktop-App</a></span></p>
   ${versionNote(ctx)}
 </footer>
 </body>

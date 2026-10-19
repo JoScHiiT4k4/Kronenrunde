@@ -27,7 +27,8 @@ Was die App kann:
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Kopfzeile:** Countdown bis zum Turnierstart, danach Links zu Twitch/YouTube (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`) und grünes „Live“, wenn gespielt wird.
 - **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin im Administrator-Bereich (Reiter Impressum und Datenschutz).
-- **Profilbild:** unter „Dein Konto“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.
+- **Dein Konto** mit fünf Reitern: Profil (Bild, Namen), App & Kalender (als App auf Startbildschirm/Desktop legen, Kalender-Abo), Benachrichtigungen, Einstellungen (Anzeige, Chat), Konto (E-Mail, Passwort, Zwei-Faktor, Abmelden, Löschen).
+- **Profilbild:** unter „Dein Konto → Profil“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.
 - **Gewinnchance:** Ab Tippschluss steht hinter jedem Team in Klammern der Anteil der Tipps (grün = höher, rot = niedriger).
 - **Verwalten** (Spielleiter der Tipprunde) mit Untermenü: Übersicht (Einladungslink, wer noch nicht getippt hat – ohne Tipp-Inhalte), Einstellungen, Turniere, Sonderfragen, Mitglieder.
 - **Admin** (Adressen aus `ADMIN_EMAILS`): Teams, Turniere, Spiele und Ergebnisse eintragen; festlegen, wer neue Tipprunden anlegen darf.
@@ -36,7 +37,7 @@ Was die App kann:
 - **Automatischer Abgleich mit Riot**: Paarungen, Ergebnisse und Anstoßzeiten alle 10 Minuten, an Spieltagen alle 2 (lolesports.com), Champion-Liste und Spielerkader alle 6 Stunden – Stand im Admin-Bereich, `tippspiel abgleich` von Hand.
 - **Auto-Update** auf dem Pi sofort per GitHub-Webhook und täglich 08:00, nur auf GitHub geprüfte Versionen (Zweig `stabil`).
 - **Konto löschen** jederzeit, mit allen Daten.
-- Läuft auf Handy und PC und lässt sich auf den Startbildschirm legen; dunkles Design mit Gold, blauer und roter Seite (eigene Formen, freie Schriften Cinzel und Barlow, keine Riot-Grafiken).
+- Läuft auf Handy und PC und lässt sich auf den Startbildschirm bzw. Desktop legen (Konto → App & Kalender oder „Desktop-App“ in der Fußzeile); dunkles Design mit Gold, blauer und roter Seite (eigene Formen, freie Schriften Cinzel und Barlow, keine Riot-Grafiken).
 
 Entscheidungen und Plan: siehe [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md).
 
