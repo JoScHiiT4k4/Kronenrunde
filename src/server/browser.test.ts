@@ -522,6 +522,14 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         const after = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
         if (after.scroll > after.inner + 1) problems.push(`${where} (auf): Seite ragt seitlich heraus (${after.scroll}px bei ${after.inner}px)`);
         if (!(await box('.top-search-q'))) problems.push(`${where} (auf): Eingabefeld erscheint nach dem Klick nicht`);
+        // Die Lupe bleibt beim Aufklappen unverändert: kein Dropdown-Pfeil, gleiche Größe.
+        const btn = await page.evaluate(() => {
+          const el = document.querySelector('.top-search-btn') as HTMLElement;
+          const r = el.getBoundingClientRect();
+          return { w: r.width, h: r.height, after: getComputedStyle(el, '::after').content };
+        });
+        if (btn.after !== 'none' && btn.after !== 'normal') problems.push(`${where} (auf): Lupe zeigt einen Dropdown-Pfeil (${btn.after})`);
+        if (btnClosed && Math.abs(btn.w - (btnClosed.right - btnClosed.left)) > 0.5) problems.push(`${where} (auf): Lupe ändert beim Aufklappen ihre Breite`);
         const brandAfter = await box('.brand');
         if (brand && brandAfter && Math.abs(brand.top - brandAfter.top) > 1) problems.push(`${where} (auf): Logo verschiebt sich durch das Aufklappen`);
         await page.close();

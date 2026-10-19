@@ -941,7 +941,11 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
   background: none; border: 1px solid var(--frame); color: var(--muted); cursor: pointer; list-style: none;
 }
 .top-search-btn::-webkit-details-marker { display: none; }
-.top-search-btn::after { content: none; }
+/* Kein Dropdown-Pfeil an der Lupe – auch nicht aufgeklappt (details[open] > summary::after wäre sonst stärker),
+   damit die Lupe in beiden Zuständen gleich aussieht und nicht gequetscht wird. */
+.top-search > .top-search-btn::after, .top-search[open] > .top-search-btn::after { content: none; display: none; }
+.top-search-btn { gap: 0; flex: none; }
+.top-search-btn .ico { flex: none; width: 18px; height: 18px; }
 .top-search:hover .top-search-btn, .top-search[open] .top-search-btn { color: var(--gold-bright); border-color: var(--gold); }
 /* position: fixed statt absolute, weil die Lupe nahe am linken Rand steht: ein an der Lupe verankertes
    Feld würde bei schmalen Bildschirmen seitlich herausragen. app.js setzt bei jedem Aufklappen passende
