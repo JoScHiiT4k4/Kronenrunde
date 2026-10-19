@@ -491,7 +491,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
        on conflict (user_id) do update set chat_push = $2, chat_filter = $3, updated_at = now()`,
       [ctx.user.id, ctx.form.get('chat') === 'an', ctx.form.get('filter') !== 'aus'],
     );
-    return redirect('/konto?bereich=chat&hinweis=chat-gespeichert');
+    return redirect('/konto?bereich=einstellungen&hinweis=chat-gespeichert');
   });
 
   router.post('/konto/anzeige', async (ctx) => {
@@ -501,7 +501,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
        on conflict (user_id) do update set spoiler_protection = $2, updated_at = now()`,
       [ctx.user.id, ctx.form.get('spoiler') !== 'aus'],
     );
-    return redirect('/konto?bereich=anzeige&hinweis=anzeige-gespeichert');
+    return redirect('/konto?bereich=einstellungen&hinweis=anzeige-gespeichert');
   });
 
   // Chat laut/stumm (Lautsprecher im Chat); gleicht sich mit der Einstellung unter Benachrichtigungen ab
@@ -532,7 +532,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     const { db } = ctx.deps;
     const row = await db.one<{ password_hash: string | null }>('select password_hash from users where id = $1', [ctx.user.id]);
     if (row?.password_hash && !(await verifyPassword(ctx.form.get('current') ?? '', row.password_hash))) {
-      return accountPage(ctx, 'Das bisherige Passwort stimmt nicht.', 'sicherheit');
+      return accountPage(ctx, 'Das bisherige Passwort stimmt nicht.', 'konto');
     }
     const password = ctx.form.get('password') ?? '';
     if (password !== (ctx.form.get('password2') ?? '')) return accountPage(ctx, 'Die beiden neuen Passwörter sind nicht gleich.', 'sicherheit');
@@ -540,7 +540,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     if (problem) return accountPage(ctx, problem, 'sicherheit');
     await setPassword(db, ctx.user.id, password);
     // Alle Sitzungen sind beendet (auch auf anderen Geräten) – hier gleich wieder anmelden
-    return signIn(ctx, ctx.user.id, '/konto?bereich=sicherheit&hinweis=passwort-gespeichert');
+    return signIn(ctx, ctx.user.id, '/konto?bereich=konto&hinweis=passwort-gespeichert');
   });
 
   router.post('/konto/email', async (ctx) => {
@@ -571,7 +571,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
 <p style="color:#666">Der Link gilt 60 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail einfach.</p>`;
       await mailer.send({ to: email, subject: `Neue E-Mail-Adresse bestätigen – ${config.appName}`, text, html: body.value });
     }
-    return redirect('/konto?bereich=sicherheit&hinweis=email-gesendet');
+    return redirect('/konto?bereich=konto&hinweis=email-gesendet');
   });
 
   router.get('/konto/email-bestaetigen', async (ctx) => {
@@ -590,7 +590,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
       if (e instanceof PgError && e.code === '23505') return accountPage(ctx, 'Diese E-Mail-Adresse ist inzwischen vergeben.', 'sicherheit');
       throw e;
     }
-    return redirect('/konto?bereich=sicherheit&hinweis=email-geaendert');
+    return redirect('/konto?bereich=konto&hinweis=email-geaendert');
   });
 
   async function checkCurrentPassword(ctx: Ctx): Promise<string | null> {
@@ -613,7 +613,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
   router.post('/konto/2fa/abbrechen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     await ctx.deps.db.run('update users set totp_secret = null where id = $1 and totp_enabled_at is null', [ctx.user.id]);
-    return redirect('/konto?bereich=sicherheit');
+    return redirect('/konto?bereich=konto');
   });
 
   router.post('/konto/2fa/bestaetigen', async (ctx) => {
@@ -641,7 +641,7 @@ export function registerAuthRoutes(router: Router<Ctx>) {
       await q.run('update users set totp_secret = null, totp_enabled_at = null where id = $1', [ctx.user!.id]);
       await q.run('delete from totp_backup_codes where user_id = $1', [ctx.user!.id]);
     });
-    return redirect('/konto?bereich=sicherheit&hinweis=2fa-deaktiviert');
+    return redirect('/konto?bereich=konto&hinweis=2fa-deaktiviert');
   });
 
   router.post('/konto/2fa/backup-codes-neu', async (ctx) => {
@@ -712,19 +712,24 @@ function welcomePage(ctx: Ctx, name: string, next: string, error?: string, first
   return htmlResponse(layout(ctx, { title: 'Willkommen', body, error }), error ? 400 : 200);
 }
 
+// Reihenfolge: Häufiges zuerst, Verwandtes zusammen; Zugangsdaten, Abmelden und Löschen ganz hinten unter „Konto“.
+// Höchstens fünf Reiter, damit sie am PC in eine Zeile passen.
 const ACCOUNT_AREAS = [
   ['profil', 'Profil'],
+  ['app', 'App & Kalender'],
   ['benachrichtigungen', 'Benachrichtigungen'],
-  ['chat', 'Chat'],
-  ['anzeige', 'Anzeige'],
-  ['sicherheit', 'E-Mail & Passwort'],
+  ['einstellungen', 'Einstellungen'],
   ['konto', 'Konto'],
 ] as const;
+
+/** Frühere Reiter (Chat, Anzeige, E-Mail & Passwort) sind zusammengelegt – alte Links bleiben gültig. */
+const ACCOUNT_ALIASES: Record<string, string> = { chat: 'einstellungen', anzeige: 'einstellungen', sicherheit: 'konto' };
 
 async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBackupCodes?: string[]): Promise<Res> {
   const user = ctx.user!;
   const { db } = ctx.deps;
-  const wanted = forced ?? ctx.query.get('bereich');
+  const asked = forced ?? ctx.query.get('bereich') ?? '';
+  const wanted = ACCOUNT_ALIASES[asked] ?? asked;
   const area = ACCOUNT_AREAS.find(([k]) => k === wanted)?.[0] ?? 'profil';
   const tabs = tabMenu('sub-tabs', 'Bereiche', ACCOUNT_AREAS.map(([k, label]) => ({ href: `/konto?bereich=${k}`, label, current: k === area })));
   let content: Html = nothing;
@@ -733,12 +738,6 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     const row = await db.one<{ avatar_updated_at: Date | null; first_name: string | null }>('select avatar_updated_at, first_name from users where id = $1', [user.id]);
     const pending = await db.one<{ new_display_name: string; new_first_name: string }>(`select new_display_name, new_first_name from name_requests where user_id = $1 and status = 'pending'`, [user.id]);
     const lastDecision = await db.one<{ status: string }>(`select status from name_requests where user_id = $1 and status <> 'pending' and decided_at > now() - interval '14 days' order by decided_at desc limit 1`, [user.id]);
-    const myLeagues = await db.query<{ slug: string; name: string }>(
-      `select l.slug, l.name from league_members m join leagues l on l.id = m.league_id where m.user_id = $1 order by m.joined_at`,
-      [user.id],
-    );
-    const calToken = myLeagues.length ? await calendarToken(db, user.id) : '';
-    const calUrl = (slug: string) => `${ctx.deps.config.appUrl}/r/${slug}/kalender/${calToken}/spielplan.ics`;
     content = html`<section class="panel">
   <h2>Profilbild</h2>
   <div class="avatar-edit">
@@ -799,6 +798,20 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     <button type="submit" class="btn">Vornamen speichern</button>
   </form>`
   }
+</section>`;
+  } else if (area === 'app') {
+    const myLeagues = await db.query<{ slug: string; name: string }>(
+      `select l.slug, l.name from league_members m join leagues l on l.id = m.league_id where m.user_id = $1 order by m.joined_at`,
+      [user.id],
+    );
+    const calToken = myLeagues.length ? await calendarToken(db, user.id) : '';
+    const calUrl = (slug: string) => `${ctx.deps.config.appUrl}/r/${slug}/kalender/${calToken}/spielplan.ics`;
+    content = html`<section class="panel" data-install-section>
+  <h2>Als App speichern</h2>
+  <p class="muted">Leg die Kronenrunde auf den Startbildschirm deines Handys oder auf den Desktop deines PCs – dann startest du sie wie eine App.</p>
+  <button type="button" class="btn btn-primary" data-install hidden>Desktop-App installieren</button>
+  <p class="muted" data-install-done hidden>Du nutzt die Kronenrunde gerade schon als App.</p>
+  <noscript><p class="muted">Im Browser-Menü (⋮ oder ⋯) „App installieren“ bzw. „Zum Startbildschirm hinzufügen“ wählen.</p></noscript>
 </section>
 <section class="panel">
   <h2>Kalender-Abo</h2>
@@ -845,9 +858,23 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     <input type="hidden" name="_csrf" value="${ctx.csrf}" data-push-csrf>
   </div>
 </section>`;
-  } else if (area === 'chat') {
+  } else if (area === 'einstellungen') {
     const prefs = (await db.one<{ chat_push: boolean; chat_filter: boolean }>('select chat_push, chat_filter from notification_prefs where user_id = $1', [user.id])) ?? { chat_push: false, chat_filter: true };
+    const display = await db.one<{ spoiler_protection: boolean }>('select spoiler_protection from notification_prefs where user_id = $1', [user.id]);
+    const on = display?.spoiler_protection ?? true;
     content = html`<section class="panel">
+  <h2>Anzeige</h2>
+  <form method="post" action="/konto/anzeige" class="stack">
+    ${csrfField(ctx)}
+    <fieldset class="field lead-field">
+      <legend>Spoilerschutz bei Ergebnissen</legend>
+      <label class="check"><input type="radio" name="spoiler" value="an"${on ? html` checked` : nothing}> An: Ergebnisse sind verdeckt, bis du sie antippst <small class="muted">(Standard)</small></label>
+      <label class="check"><input type="radio" name="spoiler" value="aus"${on ? nothing : html` checked`}> Aus: Ergebnisse immer sichtbar</label>
+    </fieldset>
+    <button type="submit" class="btn">Speichern</button>
+  </form>
+</section>
+<section class="panel">
   <h2>Chat</h2>
   <form method="post" action="/konto/chat" class="stack">
     ${csrfField(ctx)}
@@ -865,22 +892,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     <button type="submit" class="btn">Speichern</button>
   </form>
 </section>`;
-  } else if (area === 'anzeige') {
-    const prefs = await db.one<{ spoiler_protection: boolean }>('select spoiler_protection from notification_prefs where user_id = $1', [user.id]);
-    const on = prefs?.spoiler_protection ?? true;
-    content = html`<section class="panel">
-  <h2>Anzeige</h2>
-  <form method="post" action="/konto/anzeige" class="stack">
-    ${csrfField(ctx)}
-    <fieldset class="field lead-field">
-      <legend>Spoilerschutz bei Ergebnissen</legend>
-      <label class="check"><input type="radio" name="spoiler" value="an"${on ? html` checked` : nothing}> An: Ergebnisse sind verdeckt, bis du sie antippst <small class="muted">(Standard)</small></label>
-      <label class="check"><input type="radio" name="spoiler" value="aus"${on ? nothing : html` checked`}> Aus: Ergebnisse immer sichtbar</label>
-    </fieldset>
-    <button type="submit" class="btn">Speichern</button>
-  </form>
-</section>`;
-  } else if (area === 'sicherheit') {
+  } else {
     const hasPassword = !!(await db.one<{ x: number }>('select 1 as x from users where id = $1 and password_hash is not null', [user.id]));
     const totpRow = await db.one<{ totp_secret: string | null; totp_enabled_at: Date | null }>('select totp_secret, totp_enabled_at from users where id = $1', [user.id]);
     const totpEnabled = !!totpRow?.totp_enabled_at;
@@ -971,12 +983,6 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
   </div>`
       : nothing
   }
-</section>`;
-  } else {
-    content = html`<section class="panel" data-install-section hidden>
-  <h2>Aufs Handy oder den Desktop legen</h2>
-  <p class="muted">Dann startest du das Tippspiel wie eine App.</p>
-  <button type="button" class="btn" data-install>Zum Startbildschirm hinzufügen</button>
 </section>
 <section class="panel">
   <h2>Abmelden</h2>

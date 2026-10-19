@@ -154,7 +154,7 @@ if ('serviceWorker' in navigator) {
   };
 
   function show(kind, force) {
-    if (sheet || standalone || !loggedIn || (!force && quiet())) return;
+    if (sheet || standalone || (!force && (!loggedIn || quiet()))) return;
     sheet = el('div', 'install-sheet');
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-labelledby', 'install-title');
@@ -164,7 +164,7 @@ if ('serviceWorker' in navigator) {
     icon.alt = '';
     icon.width = 48;
     icon.height = 48;
-    const title = el('h2', null, 'Aufs Handy legen');
+    const title = el('h2', null, 'Als App speichern');
     title.id = 'install-title';
     head.append(icon, title);
     sheet.append(head);
@@ -176,7 +176,7 @@ if ('serviceWorker' in navigator) {
       close();
     });
     if (kind === 'android') {
-      sheet.append(el('p', null, 'Dann startest du das Tippspiel wie eine App direkt vom Startbildschirm.'));
+      sheet.append(el('p', null, 'Dann startest du das Tippspiel wie eine App direkt vom Startbildschirm oder Desktop.'));
       const add = el('button', 'btn btn-primary', 'Hinzufügen');
       add.type = 'button';
       add.addEventListener('click', async () => {
@@ -218,12 +218,22 @@ if ('serviceWorker' in navigator) {
   });
   if (isIOS) setTimeout(() => show('ios'), 1500);
 
-  // Knopf auf der Kontoseite
-  const section = document.querySelector('[data-install-section]');
-  if (section && !standalone) {
-    section.hidden = false;
-    section.querySelector('[data-install]').addEventListener('click', () => show(deferred ? 'android' : isIOS ? 'ios' : 'other', true));
+  // Knopf unter „Mein Konto → App & Kalender“ und Link „Desktop-App“ in der Fußzeile
+  const open = () => show(deferred ? 'android' : isIOS ? 'ios' : 'other', true);
+  for (const button of document.querySelectorAll('[data-install]')) {
+    if (standalone) {
+      const foot = button.closest('.foot-app');
+      if (foot) foot.hidden = true; // läuft schon als App: Fußzeilen-Link ausblenden
+      continue;
+    }
+    button.hidden = false;
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      open();
+    });
   }
+  const done = document.querySelector('[data-install-done]');
+  if (done && standalone) done.hidden = false;
 })();
 
 // Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann steht dort "Live" bzw. der nächste Countdown)
