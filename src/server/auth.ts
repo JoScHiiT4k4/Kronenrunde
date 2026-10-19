@@ -190,6 +190,18 @@ function ipAllowed(ip: string): boolean {
   return true;
 }
 
+const ipPasskeyChallenges = new Map<string, number[]>();
+
+/** Höchstens 60 Passkey-Challenges pro Internet-Adresse in 15 Minuten (Anmelden geht auch ohne Konto). */
+export function passkeyChallengeAllowed(ip: string): boolean {
+  const since = Date.now() - 15 * 60_000;
+  const hits = (ipPasskeyChallenges.get(ip) ?? []).filter((t) => t > since);
+  if (hits.length >= 60) return false;
+  ipPasskeyChallenges.set(ip, [...hits, Date.now()]);
+  if (ipPasskeyChallenges.size > 10_000) ipPasskeyChallenges.clear();
+  return true;
+}
+
 const ipRegistrations = new Map<string, number[]>();
 
 /** Höchstens 10 neue Konten pro Internet-Adresse und Stunde. */

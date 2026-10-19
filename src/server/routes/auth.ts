@@ -14,6 +14,7 @@ import {
   loginWithPassword,
   newToken,
   normalizeEmail,
+  passkeyChallengeAllowed,
   PASSWORD_MAX,
   PASSWORD_MIN,
   passwordProblem,
@@ -27,7 +28,7 @@ import {
   hashToken,
   verifyPassword,
 } from '../auth.ts';
-import { PgError } from '../db/index.ts';
+import { type Db, PgError } from '../db/index.ts';
 import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
 import { htmlResponse, redirect, type Res, type Router, serializeCookie, withCookie } from '../http.ts';
@@ -35,6 +36,7 @@ import { avatar, csrfField, layout, postButton, tabMenu } from '../views/layout.
 import { qrSvg } from '../views/qr-svg.ts';
 import { leadLabel } from '../benachrichtigung.ts';
 import { generateBackupCodes, generateTotpSecret, hashBackupCode, totpProvisioningUri, totpValid } from '../totp.ts';
+import { b64url, fromB64url, relyingParty, SUPPORTED_ALGS, verifyAssertion, verifyRegistration, WebAuthnError } from '../webauthn.ts';
 import { loadVapid, validEndpoint } from '../webpush.ts';
 import { cleanFirstName, cleanName, FIRST_NAME_HELP, FIRST_NAME_PATTERN, intField, loginRedirect } from './common.ts';
 
@@ -65,6 +67,14 @@ function loginForm(ctx: Ctx, o: { email?: string; next: string; error?: string }
     </label>
     ${passwordInput('password', 'current-password', 'Passwort')}
     <button type="submit" class="btn btn-primary">Anmelden</button>
+  </form>
+  <form method="post" action="/anmelden/passkey" class="stack passkey-login" data-passkey-login hidden>
+    ${csrfField(ctx)}
+    <input type="hidden" name="weiter" value="${o.next}">
+    ${PASSKEY_LOGIN_FIELDS.map((f) => html`<input type="hidden" name="${f}">`)}
+    <p class="or-line"><span>oder</span></p>
+    <button type="submit" class="btn" data-passkey-start>Mit Passkey anmelden</button>
+    <p class="notice notice-warn" data-passkey-error hidden></p>
   </form>
   <p><a href="${withNext('/passwort-vergessen', o.next)}">Passwort vergessen?</a></p>
 </section>
@@ -162,6 +172,54 @@ function newPasswordForm(ctx: Ctx, o: { token: string; next: string; error?: str
 </section>`,
     o.error,
   );
+}
+
+// --- Passkeys ---
+
+const PASSKEY_LOGIN_FIELDS = ['id', 'clientDataJSON', 'authenticatorData', 'signature', 'userHandle'];
+const PASSKEY_CHALLENGE_MINUTES = 5;
+
+const jsonRes = (status: number, data: unknown): Res => ({
+  status,
+  headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  body: JSON.stringify(data),
+});
+
+async function newPasskeyChallenge(db: Db, purpose: 'register' | 'login', userId: string | null, next: string | null): Promise<string> {
+  const challenge = newToken();
+  await db.run('delete from passkey_challenges where expires_at < now()');
+  await db.run(
+    `insert into passkey_challenges (challenge, user_id, purpose, next, expires_at) values ($1, $2, $3, $4, now() + make_interval(mins => $5))`,
+    [challenge, userId, purpose, next, PASSKEY_CHALLENGE_MINUTES],
+  );
+  return challenge;
+}
+
+/** Holt die Challenge aus clientDataJSON und löst sie ein (gilt nur einmal). */
+async function takePasskeyChallenge(db: Db, clientDataJSON: Buffer, purpose: 'register' | 'login', userId: string | null) {
+  let challenge = '';
+  try {
+    challenge = String(JSON.parse(clientDataJSON.toString('utf8')).challenge ?? '');
+  } catch {
+    return null;
+  }
+  if (!/^[A-Za-z0-9_-]{20,100}$/.test(challenge)) return null;
+  return db.one<{ challenge: string; next: string | null }>(
+    `delete from passkey_challenges where challenge = $1 and purpose = $2 and expires_at > now()
+       and user_id is not distinct from $3 returning challenge, next`,
+    [challenge, purpose, userId],
+  );
+}
+
+/** Formularfeld (base64url) als Bytes; leer oder kaputt → null. */
+function formBytes(ctx: Ctx, name: string): Buffer | null {
+  const v = ctx.form.get(name) ?? '';
+  if (!v || v.length > 20_000) return null;
+  try {
+    return fromB64url(v);
+  } catch {
+    return null;
+  }
 }
 
 const TOTP_PENDING_MINUTES = 10;
@@ -307,6 +365,44 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     }
     await db.run('delete from totp_pending_logins where token_hash = $1', [hashToken(token)]);
     return signIn(ctx, pending.user_id, safeNext(pending.next));
+  });
+
+  // Passkey statt Passwort + Code: das Gerät prüft den Nutzer selbst (Fingerabdruck, Gesicht, PIN).
+  router.post('/anmelden/passkey/optionen', async (ctx) => {
+    if (!passkeyChallengeAllowed(ctx.ip)) return jsonRes(429, { error: 'Zu viele Versuche. Bitte warte ein paar Minuten.' });
+    const challenge = await newPasskeyChallenge(ctx.deps.db, 'login', null, safeNext(ctx.form.get('weiter')));
+    return jsonRes(200, { challenge, rpId: relyingParty(ctx.deps.config.appUrl).rpId });
+  });
+
+  router.post('/anmelden/passkey', async (ctx) => {
+    const { db, config } = ctx.deps;
+    const next = safeNext(ctx.form.get('weiter'));
+    const fail = (error: string) => loginForm(ctx, { next, error });
+    const [id, clientDataJSON, authenticatorData, signature] = ['id', 'clientDataJSON', 'authenticatorData', 'signature'].map((f) => formBytes(ctx, f));
+    if (!id || !clientDataJSON || !authenticatorData || !signature) return fail('Die Anmeldung mit dem Passkey hat nicht geklappt. Bitte versuche es noch einmal.');
+    const pending = await takePasskeyChallenge(db, clientDataJSON, 'login', null);
+    if (!pending) return fail('Die Anmeldung mit dem Passkey hat zu lange gedauert. Bitte versuche es noch einmal.');
+    const key = await db.one<{ user_id: string; public_key: string; alg: number; sign_count: number }>(
+      'select user_id, public_key, alg, sign_count from passkeys where credential_id = $1',
+      [b64url(id)],
+    );
+    if (!key) return fail('Diesen Passkey kennen wir nicht – vielleicht wurde er in deinem Konto entfernt. Melde dich mit Passwort an.');
+    const userHandle = formBytes(ctx, 'userHandle');
+    if (userHandle && userHandle.toString('utf8') !== key.user_id) return fail('Die Anmeldung mit dem Passkey hat nicht geklappt.');
+    let signCount: number;
+    try {
+      signCount = verifyAssertion(
+        { clientDataJSON, authenticatorData, signature },
+        { publicKey: fromB64url(key.public_key), alg: key.alg, signCount: key.sign_count },
+        { challenge: pending.challenge, ...relyingParty(config.appUrl) },
+      );
+    } catch (e) {
+      if (!(e instanceof WebAuthnError)) throw e;
+      ctx.deps.log(`Passkey-Anmeldung abgelehnt: ${e.message}`);
+      return fail('Die Anmeldung mit dem Passkey hat nicht geklappt. Bitte versuche es noch einmal.');
+    }
+    await db.run('update passkeys set sign_count = $2, last_used_at = now() where credential_id = $1', [b64url(id), signCount]);
+    return signIn(ctx, key.user_id, safeNext(pending.next ?? next));
   });
 
   router.get('/registrieren', async (ctx) => {
@@ -659,6 +755,57 @@ export function registerAuthRoutes(router: Router<Ctx>) {
     return accountPage(ctx, undefined, 'sicherheit', backupCodes);
   });
 
+  router.post('/konto/passkey/optionen', async (ctx) => {
+    if (!ctx.user) return jsonRes(401, { error: 'Bitte melde dich erneut an.' });
+    const problem = await checkCurrentPassword(ctx);
+    if (problem) return jsonRes(400, { error: problem });
+    const { db, config } = ctx.deps;
+    const challenge = await newPasskeyChallenge(db, 'register', ctx.user.id, null);
+    const existing = await db.query<{ credential_id: string }>('select credential_id from passkeys where user_id = $1', [ctx.user.id]);
+    return jsonRes(200, {
+      challenge,
+      rp: { id: relyingParty(config.appUrl).rpId, name: config.appName },
+      user: { id: b64url(Buffer.from(ctx.user.id)), name: ctx.user.email, displayName: ctx.user.display_name },
+      exclude: existing.map((r) => r.credential_id),
+      algs: SUPPORTED_ALGS,
+    });
+  });
+
+  router.post('/konto/passkey/speichern', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    const { db, config } = ctx.deps;
+    const clientDataJSON = formBytes(ctx, 'clientDataJSON');
+    const attestationObject = formBytes(ctx, 'attestationObject');
+    if (!clientDataJSON || !attestationObject) return accountPage(ctx, 'Der Passkey konnte nicht erstellt werden.', 'konto');
+    const pending = await takePasskeyChallenge(db, clientDataJSON, 'register', ctx.user.id);
+    if (!pending) return accountPage(ctx, 'Das hat zu lange gedauert. Bitte erstelle den Passkey noch einmal.', 'konto');
+    let key;
+    try {
+      key = verifyRegistration({ clientDataJSON, attestationObject }, { challenge: pending.challenge, ...relyingParty(config.appUrl) });
+    } catch (e) {
+      if (!(e instanceof WebAuthnError)) throw e;
+      ctx.deps.log(`Passkey abgelehnt: ${e.message}`);
+      return accountPage(ctx, 'Der Passkey konnte nicht erstellt werden. Bitte versuche es noch einmal.', 'konto');
+    }
+    const name = (ctx.form.get('name') ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Passkey';
+    try {
+      await db.run(
+        'insert into passkeys (credential_id, user_id, public_key, alg, sign_count, name) values ($1, $2, $3, $4, $5, $6)',
+        [key.credentialId, ctx.user.id, b64url(key.publicKey), key.alg, key.signCount, name],
+      );
+    } catch (e) {
+      if (e instanceof PgError && e.code === '23505') return accountPage(ctx, 'Diesen Passkey gibt es schon.', 'konto');
+      throw e;
+    }
+    return redirect('/konto?bereich=konto&hinweis=passkey-gespeichert');
+  });
+
+  router.post('/konto/passkey/loeschen', async (ctx) => {
+    if (!ctx.user) return loginRedirect(ctx);
+    await ctx.deps.db.run('delete from passkeys where credential_id = $1 and user_id = $2', [ctx.form.get('id') ?? '', ctx.user.id]);
+    return redirect('/konto?bereich=konto&hinweis=passkey-geloescht');
+  });
+
   router.post('/konto/loeschen', async (ctx) => {
     if (!ctx.user) return loginRedirect(ctx);
     if (ctx.form.get('bestaetigt') !== 'ja') return accountPage(ctx, 'Bitte bestätige das Löschen mit dem Häkchen.', 'konto');
@@ -897,6 +1044,10 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     const totpRow = await db.one<{ totp_secret: string | null; totp_enabled_at: Date | null }>('select totp_secret, totp_enabled_at from users where id = $1', [user.id]);
     const totpEnabled = !!totpRow?.totp_enabled_at;
     const totpPending = !totpEnabled && !!totpRow?.totp_secret;
+    const passkeys = await db.query<{ credential_id: string; name: string; created_at: Date; last_used_at: Date | null }>(
+      'select credential_id, name, created_at, last_used_at from passkeys where user_id = $1 order by created_at',
+      [user.id],
+    );
     let totpQr: Html = nothing;
     if (totpPending) {
       try {
@@ -953,7 +1104,7 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     <button type="submit" class="btn btn-quiet">Ausschalten</button>
   </form>`
       : totpPending
-        ? html`<p class="muted">Scanne den Code mit einer Authenticator-App (z. B. Google Authenticator, Aegis, 1Password) und bestätige mit dem angezeigten 6-stelligen Code.</p>
+        ? html`<p class="muted">Öffne deine Authenticator-App, tippe auf „Hinzufügen“ (meist ein Plus) und scanne diesen QR-Code. Gib danach den 6-stelligen Code ein, den die App für ${ctx.deps.config.appName} anzeigt.</p>
   ${totpQr}
   <p class="muted">Geht der Scan nicht? Schlüssel von Hand eingeben: <code>${totpRow!.totp_secret}</code></p>
   <form method="post" action="/konto/2fa/bestaetigen" class="stack">
@@ -968,11 +1119,16 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     ${csrfField(ctx)}
     <button type="submit" class="btn btn-quiet">Abbrechen</button>
   </form>`
-        : html`<p class="muted">Schützt dein Konto zusätzlich mit einem Code aus einer Authenticator-App bei jeder Anmeldung.</p>
+        : html`<p class="muted">Schützt dein Konto zusätzlich: Nach dem Passwort fragt die Anmeldung nach einem 6-stelligen Code aus einer Authenticator-App (z. B. Google Authenticator, Microsoft Authenticator, Aegis, 1Password).</p>
+  <ol class="steps muted">
+    <li>${hasPassword ? 'Passwort eingeben und „QR-Code anzeigen“ antippen.' : '„QR-Code anzeigen“ antippen.'}</li>
+    <li>Den QR-Code mit der Authenticator-App scannen.</li>
+    <li>Den Code aus der App hier eingeben – fertig.</li>
+  </ol>
   <form method="post" action="/konto/2fa/einrichten" class="stack">
     ${csrfField(ctx)}
-    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
-    <button type="submit" class="btn">Einrichten</button>
+    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort', '(zur Sicherheit)') : nothing}
+    <button type="submit" class="btn">QR-Code anzeigen</button>
   </form>`
   }
   ${
@@ -983,6 +1139,34 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
   </div>`
       : nothing
   }
+</section>
+<section class="panel">
+  <h2>Passkeys</h2>
+  <p class="muted">Mit einem Passkey meldest du dich per Fingerabdruck, Gesichtserkennung oder Geräte-PIN an – ohne Passwort und ohne Code aus der Authenticator-App. Gespeichert wird er auf deinem Gerät bzw. in deinem Passwort-Manager (z. B. iCloud-Schlüsselbund, Google, 1Password).</p>
+  ${
+    passkeys.length
+      ? html`<ul class="passkey-list">${passkeys.map(
+          (k) => html`<li>
+      <div><strong>${k.name}</strong><br><small class="muted">Erstellt ${formatDateTime(k.created_at, ctx.deps.config.timeZone)} Uhr${k.last_used_at ? html` · zuletzt benutzt ${formatDateTime(k.last_used_at, ctx.deps.config.timeZone)} Uhr` : nothing}</small></div>
+      ${postButton(ctx, '/konto/passkey/loeschen', 'Entfernen', { cls: 'btn btn-quiet', confirm: `Passkey „${k.name}“ entfernen?`, fields: { id: k.credential_id } })}
+    </li>`,
+        )}</ul>`
+      : nothing
+  }
+  <form method="post" action="/konto/passkey/speichern" class="stack" data-passkey-register hidden>
+    ${csrfField(ctx)}
+    <input type="email" name="email" value="${user.email}" autocomplete="username" hidden>
+    <input type="hidden" name="clientDataJSON">
+    <input type="hidden" name="attestationObject">
+    <label class="field">
+      <span>Name für den Passkey <small class="muted">(z. B. „iPhone“ oder „Laptop“)</small></span>
+      <input type="text" name="name" maxlength="60" placeholder="Passkey">
+    </label>
+    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort', '(zur Sicherheit)') : nothing}
+    <button type="submit" class="btn" data-passkey-start>Passkey erstellen</button>
+    <p class="notice notice-warn" data-passkey-error hidden></p>
+  </form>
+  <p class="muted" data-passkey-unsupported>Dieser Browser kann keine Passkeys erstellen.</p>
 </section>
 <section class="panel">
   <h2>Abmelden</h2>
