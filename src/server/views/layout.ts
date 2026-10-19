@@ -83,7 +83,7 @@ export function layout(ctx: Ctx, o: PageOptions): Html {
 <meta name="theme-color" content="#07111c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="${ctx.deps.asset('icon.svg')}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="${ctx.deps.asset('icon-maskable-512.png')}">
 <link rel="stylesheet" href="${ctx.deps.asset('app.css')}">
 <script src="${ctx.deps.asset('app.js')}" defer></script>
 ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('chat.css')}">

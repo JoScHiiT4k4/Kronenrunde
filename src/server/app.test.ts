@@ -198,7 +198,12 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     const c = await stranger.get(css);
     assert.equal(c.status, 200);
     assert.match(c.headers.get('cache-control') ?? '', /immutable/);
-    assert.equal((await stranger.get('/manifest.webmanifest')).status, 200);
+    const manifest = await stranger.get('/manifest.webmanifest');
+    assert.equal(manifest.status, 200);
+    // App-Symbol: Krone mit Versionsnummer (neues Bild wird neu geladen), dazu maskierbar für Android
+    const icons = JSON.parse(manifest.text).icons as { src: string; purpose: string }[];
+    assert.ok(icons.every((i) => /^\/static\/icon[\w-]*\.(png|svg)\?v=/.test(i.src)), 'Symbole mit ?v=');
+    assert.ok(icons.some((i) => i.purpose === 'maskable'));
     assert.equal((await stranger.get('/gibt-es-nicht')).status, 404);
     assert.equal((await stranger.get('/gesund')).text, 'ok');
     // Handy-App: Service Worker im Hauptverzeichnis, Hinweisseite ohne Internet

@@ -122,7 +122,9 @@ if ('serviceWorker' in navigator) {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const ua = navigator.userAgent;
   const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
   const loggedIn = document.body.dataset.angemeldet === '1';
+  const INSTALLED = 'kronenrunde-installiert';
   let deferred = null;
   let sheet = null;
 
@@ -142,6 +144,30 @@ if ('serviceWorker' in navigator) {
       /* privates Fenster: dann eben beim nächsten Mal wieder */
     }
   };
+  // Ob die App auf diesem Gerät schon installiert ist: gemerkt beim Installieren oder beim Start als App,
+  // dazu (Chrome/Edge) getInstalledRelatedApps. Bietet der Browser das Installieren wieder an, ist sie es nicht mehr.
+  const setInstalled = (on) => {
+    try {
+      if (on) localStorage.setItem(INSTALLED, '1');
+      else localStorage.removeItem(INSTALLED);
+    } catch {
+      /* privates Fenster */
+    }
+  };
+  const knownInstalled = async () => {
+    if (standalone) return true;
+    try {
+      if (localStorage.getItem(INSTALLED) === '1') return true;
+    } catch {
+      /* privates Fenster */
+    }
+    try {
+      return !!(navigator.getInstalledRelatedApps && (await navigator.getInstalledRelatedApps()).length);
+    } catch {
+      return false;
+    }
+  };
+  if (standalone) setInstalled(true);
   const close = () => {
     if (sheet) sheet.remove();
     sheet = null;
@@ -154,28 +180,69 @@ if ('serviceWorker' in navigator) {
   };
 
   function show(kind, force) {
-    if (sheet || standalone || (!force && (!loggedIn || quiet()))) return;
+    if (sheet || (standalone && kind !== 'installed') || (!force && (!loggedIn || quiet()))) return;
     sheet = el('div', 'install-sheet');
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-labelledby', 'install-title');
     const head = el('div', 'install-head');
     const icon = el('img');
-    icon.src = '/static/icon-192.png';
+    const svgIcon = document.querySelector('link[rel="icon"]');
+    icon.src = svgIcon ? svgIcon.href : '/static/icon.svg';
     icon.alt = '';
     icon.width = 48;
     icon.height = 48;
-    const title = el('h2', null, 'Als App speichern');
+    const title = el('h2', null, kind === 'installed' ? 'App bereits installiert' : 'Als App speichern');
     title.id = 'install-title';
     head.append(icon, title);
     sheet.append(head);
     const actions = el('div', 'install-actions');
-    const later = el('button', 'btn btn-quiet', kind === 'ios' ? 'Verstanden' : 'Später');
+    const later = el('button', 'btn btn-quiet', kind === 'installed' ? 'Schließen' : kind === 'ios' ? 'Verstanden' : 'Später');
     later.type = 'button';
     later.addEventListener('click', () => {
       remember();
       close();
     });
-    if (kind === 'android') {
+    if (kind === 'installed') {
+      sheet.append(
+        el(
+          'p',
+          null,
+          standalone
+            ? 'Du nutzt die Kronenrunde gerade schon als App.'
+            : 'Die Kronenrunde ist auf diesem Gerät schon als App installiert. Du startest sie über das Symbol auf dem Startbildschirm bzw. Desktop.',
+        ),
+      );
+      const help = el('div');
+      help.hidden = true;
+      const steps = el('ol', 'install-steps');
+      help.append(steps);
+      if (isIOS) {
+        steps.append(
+          el('li', null, 'Halte das Kronenrunde-Symbol auf dem Home-Bildschirm gedrückt.'),
+          el('li', null, 'Tippe auf „App entfernen“ bzw. „Lesezeichen löschen“ und bestätige.'),
+        );
+      } else if (isAndroid) {
+        steps.append(
+          el('li', null, 'Halte das Kronenrunde-Symbol auf dem Startbildschirm gedrückt.'),
+          el('li', null, 'Tippe auf „Deinstallieren“ (oder „App-Info“ → „Deinstallieren“) und bestätige.'),
+        );
+      } else {
+        steps.append(
+          el('li', null, 'Öffne die Kronenrunde-App.'),
+          el('li', null, 'Klicke oben rechts im App-Fenster auf ⋮ bzw. ⋯.'),
+          el('li', null, 'Wähle „Kronenrunde deinstallieren“ und bestätige.'),
+        );
+        help.append(el('p', 'muted', 'Unter Windows geht es auch über das Startmenü: Rechtsklick auf Kronenrunde → „Deinstallieren“.'));
+      }
+      const how = el('button', 'btn', 'So deinstallierst du sie');
+      how.type = 'button';
+      how.addEventListener('click', () => {
+        help.hidden = false;
+        how.remove();
+      });
+      sheet.append(help);
+      actions.append(later, how);
+    } else if (kind === 'android') {
       sheet.append(el('p', null, 'Dann startest du das Tippspiel wie eine App direkt vom Startbildschirm oder Desktop.'));
       const add = el('button', 'btn btn-primary', 'Hinzufügen');
       add.type = 'button';
@@ -210,30 +277,36 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferred = e;
+    setInstalled(false); // Browser bietet das Installieren an: Die App ist (nicht mehr) installiert
     show('android');
   });
   window.addEventListener('appinstalled', () => {
+    setInstalled(true);
     remember();
     close();
   });
   if (isIOS) setTimeout(() => show('ios'), 1500);
 
   // Knopf unter „Mein Konto → App & Kalender“ und Link „Desktop-App“ in der Fußzeile
-  const open = () => show(deferred ? 'android' : isIOS ? 'ios' : 'other', true);
+  const open = async () => {
+    if (deferred) return show('android', true);
+    if (await knownInstalled()) return show('installed', true);
+    show(isIOS ? 'ios' : 'other', true);
+  };
   for (const button of document.querySelectorAll('[data-install]')) {
-    if (standalone) {
-      const foot = button.closest('.foot-app');
-      if (foot) foot.hidden = true; // läuft schon als App: Fußzeilen-Link ausblenden
-      continue;
-    }
     button.hidden = false;
     button.addEventListener('click', (e) => {
       e.preventDefault();
       open();
     });
   }
-  const done = document.querySelector('[data-install-done]');
-  if (done && standalone) done.hidden = false;
+  knownInstalled().then((yes) => {
+    if (!yes) return;
+    const button = document.querySelector('button[data-install]');
+    if (button) button.textContent = 'App bereits installiert';
+    const done = document.querySelector('[data-install-done]');
+    if (done && standalone) done.hidden = false;
+  });
 })();
 
 // Countdown im Kopf: läuft sekundengenau; bei Null Seite neu laden (dann steht dort "Live" bzw. der nächste Countdown)
