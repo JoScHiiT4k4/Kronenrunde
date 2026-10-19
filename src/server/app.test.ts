@@ -201,6 +201,13 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.equal((await stranger.get('/manifest.webmanifest')).status, 200);
     assert.equal((await stranger.get('/gibt-es-nicht')).status, 404);
     assert.equal((await stranger.get('/gesund')).text, 'ok');
+    // Riot-Nachweis: ohne Anmeldung, nur Text, auch mit doppeltem Schrägstrich
+    for (const p of ['/riot.txt', '//riot.txt']) {
+      const riot = await stranger.get(p);
+      assert.equal(riot.status, 200, p);
+      assert.match(riot.headers.get('content-type') ?? '', /^text\/plain/);
+      assert.equal(riot.text, '209e1524-b7c8-4205-affe-3cb6a6eea441');
+    }
     // Handy-App: Service Worker im Hauptverzeichnis, Hinweisseite ohne Internet
     const sw = await stranger.get('/sw.js');
     assert.equal(sw.status, 200);
