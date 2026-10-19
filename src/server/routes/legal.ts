@@ -87,9 +87,36 @@ async function datenschutz(ctx: Ctx): Promise<Res> {
   return page(ctx, 'Datenschutz', body);
 }
 
+/** Häufige Fragen: feste Antworten zur Bedienung, für alle sichtbar (auch ohne Anmeldung). */
+function faq(ctx: Ctx): Res {
+  const app = ctx.deps.config.appName;
+  const items: [string, Html][] = [
+    ['Was ist ' + app + '?', html`Ein kostenloses Tippspiel für E-Sport-Turniere, zuerst League of Legends. Du tippst die Spiele eines Turniers und sammelst Punkte in einer Tipprunde mit deinen Leuten.`],
+    ['Wie komme ich in eine Tipprunde?', html`Über den Einladungslink, den dir die Spielleitung schickt. Er gilt bis zum Start des ersten Spiels des Turniers. Du kannst in mehreren Tipprunden mitspielen und oben zwischen ihnen wechseln.`],
+    ['Wie tippe ich?', html`Im Reiter „Tippen“ wählst du bei jedem Spiel den Sieger, bei Bo3 und Bo5 auch das Ergebnis (z. B. 2:1), und speicherst unten. Bis zum Tippschluss kannst du deinen Tipp beliebig oft ändern.`],
+    ['Wann ist Tippschluss?', html`Das legt die Spielleitung fest. Meist schließt jedes Spiel einzeln zum Anstoß – oder schon früher, sobald das Spiel davor vorbei ist, weil Spiele oft früher beginnen als angesetzt. Über jedem Spieltag steht, was gilt.`],
+    ['Wie werden Punkte vergeben?', html`Für den richtigen Sieger gibt es Punkte, für das exakte Ergebnis Extrapunkte; wie viele, stellt die Spielleitung ein. Bei Gleichstand in der Rangliste entscheidet die Zahl der exakten Ergebnisse.`],
+    ['Was sind Sonderfragen?', html`Zusatzfragen zum ganzen Turnier, etwa „Wer wird Weltmeister?“. Sie lassen sich bis zum Start des ersten Spiels beantworten; die Schreibweise der Antwort ist egal.`],
+    ['Ab wann sehe ich die Tipps der anderen?', html`Ab dem Tippschluss eines Spiels, im Reiter „Alle Tipps“. Vorher sieht niemand deinen Tipp, auch die Spielleitung nicht.`],
+    ['Wo sehe ich die Spiele live?', html`Läuft ein Spiel, steht oben „Live“ und das „VS“ des Spiels leuchtet grün. Ein Klick darauf führt wahlweise zu Twitch oder YouTube. Die Links stehen auch unten in der Fußzeile.`],
+    ['Kann ich ' + app + ' als App nutzen?', html`Ja. Unter „Mein Konto → App & Kalender“ steht, wie du die Seite auf den Startbildschirm oder den Desktop legst. Dort gibt es auch ein Kalender-Abo mit allen Spielen.`],
+    ['Bekomme ich Erinnerungen?', html`Wenn du möchtest: Unter „Mein Konto → Benachrichtigungen“ stellst du Erinnerungen per E-Mail oder Push ein, falls dir vor dem Tippschluss noch Tipps fehlen.`],
+    ['Wie schütze ich mein Konto?', html`Mit einem eigenen Passwort und freiwillig mit Zwei-Faktor (Authenticator-App) oder einem Passkey – beides unter „Mein Konto → Konto“.`],
+    ['Ich sehe Ergebnisse nicht – warum?', html`Der Spoilerschutz verdeckt Ergebnisse, bis du darauf tippst. Du kannst ihn unter „Mein Konto → Einstellungen“ abschalten.`],
+    ['Kann ich mein Konto löschen?', html`Jederzeit unter „Mein Konto → Konto“. Dabei werden alle deine Daten gelöscht, auch Tipps und Antworten.`],
+    ['Gehört ' + app + ' zu Riot Games?', html`Nein. ${app} ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.`],
+  ];
+  const body = html`<section class="panel narrow legal faq">
+  <h1>Häufige Fragen</h1>
+  ${items.map(([q, a]) => html`<details class="faq-item"><summary>${q}</summary><p>${a}</p></details>`)}
+</section>`;
+  return page(ctx, 'FAQ', body);
+}
+
 export function registerLegalRoutes(router: Router<Ctx>) {
   router.get('/impressum', impressum);
   router.get('/datenschutz', datenschutz);
+  router.get('/faq', async (ctx) => faq(ctx));
   const guard = (ctx: Ctx): Res | null => {
     if (!ctx.user) return loginRedirect(ctx);
     if (!ctx.isAdmin) throw new HttpError(404, 'Diese Seite gibt es nicht.');

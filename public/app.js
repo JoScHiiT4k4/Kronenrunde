@@ -328,7 +328,7 @@ if ('serviceWorker' in navigator) {
     const s = Math.max(0, Math.floor((target - Date.now()) / 1000));
     const d = Math.floor(s / 86400);
     const rest = `${two(Math.floor((s % 86400) / 3600))}:${two(Math.floor((s % 3600) / 60))}:${two(s % 60)}`;
-    el.textContent = d > 0 ? `${d} Tg ${rest}` : rest;
+    el.textContent = d > 0 ? `${d} ${d === 1 ? 'Tag' : 'Tage'} ${rest}` : rest;
     if (s === 0) {
       clearInterval(timer);
       // Danach zeigt der Kopf "Live" bzw. den nächsten Countdown; geht die Uhr hier vor, nach ein paar Sekunden noch einmal
@@ -448,22 +448,22 @@ document.querySelectorAll('details.top-search[data-search]').forEach((details) =
   const panel = details.querySelector('.top-search-panel');
   const btn = details.querySelector('.top-search-btn');
   const slug = details.dataset.slug;
-  // Das Panel hängt per CSS fix am Viewport (nicht an der Lupe), damit es am linken Rand nie herausragt.
-  // Am Handy soll es als Overlay über die volle Breite erscheinen, am PC dicht unter der Lupe als schmale
-  // Box – deshalb hier statt in CSS berechnet, wo die Lupe gerade tatsächlich sitzt.
+  // Das Panel hängt per CSS fix am Viewport (nicht an der Lupe), damit es nie über den Rand ragt.
+  // Am Handy erscheint es als Overlay über die volle Breite unter der Lupe, am PC fährt das Feld auf Höhe
+  // der Lupe rechts daneben zur Seite aus – deshalb hier berechnet, wo die Lupe gerade tatsächlich sitzt.
   const place = () => {
     const r = btn.getBoundingClientRect();
-    panel.style.top = `${Math.round(r.bottom + 8)}px`;
     if (window.innerWidth <= 640) {
-      panel.style.left = '16px';
-      panel.style.right = '16px';
+      panel.style.top = `${Math.round(r.bottom + 8)}px`;
+      panel.style.left = '8px';
+      panel.style.right = '8px';
       panel.style.width = 'auto';
     } else {
-      const width = Math.min(352, window.innerWidth - 32);
-      const left = Math.min(Math.round(r.left), window.innerWidth - 16 - width);
-      panel.style.left = `${Math.max(16, left)}px`;
+      const left = Math.round(r.right + 8);
+      panel.style.top = `${Math.round(r.top)}px`;
+      panel.style.left = `${left}px`;
       panel.style.right = 'auto';
-      panel.style.width = `${width}px`;
+      panel.style.width = `${Math.max(200, Math.min(440, window.innerWidth - 16 - left))}px`;
     }
   };
   window.addEventListener('resize', () => {
@@ -590,9 +590,9 @@ window.addEventListener('resize', () => {
   });
 })();
 
-// Dropdowns (Handy-Menüs, Spielleiter/Administrator, Suche): Tipp daneben schließt sie wieder
+// Dropdowns (Handy-Menüs, Spielleiter/Administrator, Suche, Livestream-Auswahl): Tipp daneben schließt sie wieder
 document.addEventListener('click', (e) => {
-  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open], details.top-search[open]').forEach((d) => {
+  document.querySelectorAll('details[data-m-menu][open], details.role-switch[open], details.top-search[open], details[data-stream-pick][open]').forEach((d) => {
     if (!d.contains(e.target)) d.removeAttribute('open');
   });
 });

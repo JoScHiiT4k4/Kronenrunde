@@ -27,7 +27,8 @@ Was die App kann:
 - **Rangliste**: richtiger Sieger + Extrapunkte für exaktes Ergebnis; Gleichstand wird über exakte Ergebnisse entschieden.
 - **Sonderfragen** mit automatischer Frist (Start des ersten Spiels): Die Leitung wählt per Checkbox aus einem festen Katalog (Antwortart fest: Team, Spieler, Champion); nach Turnierstart gesperrt, Löschen nur über die Einstellungen der Frage. Neue Fragen werden per E-Mail vorgeschlagen (`SUGGESTIONS_TO`, sonst `MAIL_FROM`). Schreibweise egal, mehrere richtige Antworten möglich.
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
-- **Kopfzeile:** Countdown bis zum Turnierstart, danach Links zu Twitch/YouTube (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`) und grünes „Live“, wenn gespielt wird.
+- **Kopfzeile:** Countdown bis zum Turnierstart (z. B. „4 Tage 07:00:00“) und grünes „Live“, wenn gespielt wird. Ein Klick auf „Live“ oder das grüne „VS“ eines laufenden Spiels bietet Twitch oder YouTube an (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`); die Links stehen außerdem in der Fußzeile. Am Handy: oben „Kronenrunde“ mit Suchen, Mein Konto und Abmelden, darunter Turnier und Countdown.
+- **FAQ** in der Fußzeile neben Datenschutz.
 - **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin im Administrator-Bereich (Reiter Impressum und Datenschutz).
 - **Dein Konto** mit fünf Reitern: Profil (Bild, Namen), App & Kalender (als App auf Startbildschirm/Desktop legen, Kalender-Abo), Benachrichtigungen, Einstellungen (Anzeige, Chat), Konto (E-Mail, Passwort, Zwei-Faktor, Passkeys, Abmelden, Löschen).
 - **Profilbild:** unter „Dein Konto → Profil“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.

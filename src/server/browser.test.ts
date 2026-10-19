@@ -517,6 +517,17 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
           problems.push(`${where} (zu): Lupe steht nicht in derselben Zeile wie "Kronenrunde" (${brand.top} vs. ${btnClosed.top})`);
         }
 
+        // Handy: Zeile 1 „Kronenrunde“, dann Suchen, Mein Konto, Abmelden (ohne Namen); Turnier und Countdown darunter.
+        if (width <= 640) {
+          const user = await box('.top-user');
+          const logout = await box('.top-logout-btn');
+          const bar = await box('.tbar');
+          if (await box('.top-user-name')) problems.push(`${where}: Profilname steht noch im Kopf`);
+          if (!user || !logout || !btnClosed || !(btnClosed.left < user.left && user.left < logout.left)) problems.push(`${where}: Reihenfolge im Kopf nicht Suchen, Mein Konto, Abmelden`);
+          if (user && brand && Math.abs(user.top - brand.top) > 10) problems.push(`${where}: Mein Konto steht nicht in der Zeile von "Kronenrunde"`);
+          if (bar && brand && bar.top <= brand.top + 10) problems.push(`${where}: Turnier/Countdown steht nicht in der zweiten Zeile`);
+        }
+
         // Klick auf die Lupe: Eingabefeld klappt auf, ohne die übrige Kopfzeile zu verschieben oder die Seite zu verbreitern.
         await page.click('.top-search-btn');
         const after = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
@@ -532,6 +543,22 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
         if (btnClosed && Math.abs(btn.w - (btnClosed.right - btnClosed.left)) > 0.5) problems.push(`${where} (auf): Lupe ändert beim Aufklappen ihre Breite`);
         const brandAfter = await box('.brand');
         if (brand && brandAfter && Math.abs(brand.top - brandAfter.top) > 1) problems.push(`${where} (auf): Logo verschiebt sich durch das Aufklappen`);
+        // Am PC fährt das Feld neben der Lupe zur Seite aus (gleiche Höhe), statt darunter aufzuklappen.
+        await page.waitForTimeout(300);
+        const input = await box('.top-search-q');
+        if (width > 640 && input && btnClosed && (Math.abs(input.top - btnClosed.top) > 2 || input.left < btnClosed.right)) {
+          problems.push(`${where} (auf): Suchfeld fährt nicht seitlich neben der Lupe aus (Feld ${input.top}/${input.left}, Lupe ${btnClosed.top}/${btnClosed.right})`);
+        }
+        // Der Platzhalter („… Champions …“) passt ganz ins Feld, nichts wird abgeschnitten.
+        const fit = await page.evaluate(() => {
+          const el = document.querySelector('.top-search-q') as HTMLInputElement;
+          const cs = getComputedStyle(el, '::placeholder');
+          const ctx2d = document.createElement('canvas').getContext('2d')!;
+          ctx2d.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const own = getComputedStyle(el);
+          return { text: ctx2d.measureText(el.placeholder).width, room: el.clientWidth - parseFloat(own.paddingLeft) - parseFloat(own.paddingRight) };
+        });
+        if (fit.text > fit.room) problems.push(`${where} (auf): Platzhalter im Suchfeld wird abgeschnitten (${Math.round(fit.text)}px Text, ${Math.round(fit.room)}px Platz)`);
         await page.close();
       }
     } finally {

@@ -98,7 +98,7 @@ ${ctx.user && ctx.sidebar ? html`<link rel="stylesheet" href="${ctx.deps.asset('
   ${tournamentBar(ctx)}
   <nav class="top-nav">
     ${leagueSwitch(ctx)}
-    ${ctx.user ? html`<a href="/konto" class="top-user" title="Dein Konto">${ICON_USER}<span class="top-user-name">${ctx.user.display_name}</span></a>
+    ${ctx.user ? html`<a href="/konto" class="top-user" title="Dein Konto" aria-label="Dein Konto">${ICON_USER}<span class="top-user-name">${ctx.user.display_name}</span></a>
     <form method="post" action="/abmelden" class="top-logout">${csrfField(ctx)}<button type="submit" class="top-logout-btn" title="Abmelden" aria-label="Abmelden">${ICON_LOGOUT}</button></form>`: html`<a href="/anmelden">Anmelden</a>`}
   </nav>
 </header>
@@ -116,9 +116,10 @@ ${o.below ? html`<div class="below">${o.below}</div>` : nothing}
 ${chatWidget(ctx)}
 <footer class="foot">
   ${ctx.isAdmin && !ctx.sidebar?.isTest ? html`<div class="foot-role">${roleSwitch(ctx, o.league)}</div>` : nothing}
+  ${streamLinks(ctx)}
   <p><strong>${appName}</strong> ist ein Fan-Projekt und wird von Riot Games weder unterstützt noch gesponsert.</p>
   <p>League of Legends ist eine Marke von Riot Games, Inc.</p>
-  <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a><span class="foot-app"> · <a href="/konto?bereich=app" data-install>Desktop-App</a></span></p>
+  <p class="foot-links"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a> · <a href="/faq">FAQ</a><span class="foot-app"> · <a href="/konto?bereich=app" data-install>Desktop-App</a></span></p>
   ${versionNote(ctx)}
 </footer>
 </body>
@@ -161,8 +162,8 @@ const ICON_SEARCH = html`<svg class="ico" viewBox="0 0 24 24" width="18" height=
 /**
  * Globale Suche im Kopf (Teams, Spieler, Teilnehmer, Champions), zwischen Logo und Turnier-Leiste – nur mit
  * angemeldeter Tipprunde (ctx.sidebar), da die Suche innerhalb der aktuellen Tipprunde läuft. Zunächst steht
- * nur die Lupe da (am PC wie am Handy); ein Klick klappt das Eingabefeld darunter auf (<details>, geht also
- * auch ohne JavaScript). Mit JavaScript zeigt app.js dort schon beim Tippen Treffer an (/suche.json); ohne
+ * nur die Lupe da; ein Klick öffnet das Eingabefeld – am PC (und in der Desktop-App) fährt es neben der Lupe zur
+ * Seite aus, am Handy erscheint es über die volle Breite darunter (<details>, geht also auch ohne JavaScript). Mit JavaScript zeigt app.js dort schon beim Tippen Treffer an (/suche.json); ohne
  * JavaScript übernimmt das Absenden des Formulars und führt zur vollständigen Such-Seite.
  */
 function searchBox(ctx: Ctx): Html {
@@ -188,17 +189,16 @@ function countdownText(ms: number): string {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   const two = (n: number) => String(n).padStart(2, '0');
-  return d > 0 ? `${d} Tg ${two(h)}:${two(m)}:${two(sec)}` : `${two(h)}:${two(m)}:${two(sec)}`;
+  return d > 0 ? `${d} ${d === 1 ? 'Tag' : 'Tage'} ${two(h)}:${two(m)}:${two(sec)}` : `${two(h)}:${two(m)}:${two(sec)}`;
 }
 
 /**
  * Mitte im Kopf: vor dem Turnier "Name in <Countdown>", danach am Spieltag ein grünes „Live“, dazwischen der Countdown bis
- * zu den nächsten Begegnungen (ohne „in“). Dazu immer die Links zum Livestream.
+ * zu den nächsten Begegnungen (ohne „in“). Ein Klick auf „Live“ bietet Twitch und YouTube an.
  */
 function tournamentBar(ctx: Ctx): Html {
   const t = ctx.headerTournament;
   if (!t) return nothing;
-  const { twitch, youtube } = ctx.deps.config.streams;
   const count = (to: Date) => html`<time class="tbar-count" datetime="${to.toISOString()}" data-countdown="${to.toISOString()}">${countdownText(to.getTime() - ctx.now.getTime())}</time>`;
   return html`<div class="tbar" aria-label="${t.name}">
     ${
@@ -206,10 +206,32 @@ function tournamentBar(ctx: Ctx): Html {
         ? html`<span class="tbar-label">${t.name}</span>${!t.live && t.nextStart ? count(t.nextStart) : nothing}`
         : html`<span class="tbar-label">${t.name} in</span>${count(t.startsAt)}`
     }
-    ${t.live ? html`<span class="tbar-live">Live</span>` : nothing}
-    <a class="tbar-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
-    <a class="tbar-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>
+    ${t.live ? streamPick(ctx, html`<summary class="tbar-live" title="Livestream ansehen">Live</summary>`) : nothing}
   </div>`;
+}
+
+/**
+ * Auswahl Twitch oder YouTube hinter einem Auslöser (grünes „Live“ im Kopf, grünes „VS“ eines laufenden Spiels).
+ * Als <details>, klappt also auch ohne JavaScript auf; ein Klick daneben schließt es (app.js).
+ */
+export function streamPick(ctx: Ctx, summary: Html, cls = ''): Html {
+  const { twitch, youtube } = ctx.deps.config.streams;
+  return html`<details class="stream-pick${cls ? ` ${cls}` : ''}" data-stream-pick>
+    ${summary}
+    <div class="stream-menu" role="menu" aria-label="Livestream ansehen">
+      <a href="${twitch}" target="_blank" rel="noopener noreferrer" role="menuitem">${TWITCH_ICON}Twitch</a>
+      <a href="${youtube}" target="_blank" rel="noopener noreferrer" role="menuitem">${YOUTUBE_ICON}YouTube</a>
+    </div>
+  </details>`;
+}
+
+/** Links zu den Livestreams in der Fußzeile (über dem Hinweis zum Fan-Projekt). */
+function streamLinks(ctx: Ctx): Html {
+  const { twitch, youtube } = ctx.deps.config.streams;
+  return html`<p class="foot-streams">
+    <a class="stream-link" href="${twitch}" target="_blank" rel="noopener noreferrer">${TWITCH_ICON}Twitch</a>
+    <a class="stream-link" href="${youtube}" target="_blank" rel="noopener noreferrer">${YOUTUBE_ICON}YouTube</a>
+  </p>`;
 }
 
 /** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
@@ -337,13 +359,16 @@ function leagueNav(l: LeagueNav): Html {
     ...(l.canManage ? [tab('verwalten', 'Verwalten')] : []),
   ];
   const link = (t: TabItem) => html`<a href="${t.href}"${t.current ? html` aria-current="page"` : nothing}>${t.label}</a>`;
+  // Im Handy-Dropdown zusätzlich „Mein Konto“ direkt nach Statistiken (im Browser steht dafür das Symbol im Kopf)
+  const stats = items.findIndex((t) => t.href.endsWith('/statistiken'));
+  const mobileItems = [...items.slice(0, stats + 1), { href: '/konto', label: 'Mein Konto', current: false }, ...items.slice(stats + 1)];
   // Steht im selben Raster wie der Inhalt (.page), Reiter und Inhalt haben dadurch immer dieselbe Spalte
   return html`<nav class="league-nav" aria-label="${l.name}">
   <div class="league-name">${l.name}</div>
   <div class="tabs${items.length > 7 ? ' tabs-many' : ''}">
     ${items.map(link)}
   </div>
-  ${mobileMenu('league-tabs', l.name, items, link)}
+  ${mobileMenu('league-tabs', l.name, mobileItems, link)}
 </nav>`;
 }
 
