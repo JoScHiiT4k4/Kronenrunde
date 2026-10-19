@@ -386,6 +386,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .backup-code-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; }
 .backup-code-list code { display: block; text-align: center; font-size: 1.05em; }
 @media (max-width: 420px) { .backup-code-list { grid-template-columns: 1fr; } }
+.steps { margin: 0 0 12px; padding-left: 1.4em; }
+.steps li + li { margin-top: 2px; }
+.or-line { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; color: var(--muted); font-size: .9em; }
+.or-line::before, .or-line::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.passkey-list { list-style: none; margin: 0 0 14px; padding: 0; }
+.passkey-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.passkey-list li:last-child { border-bottom: 1px solid var(--line); }
+.passkey-list li > div { min-width: 0; overflow-wrap: anywhere; }
 
 .danger-zone { --frame: #6e2a26; background-color: transparent; }
 

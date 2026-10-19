@@ -625,3 +625,80 @@ document.querySelectorAll('form[data-auto-filter]').forEach((form) => {
   });
 });
 
+
+// Passkeys: im Konto erstellen und beim Anmelden benutzen (WebAuthn). Ohne Unterstützung bleibt alles verborgen.
+(function () {
+  const supported = 'PublicKeyCredential' in window && navigator.credentials && navigator.credentials.create;
+  const toB64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromB64url = (s) => {
+    const raw = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+  const post = async (url, form, extra) => {
+    const body = new URLSearchParams({ _csrf: form.querySelector('input[name="_csrf"]')?.value || '', ...extra });
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Das hat nicht geklappt. Bitte lade die Seite neu.');
+    return data;
+  };
+  const setup = (form, run) => {
+    if (!form) return;
+    const error = form.querySelector('[data-passkey-error]');
+    const button = form.querySelector('[data-passkey-start]');
+    form.hidden = false;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.hidden = true;
+      button.disabled = true;
+      try {
+        await run();
+        form.submit();
+      } catch (err) {
+        // Abbruch im Passkey-Dialog ist kein Fehler, den man erklären muss
+        if (err && err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+          error.textContent = err.name === 'InvalidStateError' ? 'Auf diesem Gerät gibt es schon einen Passkey für dein Konto.' : err.message;
+          error.hidden = false;
+        }
+        button.disabled = false;
+      }
+    });
+  };
+  const field = (form, name, value) => {
+    form.querySelector(`input[name="${name}"]`).value = value;
+  };
+  if (!supported) return;
+  document.querySelectorAll('[data-passkey-unsupported]').forEach((el) => (el.hidden = true));
+
+  const reg = document.querySelector('[data-passkey-register]');
+  setup(reg, async () => {
+    const current = reg.querySelector('input[name="current"]');
+    const o = await post('/konto/passkey/optionen', reg, current ? { current: current.value } : {});
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: fromB64url(o.challenge),
+        rp: o.rp,
+        user: { id: fromB64url(o.user.id), name: o.user.name, displayName: o.user.displayName },
+        pubKeyCredParams: o.algs.map((alg) => ({ type: 'public-key', alg })),
+        excludeCredentials: o.exclude.map((id) => ({ type: 'public-key', id: fromB64url(id) })),
+        authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+        attestation: 'none',
+        timeout: 120000,
+      },
+    });
+    field(reg, 'clientDataJSON', toB64url(cred.response.clientDataJSON));
+    field(reg, 'attestationObject', toB64url(cred.response.attestationObject));
+  });
+
+  const login = document.querySelector('[data-passkey-login]');
+  setup(login, async () => {
+    const o = await post('/anmelden/passkey/optionen', login, { weiter: login.querySelector('input[name="weiter"]').value });
+    const cred = await navigator.credentials.get({
+      publicKey: { challenge: fromB64url(o.challenge), rpId: o.rpId, userVerification: 'required', timeout: 120000 },
+    });
+    field(login, 'id', toB64url(cred.rawId));
+    field(login, 'clientDataJSON', toB64url(cred.response.clientDataJSON));
+    field(login, 'authenticatorData', toB64url(cred.response.authenticatorData));
+    field(login, 'signature', toB64url(cred.response.signature));
+    field(login, 'userHandle', cred.response.userHandle ? toB64url(cred.response.userHandle) : '');
+  });
+})();

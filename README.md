@@ -15,6 +15,8 @@ Tippspiel-Web-App für E-Sport-Turniere, zuerst League of Legends – erst für 
 Was die App kann:
 
 - **Anmelden mit E-Mail und Passwort**; „Passwort vergessen“ schickt einen Link per Mail. Beim Konto-Erstellen wählt man seinen Namen für die Rangliste.
+- **Zwei-Faktor** (freiwillig): QR-Code mit einer Authenticator-App scannen, danach fragt die Anmeldung nach dem 6-stelligen Code (plus Backup-Codes).
+- **Passkeys**: unter „Dein Konto → Konto“ erstellen, dann „Mit Passkey anmelden“ per Fingerabdruck, Gesicht oder Geräte-PIN – ohne Passwort und ohne Code. Gilt für die Adresse aus `APP_URL`.
 - **Tipprunden** anlegen und per Einladungslink beitreten; mehrere Tipprunden pro Person. Der Link gilt nur bis zum Start des ersten Spiels, danach ist er abgelaufen. Das Konto hängt an keiner Tipprunde und bleibt nach deren Ende bestehen.
   Wer neue Tipprunden anlegen darf, stellt der Admin ein (Standard: nur Admins – für alle anderen ist der Knopf ausgeblendet).
 - **Tippen**: Sieger und Ergebnis (Bo1 nur Sieger, Bo3/Bo5 z. B. 2:1 oder 3:1), nach Spieltagen sortiert.
@@ -27,7 +29,7 @@ Was die App kann:
   Die typischen Fragen (Weltmeister, Finals-MVP, meistgebannter Champion, …) lassen sich mit einem Klick einfügen.
 - **Kopfzeile:** Countdown bis zum Turnierstart, danach Links zu Twitch/YouTube (`STREAM_TWITCH_URL`, `STREAM_YOUTUBE_URL`) und grünes „Live“, wenn gespielt wird.
 - **Rechtliches:** Impressum und Datenschutz als Vorlagen im Footer; Angaben pflegt der Admin im Administrator-Bereich (Reiter Impressum und Datenschutz).
-- **Dein Konto** mit fünf Reitern: Profil (Bild, Namen), App & Kalender (als App auf Startbildschirm/Desktop legen, Kalender-Abo), Benachrichtigungen, Einstellungen (Anzeige, Chat), Konto (E-Mail, Passwort, Zwei-Faktor, Abmelden, Löschen).
+- **Dein Konto** mit fünf Reitern: Profil (Bild, Namen), App & Kalender (als App auf Startbildschirm/Desktop legen, Kalender-Abo), Benachrichtigungen, Einstellungen (Anzeige, Chat), Konto (E-Mail, Passwort, Zwei-Faktor, Passkeys, Abmelden, Löschen).
 - **Profilbild:** unter „Dein Konto → Profil“ hochladen (im Browser auf 128×128 verkleinert), erscheint in der Rangliste.
 - **Gewinnchance:** Ab Tippschluss steht hinter jedem Team in Klammern der Anteil der Tipps (grün = höher, rot = niedriger).
 - **Verwalten** (Spielleiter der Tipprunde) mit Untermenü: Übersicht (Einladungslink, wer noch nicht getippt hat – ohne Tipp-Inhalte), Einstellungen, Turniere, Sonderfragen, Mitglieder.

@@ -24,6 +24,7 @@ import { createMailer, type Mailer } from './mail.ts';
 import { notifyDue } from './benachrichtigung.ts';
 import { purgeOldMessages } from './routes/chat.ts';
 import { totpCode } from './totp.ts';
+import { FakePasskey } from './testdaten/fake-passkey.ts';
 
 const DB_URL = process.env.TEST_DATABASE_URL;
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -388,6 +389,70 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     // Ab jetzt wieder normale Anmeldung ohne Code
     await two.post('/abmelden');
     assert.equal((await two.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT })).status, 303);
+  });
+
+  test('Passkey: im Konto erstellen, Anmeldung ohne Passwort und ohne Code, entfernen', async () => {
+    // Konto aus dem Zwei-Faktor-Test (dort am Ende wieder ohne Code), damit nicht noch ein Konto nötig ist
+    const pk = new Client();
+    await pk.login('zwei-faktor@example.de');
+    const page = await pk.get('/konto?bereich=konto');
+    assert.match(page.text, /<h2>Passkeys<\/h2>/);
+    assert.match(page.text, /data-passkey-register/);
+
+    // Optionen nur mit richtigem Passwort
+    const wrong = await pk.post('/konto/passkey/optionen', { current: 'falsch' });
+    assert.equal(wrong.status, 400);
+    assert.match(JSON.parse(wrong.text).error, /Passwort stimmt nicht/);
+    const opts = JSON.parse((await pk.post('/konto/passkey/optionen', { current: PASSWORT })).text);
+    assert.equal(opts.rp.id, '127.0.0.1');
+    assert.equal(opts.user.name, 'zwei-faktor@example.de');
+    assert.deepEqual(opts.exclude, []);
+
+    const device = new FakePasskey('127.0.0.1', base);
+    const created = device.create(opts.challenge, Buffer.from(opts.user.id, 'base64url'));
+    const saved = await pk.post('/konto/passkey/speichern', { ...created, name: 'Testhandy' });
+    assert.equal(saved.location, '/konto?bereich=konto&hinweis=passkey-gespeichert', saved.text);
+    // Dieselbe Challenge gilt nur einmal
+    assert.match((await pk.post('/konto/passkey/speichern', { ...created, name: 'Nochmal' })).text, /zu lange gedauert/);
+    assert.match((await pk.get('/konto?bereich=konto')).text, /<strong>Testhandy<\/strong>/);
+
+    // Zwei-Faktor einschalten: mit Passwort braucht es jetzt einen Code, mit Passkey nicht
+    const setup = await pk.post('/konto/2fa/einrichten', { current: PASSWORT });
+    const secret = /Schlüssel von Hand eingeben: <code>([A-Z2-7]+)<\/code>/.exec(setup.text)![1];
+    await pk.post('/konto/2fa/bestaetigen', { code: totpCode(secret) });
+    await pk.post('/abmelden');
+    assert.match((await pk.post('/anmelden', { email: 'zwei-faktor@example.de', password: PASSWORT })).location!, /^\/anmelden\/2fa/);
+
+    const fresh = new Client();
+    assert.match((await fresh.get('/anmelden')).text, /data-passkey-login/);
+    const loginOpts = JSON.parse((await fresh.post('/anmelden/passkey/optionen', { weiter: '/rangliste' })).text);
+    assert.equal(loginOpts.rpId, '127.0.0.1');
+    const assertion = device.get(loginOpts.challenge);
+    const signedIn = await fresh.post('/anmelden/passkey', { ...assertion, weiter: '/' });
+    assert.equal(signedIn.status, 303, signedIn.text);
+    assert.equal(signedIn.location, '/rangliste', 'Ziel aus der Challenge, kein Code nötig');
+    await fresh.refresh();
+    assert.match((await fresh.get('/konto?bereich=konto')).text, /zuletzt benutzt/);
+
+    // Wiederholen derselben Antwort klappt nicht (Challenge verbraucht)
+    assert.match((await new Client().post('/anmelden/passkey', assertion)).text, /zu lange gedauert/);
+    // Falsche Signatur bzw. falsches Gerät
+    const opts2 = JSON.parse((await new Client().post('/anmelden/passkey/optionen')).text);
+    const stranger = new FakePasskey('127.0.0.1', base);
+    stranger.create(opts2.challenge, Buffer.from('x'));
+    assert.match((await new Client().post('/anmelden/passkey', stranger.get(opts2.challenge))).text, /Diesen Passkey kennen wir nicht/);
+    const opts3 = JSON.parse((await new Client().post('/anmelden/passkey/optionen')).text);
+    const bad = { ...device.get(opts3.challenge), signature: stranger.get(opts3.challenge).signature };
+    assert.match((await new Client().post('/anmelden/passkey', bad)).text, /hat nicht geklappt/);
+
+    // Entfernen: danach geht die Anmeldung damit nicht mehr
+    const list = await fresh.get('/konto?bereich=konto');
+    const id = /name="id" value="([A-Za-z0-9_-]+)"/.exec(list.text)![1];
+    assert.equal((await fresh.post('/konto/passkey/loeschen', { id })).location, '/konto?bereich=konto&hinweis=passkey-geloescht');
+    const opts4 = JSON.parse((await new Client().post('/anmelden/passkey/optionen')).text);
+    assert.match((await new Client().post('/anmelden/passkey', device.get(opts4.challenge))).text, /Diesen Passkey kennen wir nicht/);
+    await fresh.refresh();
+    await fresh.post('/konto/2fa/deaktivieren', { current: PASSWORT });
   });
 
   test('Formularschutz: ohne Token und von fremder Seite abgelehnt', async () => {
