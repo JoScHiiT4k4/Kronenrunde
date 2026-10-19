@@ -1098,11 +1098,15 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
       <button type="submit" class="btn btn-quiet">Neue Backup-Codes erzeugen</button>
     </form>
   </details>
-  <form method="post" action="/konto/2fa/deaktivieren" class="stack">
-    ${csrfField(ctx)}
-    ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
-    <button type="submit" class="btn btn-quiet">Ausschalten</button>
-  </form>`
+  <details class="qr-details">
+    <summary>Zwei-Faktor-Authentifizierung ausschalten</summary>
+    <p class="muted">Danach reicht bei der Anmeldung wieder das Passwort, die Backup-Codes werden ungültig.</p>
+    <form method="post" action="/konto/2fa/deaktivieren" class="stack">
+      ${csrfField(ctx)}
+      ${hasPassword ? passwordInput('current', 'current-password', 'Dein Passwort') : nothing}
+      <button type="submit" class="btn btn-quiet">Ausschalten</button>
+    </form>
+  </details>`
       : totpPending
         ? html`<p class="muted">Öffne deine Authenticator-App, tippe auf „Hinzufügen“ (meist ein Plus) und scanne diesen QR-Code. Gib danach den 6-stelligen Code ein, den die App für ${ctx.deps.config.appName} anzeigt.</p>
   ${totpQr}
@@ -1135,7 +1139,8 @@ async function accountPage(ctx: Ctx, error?: string, forced?: string, freshBacku
     freshBackupCodes
       ? html`<div class="notice notice-ok backup-codes">
     <p><strong>Deine Backup-Codes</strong> – jeder gilt einmal, falls die App mal nicht verfügbar ist. Jetzt notieren oder speichern, sie werden nicht noch einmal angezeigt:</p>
-    <ul class="backup-code-list">${freshBackupCodes.map((c) => html`<li><code>${c}</code></li>`)}</ul>
+    <p class="backup-code-line"><code id="backup-codes">${freshBackupCodes.map((c, i) => html`${i ? ' ' : ''}<span>${i + 1}:${c}</span>`)}</code></p>
+    <button type="button" class="btn btn-quiet" data-copy="backup-codes">Zeile kopieren</button>
   </div>`
       : nothing
   }

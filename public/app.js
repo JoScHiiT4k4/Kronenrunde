@@ -18,21 +18,30 @@ document.addEventListener('click', (e) => {
   if (!button) return;
   const input = document.getElementById(button.dataset.copy);
   if (!input) return;
+  // Eingabefelder liefern ihren Wert, sonstige Elemente (z. B. die Backup-Code-Zeile) ihren Text.
+  const text = 'value' in input ? input.value : input.textContent;
   const done = () => {
     const label = button.textContent;
     button.textContent = 'Kopiert';
     setTimeout(() => (button.textContent = label), 1800);
   };
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(input.value).then(done, () => {
-      input.select();
-    });
+    navigator.clipboard.writeText(text).then(done, () => selectAll(input));
   } else {
-    input.select();
+    selectAll(input);
     document.execCommand('copy');
     done();
   }
 });
+
+function selectAll(el) {
+  if ('select' in el) return el.select();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 
 // ---------------------------------------------------------------------------
 // Ergebnis teilen: die vom Server gelieferte SVG-Karte wird hier im Browser selbst (Canvas)

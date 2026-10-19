@@ -383,9 +383,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .qr-code { width: 220px; height: 220px; max-width: 100%; border-radius: 8px; }
 @media (max-width: 520px) { .qr-code { width: 180px; height: 180px; } }
 
-.backup-code-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin: 10px 0 0; padding: 0; list-style: none; }
-.backup-code-list code { display: block; text-align: center; font-size: 1.05em; }
-@media (max-width: 420px) { .backup-code-list { grid-template-columns: 1fr; } }
+.backup-code-line { margin: 10px 0; }
+.backup-code-line code { display: block; padding: 8px 10px; font-size: 1.05em; line-height: 1.7; overflow-wrap: anywhere; user-select: all; }
+.backup-code-line span { white-space: nowrap; }
 .steps { margin: 0 0 12px; padding-left: 1.4em; }
 .steps li + li { margin-top: 2px; }
 .or-line { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; color: var(--muted); font-size: .9em; }

@@ -339,7 +339,9 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match((await two.post('/konto/2fa/bestaetigen', { code: '000000' })).text, /Der Code stimmt nicht/);
     const confirm = await two.post('/konto/2fa/bestaetigen', { code: totpCode(secret) });
     assert.match(confirm.text, /Deine Backup-Codes/);
-    const backupCodes = [...confirm.text.matchAll(/<li><code>([A-Z2-7-]+)<\/code><\/li>/g)].map((m) => m[1]);
+    const backupCodes = [...confirm.text.matchAll(/<span>\d+:([A-Z2-7-]+)<\/span>/g)].map((m) => m[1]);
+    assert.match(confirm.text, /<span>1:[A-Z2-7-]+<\/span> <span>2:/, 'alle Codes nummeriert in einer Zeile');
+    assert.match(confirm.text, /data-copy="backup-codes">Zeile kopieren/);
     assert.equal(backupCodes.length, 8);
     assert.match((await two.get('/konto?bereich=sicherheit')).text, /Aktiv seit/);
 
