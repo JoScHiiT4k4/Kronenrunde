@@ -27,7 +27,7 @@ BACKUP_DIR=/var/backups/lol-tippspiel
 NODE_MAJOR=24
 DEFAULT_PORT=3000
 TS_HOSTNAME=kronenrunde   # nur bei der Erst-Einrichtung; bestehende Adressen bleiben
-DEFAULT_REPO=https://github.com/JoScHiiT4k4/kronenrunde.git
+DEFAULT_REPO=https://github.com/JoScHiiT4k4/Kronenrunde.git
 LOG=/var/log/lol-tippspiel-install.log
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

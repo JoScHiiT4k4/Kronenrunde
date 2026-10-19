@@ -55,13 +55,13 @@ Das Repository ist öffentlich, der Pi braucht dafür keinen Schlüssel. Auf dem
 
 ```
 sudo apt-get install -y git
-git clone https://github.com/JoScHiiT4k4/kronenrunde.git ~/kronenrunde
+git clone https://github.com/JoScHiiT4k4/Kronenrunde.git ~/kronenrunde
 ```
 
 > Nur falls das Repository wieder privat wird: auf dem Pi mit `ssh-keygen -t ed25519 -N "" -f ~/.ssh/kronenrunde`
 > einen Schlüssel erzeugen, den Inhalt von `~/.ssh/kronenrunde.pub` auf GitHub unter
 > *Settings → Deploy keys → Add deploy key* eintragen (ohne Schreibrecht) und mit
-> `git clone -c core.sshCommand="ssh -i ~/.ssh/kronenrunde" git@github.com:JoScHiiT4k4/kronenrunde.git ~/kronenrunde` holen.
+> `git clone -c core.sshCommand="ssh -i ~/.ssh/kronenrunde" git@github.com:JoScHiiT4k4/Kronenrunde.git ~/kronenrunde` holen.
 
 ---
 
@@ -150,7 +150,7 @@ Der Befehl fragt nach der NFS-Adresse (z. B. `nfs://192.168.1.50/nfs/Sicherung`)
 Wer die App noch aus dem alten Repository installiert hat, stellt den Pi so auf das neue um (Daten und Einstellungen bleiben):
 
 ```
-sudo git -C /opt/lol-tippspiel remote set-url origin https://github.com/JoScHiiT4k4/kronenrunde.git
+sudo git -C /opt/lol-tippspiel remote set-url origin https://github.com/JoScHiiT4k4/Kronenrunde.git
 sudo git -C /opt/lol-tippspiel config --unset core.sshCommand
 sudo tippspiel update
 sudo tippspiel webhook-einrichten
