@@ -375,6 +375,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 
 .inline-form { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0; }
 .inline-form select { width: auto; min-width: 0; }
+.inline-form.form-after { margin-top: 16px; }
 
 .copy-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .copy-row input { flex: 1; min-width: 0; }

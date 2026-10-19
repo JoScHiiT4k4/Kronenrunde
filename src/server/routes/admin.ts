@@ -183,8 +183,6 @@ async function systemPanel(ctx: Ctx): Promise<Html> {
     <div class="sys-fact-${databaseLevel(dbBytes, sys.disk ? sys.disk.total - sys.disk.used : null)}"><span class="muted">Datenbank</span><strong>${formatBytes(dbBytes)}</strong></div>
     ${sys.backupBytes !== null ? html`<div class="sys-fact-${backupLevel(sys.backupCount, sys.backupNewest, ctx.now)}"><span class="muted">Sicherungen</span><strong>${formatBytes(sys.backupBytes)} (${sys.backupCount})</strong>
       <small class="muted">${sys.backupNewest ? `Neueste: ${formatDateTime(sys.backupNewest, tz)} Uhr` : 'Noch keine Sicherung'} · rot, wenn älter als ${LIMITS.backupAgeHours.hot} Std.</small></div>` : nothing}
-    ${sys.nas ? html`<div class="sys-fact-${nasLevel(sys.nas, ctx.now)}"><span class="muted">Kopie auf der MyCloud</span><strong>${sys.nas.ok ? 'in Ordnung' : 'fehlgeschlagen'}</strong>
-      <small class="muted">${formatDateTime(sys.nas.at, tz)} Uhr${sys.nas.ok ? '' : ` · ${sys.nas.message}`} · rot bei Fehler oder älter als ${LIMITS.backupAgeHours.hot} Std.</small></div>` : nothing}
   </div>
   <h3 class="small-title">Größte Tabellen der Datenbank</h3>
   <ul class="sys-tables">
@@ -382,7 +380,7 @@ async function adminHome(ctx: Ctx, error?: string): Promise<Res> {
       }</td></tr>`;
     })}
   </tbody></table>
-  <form method="post" action="/admin/abgleich" class="inline-form">
+  <form method="post" action="/admin/abgleich" class="inline-form form-after">
     ${csrfField(ctx)}
     <button type="submit" class="btn">Jetzt abgleichen</button>
   </form>
