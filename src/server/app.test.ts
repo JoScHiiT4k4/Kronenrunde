@@ -1565,6 +1565,7 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     assert.match(filled.text, /täglich um 7 Uhr/);
     assert.match(filled.text, /<strong>4 \(3,8 KB\)<\/strong>/);
     assert.match(filled.text, /Kopie auf der MyCloud<\/span><strong>in Ordnung/);
+    assert.doesNotMatch((await admin.get('/admin?bereich=system')).text, /MyCloud/, 'unter Server steht die MyCloud nicht mehr, nur unter Backup');
 
     // Filter: Von-Bis und Art (ungültige Werte zählen als "kein Filter")
     const rows = (t: string) => (t.match(/<tr><td>[^<]*Uhr<\/td>/g) ?? []).length;
