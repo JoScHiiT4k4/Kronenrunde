@@ -77,10 +77,10 @@ jobs:
             url=$(gh api repos/homebridge/homebridge-apt-pkg/releases/latest \
               --jq '[.assets[] | select(.name | endswith("_amd64.deb"))][0].browser_download_url')
             curl -sSfL --retry 3 -o /tmp/homebridge.deb "$url"
-            docker cp /tmp/homebridge.deb pi:/tmp/homebridge.deb
+            docker cp /tmp/homebridge.deb pi:/root/homebridge.deb   # /tmp ist im Container ein eigenes tmpfs (systemd)
             docker exec pi bash -euo pipefail -c '
               apt-get update -q
-              DEBIAN_FRONTEND=noninteractive apt-get install -y -q /tmp/homebridge.deb >/dev/null
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -q /root/homebridge.deb >/dev/null
             '
           fi
           for _ in $(seq 60); do docker exec pi curl -fsS -o /dev/null http://127.0.0.1:8581 && break; sleep 2; done
