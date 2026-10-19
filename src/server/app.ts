@@ -171,7 +171,8 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
 <p><a class="btn btn-primary" href="/">Neu laden</a></p></section></main></body></html>`;
 
   async function handle(req: IncomingMessage): Promise<Res> {
-    const url = new URL(req.url ?? '/', 'http://localhost');
+    // Mehrere Schrägstriche am Anfang (z. B. //riot.txt) wären sonst ein Hostname statt eines Pfads
+    const url = new URL((req.url ?? '/').replace(/^\/{2,}/, '/'), 'http://localhost');
     const method = req.method ?? 'GET';
     const path = url.pathname;
 
@@ -203,6 +204,10 @@ export function createApp(opts: { db: Db; config: Config; mailer: Mailer; public
     if (path === '/favicon.ico') return { status: 301, headers: { location: deps.asset('icon.svg') }, body: '' };
     if (path === '/robots.txt') {
       return { status: 200, headers: { 'content-type': MIME['.txt'] }, body: 'User-agent: *\nDisallow: /r/\nDisallow: /beitreten/\nDisallow: /anmelden/\n' };
+    }
+    if (path === '/riot.txt') {
+      // Nachweis für den Produktionsschlüssel der Riot-API (Riot ruft auch //riot.txt ab): genau dieser Text, ohne Zeilenumbruch
+      return { status: 200, headers: { 'content-type': MIME['.txt'], 'cache-control': 'no-cache' }, body: '209e1524-b7c8-4205-affe-3cb6a6eea441' };
     }
     if (path === '/gesund') {
       await db.one('select 1');
