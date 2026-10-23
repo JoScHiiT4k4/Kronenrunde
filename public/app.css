@@ -934,7 +934,10 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .stream-pick > summary { list-style: none; cursor: pointer; }
 .stream-pick > summary::-webkit-details-marker { display: none; }
 .stream-pick > summary::after, .stream-pick[open] > summary::after { content: none; display: none; }
-.vs-pick > summary.vs { padding: 0; gap: 0; display: grid; }
+/* justify-content: center hebt das flex-start von „details > summary“ auf – sonst steht die Grid-Spalte links
+   und „VS“ rutscht aus dem Kreis. Zeilenhöhe = Innenhöhe des Kreises (38px − 2 × 1,5px Rand), text-indent
+   gleicht den Buchstabenabstand nach dem S aus. */
+.vs-pick > summary.vs { padding: 0; gap: 0; display: grid; justify-content: center; text-align: center; line-height: 35px; text-indent: 0.06em; }
 .tbar-live { padding: 3px 8px; border: 1px solid rgb(61 220 132 / 45%); border-radius: 3px; }
 .stream-pick[open] > .tbar-live, .tbar-live:hover { border-color: #3ddc84; background: rgb(61 220 132 / 12%); }
 .vs-pick > .vs-live:hover, .vs-pick[open] > .vs-live { box-shadow: 0 0 0 1px var(--frame) inset, 0 0 18px rgb(61 220 132 / 70%); }

@@ -372,7 +372,7 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
     assert.deepEqual(problems, [], `\n${problems.join('\n')}`);
   });
 
-  test('%-Zahl steht mittig zwischen Team-Name und VS/Ergebnis – bei laufendem Spiel (VS) wie bei Spoilerschutz gleich', async () => {
+  test('%-Zahl steht mittig zwischen Team-Name und VS/Ergebnis – bei laufendem Spiel (VS) wie bei Spoilerschutz gleich, VS mittig im Kreis', async () => {
     const { id: tid } = (await db.one<{ id: string }>(
       `insert into tournaments (name, starts_on, ends_on) values ('Mittig-Testturnier', current_date - 1, current_date + 30) returning id`,
     ))!;
@@ -446,7 +446,18 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
               range.setEnd(last, last.textContent.length);
               return range.getBoundingClientRect().left;
             };
+            // Abstand der Mitte des Schriftzugs „VS“ zur Mitte des grünen Kreises (x, y)
+            const vsOffset = () => {
+              const vs = document.querySelector(`#spiel-${idLive} summary.vs`);
+              if (!vs) return null;
+              const box = vs.getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(vs);
+              const text = range.getBoundingClientRect();
+              return { dx: text.left + text.width / 2 - (box.left + box.width / 2), dy: text.top + text.height / 2 - (box.top + box.height / 2) };
+            };
             return {
+              vs: vsOffset(),
               aLive: percentX(idLive, 'pct-a'),
               bLive: percentX(idLive, 'pct-b'),
               aScore: percentX(idScore, 'pct-a'),
@@ -455,6 +466,8 @@ describe('Browser-Prüfung (Layout bei verschiedenen Fensterbreiten)', { skip },
           },
           { idLive: liveMatch, idScore: scoreMatch },
         );
+        if (!r.vs) problems.push(`${where}: grünes VS nicht gefunden`);
+        else if (Math.abs(r.vs.dx) > 1.5 || Math.abs(r.vs.dy) > 1.5) problems.push(`${where}: VS nicht mittig im Kreis (dx ${r.vs.dx}, dy ${r.vs.dy})`);
         if (r.aLive === null || r.bLive === null || r.aScore === null || r.bScore === null) {
           problems.push(`${where}: %-Zeichen nicht gefunden`);
         } else {
