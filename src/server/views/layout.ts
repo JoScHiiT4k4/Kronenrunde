@@ -3,7 +3,7 @@
 import type { Ctx } from '../app.ts';
 import { formatDateTime } from '../format.ts';
 import { type Html, html, nothing } from '../html.ts';
-import { gotPercent } from '../../domain/possible.ts';
+import { gotPercent, type ScaleParts } from '../../domain/possible.ts';
 import { buildInfo } from '../version.ts';
 
 /** Kurze Hinweise nach einer Aktion (?hinweis=…). Nur feste Texte – nichts aus der Adresse wird angezeigt. */
@@ -234,14 +234,37 @@ function streamLinks(ctx: Ctx): Html {
   </p>`;
 }
 
-/** Grün/rote Skala: geholte Punkte im Verhältnis zu den bisher möglichen. */
-export function scaleBar(points: number, possible: number): Html {
+/** Farbiger Strahl: die bisher möglichen Punkte, aufgeteilt in gold (exakt), grün (Sieger), grau (nicht getippt) und rot (liegen gelassen). */
+export function scaleBar(points: number, possible: number, parts?: ScaleParts): Html {
   const got = gotPercent(points, possible);
-  const label = possible > 0 ? `${points} von ${possible} möglichen Punkten (${got} %)` : 'Noch keine Punkte vergeben';
+  if (possible <= 0) {
+    return html`<svg class="scale" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="Noch keine Punkte vergeben">
+    <title>Noch keine Punkte vergeben</title><rect class="scale-none" x="0" y="0" width="100" height="8"/></svg>`;
+  }
+  const p = parts ?? { exact: 0, winner: points, skipped: 0, lost: possible - points };
+  const label = `${points} von ${possible} möglichen Punkten (${got} %) · exakt ${p.exact}, Sieger ${p.winner}, nicht getippt ${p.skipped}, liegen gelassen ${p.lost}`;
+  const segments: [string, number][] = [['scale-exact', p.exact], ['scale-got', p.winner], ['scale-skip', p.skipped], ['scale-miss', p.lost]];
+  let x = 0;
   return html`<svg class="scale" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="${label}">
     <title>${label}</title>
-    ${possible > 0 ? html`<rect class="scale-got" x="0" y="0" width="${got}" height="8"/><rect class="scale-miss" x="${got}" y="0" width="${100 - got}" height="8"/>` : html`<rect class="scale-none" x="0" y="0" width="100" height="8"/>`}
+    ${segments.map(([cls, value]) => {
+      if (value <= 0) return nothing;
+      const w = (value / possible) * 100;
+      const rect = html`<rect class="${cls}" x="${x.toFixed(2)}" y="0" width="${w.toFixed(2)}" height="8"/>`;
+      x += w;
+      return rect;
+    })}
   </svg>`;
+}
+
+/** Legende zum farbigen Strahl. */
+export function scaleLegend(): Html {
+  return html`<p class="scale-legend">
+    <span><i class="scale-key scale-exact"></i>Exakt richtiges Ergebnis</span>
+    <span><i class="scale-key scale-got"></i>Richtiger Sieger</span>
+    <span><i class="scale-key scale-skip"></i>Tippen verpasst</span>
+    <span><i class="scale-key scale-miss"></i>Verpasste Punkte</span>
+  </p>`;
 }
 
 /** Reiter, auf denen die Rangliste rechts fehlt: dort steht die Rangliste bzw. der Turnierbaum selbst bzw. die Verwaltung. */
@@ -270,7 +293,7 @@ function rankBox(ctx: Ctx): Html {
           (r) => html`<li class="rank-row${r.userId === ctx.user?.id ? ' me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium-${r.rank}` : ''}">
           <span class="rank-pos">${r.rank}</span>
           <span class="rank-name">${avatar(r.userId, r.displayName, s.avatarOf.get(r.userId) ?? null, 'sm', isOnline(s.lastSeenOf.get(r.userId) ?? null, ctx.now))}<a class="rank-n" href="/r/${s.slug}/spieler/${r.userId}">${r.displayName}</a></span>
-          ${scaleBar(r.points, s.possible)}
+          ${scaleBar(r.points, s.possible, s.parts.get(r.userId))}
           <span class="rank-pts">${r.points}</span>
         </li>`,
         )}

@@ -89,7 +89,7 @@ async function profilePage(ctx: Ctx): Promise<Res> {
     ${standings.hasBonus ? tile(row.bonusPoints, 'Punkte aus Sonderfragen') : nothing}
     ${tile(row.predictionsMade, row.predictionsMade === 1 ? 'Tipp abgegeben' : 'Tipps abgegeben')}
   </div>
-  <p class="profile-scale">${scaleBar(row.points, standings.possible)}<small class="muted">Ausbeute von bisher ${standings.possible} möglichen Punkten</small></p>
+  <p class="profile-scale">${scaleBar(row.points, standings.possible, standings.parts.get(id))}<small class="muted">Ausbeute von bisher ${standings.possible} möglichen Punkten</small></p>
 </section>
 <section class="panel">
   <h2>Tippverlauf</h2>

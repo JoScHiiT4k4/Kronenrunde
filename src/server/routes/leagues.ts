@@ -6,7 +6,6 @@ import { buildIcs } from '../../domain/ics.ts';
 import { userByCalendarToken } from '../auth.ts';
 import type { LockMode } from '../../domain/types.ts';
 import { arePredictionsPublic, isOpen, lockTime } from '../../domain/locking.ts';
-import { missedTips } from '../../domain/missing.ts';
 import { type Shares, winShares } from '../../domain/shares.ts';
 import { isValidResult, matchResult, resultOptions, type ResultOption } from '../../domain/results.ts';
 import { computeStandings, scorePrediction } from '../../domain/scoring.ts';
@@ -15,7 +14,7 @@ import { PgError } from '../db/index.ts';
 import { dayKey, formatDate, formatDateTime, formatDayLong, formatRemaining, formatTime } from '../format.ts';
 import { attr, type Html, html, nothing, raw } from '../html.ts';
 import { HttpError, htmlResponse, redirect, type Res, type Router } from '../http.ts';
-import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, streamPick, tabMenu } from '../views/layout.ts';
+import { avatar, csrfField, emptyState, filterBar, isOnline, layout, postButton, progress, scaleBar, scaleLegend, streamPick, tabMenu } from '../views/layout.ts';
 import { loadStandings } from './standings-data.ts';
 import { standingsShareCard } from '../views/standings-share-card.ts';
 import { cleanName, intField, isUuid, loginRedirect, slugify } from './common.ts';
@@ -923,14 +922,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   const access = await loadLeague(ctx, ctx.params.slug);
   const { league } = access;
   const { db } = ctx.deps;
-  const { rows, avatarOf, lastSeenOf, finished, possible, hasBonus, raw: data } = await loadStandings(db, league);
-  const missed = missedTips(
-    rows.map((r) => r.userId),
-    data.matches,
-    new Set(data.predictions.map((p) => `${p.userId}:${p.matchId}`)),
-    league.lock_mode,
-    ctx.now,
-  );
+  const { rows, avatarOf, lastSeenOf, finished, possible, hasBonus, parts } = await loadStandings(db, league);
 
   const body = html`<section class="panel">
   <div class="panel-head">
@@ -942,10 +934,7 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
   <table class="table standings" id="rk-list">
     <thead><tr>
       <th class="num">Platz</th><th>Name</th>
-      <th class="scale-col col-x" title="Grün: geholte Punkte, rot: liegen gelassen (von ${possible} bisher möglichen)">Ausbeute</th>
-      <th class="num col-x" title="Richtige Sieger">Richtiger Sieger</th>
-      <th class="num col-x" title="Exakte Ergebnisse">Korrekter Tipp</th>
-      <th class="num col-x" title="Spiele nach Tippschluss ohne Tipp">Verpasster Tipp</th>
+      <th class="scale-col col-x" title="Aufteilung der ${possible} bisher möglichen Punkte, siehe Legende unten">Ausbeute</th>
       ${hasBonus ? html`<th class="num col-x" title="Punkte aus Sonderfragen">Sonder</th>` : nothing}
       <th class="num">Punkte</th>
     </tr></thead>
@@ -954,17 +943,15 @@ async function standingsPage(ctx: Ctx): Promise<Res> {
       (r) => html`<tr data-item data-text="${r.displayName.toLowerCase()}" class="${r.userId === ctx.user!.id ? 'me' : ''}${r.rank <= 3 && r.points > 0 ? ` podium podium-${r.rank}` : ''}">
         <td class="num rank">${r.rank}</td>
         <td><a class="who who-link" href="/r/${league.slug}/spieler/${r.userId}">${avatar(r.userId, r.displayName, avatarOf.get(r.userId) ?? null, 'sm', isOnline(lastSeenOf.get(r.userId) ?? null, ctx.now))}<span>${r.displayName}</span></a>
-          <span class="rk-sub">${scaleBar(r.points, possible)}<small>${r.correctWinners} Sieger richtig · ${r.exactResults} korrekt · ${missed.get(r.userId) ?? 0} verpasst${hasBonus ? ` · ${r.bonusPoints} Sonder` : ''}</small></span></td>
-        <td class="scale-col col-x">${scaleBar(r.points, possible)}</td>
-        <td class="num col-x">${r.correctWinners}</td>
-        <td class="num col-x">${r.exactResults}</td>
-        <td class="num col-x">${missed.get(r.userId) ?? 0}</td>
+          <span class="rk-sub">${scaleBar(r.points, possible, parts.get(r.userId))}${hasBonus ? html`<small>${r.bonusPoints} Sonder</small>` : nothing}</span></td>
+        <td class="scale-col col-x">${scaleBar(r.points, possible, parts.get(r.userId))}</td>
         ${hasBonus ? html`<td class="num col-x">${r.bonusPoints}</td>` : nothing}
         <td class="num total">${r.points}</td>
       </tr>`,
     )}
     </tbody>
   </table>
+  ${scaleLegend()}
 </section>
 ${
   league.role && league.role !== 'owner'
