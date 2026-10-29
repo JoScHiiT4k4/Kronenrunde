@@ -1054,6 +1054,8 @@ a.bk-match:focus-visible .bk-box { stroke: var(--gold-bright); stroke-width: 2; 
 .presence-dot.presence-on { background: var(--ok); }
 .profile-presence { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: var(--muted); font-size: 0.92rem; }
 .profile-presence .presence-dot { position: static; border: none; width: 9px; height: 9px; }
+/* Zeitangabe bleibt zusammen: wird es eng, bricht sie als Ganzes nach „Zuletzt online:“ um, nie nur „Uhr“ */
+.nowrap { white-space: nowrap; }
 /* Umschalter Spielleiter / Administrator (nur Betreiber) */
 .role-switch { position: relative; }
 .role-switch summary {
