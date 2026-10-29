@@ -682,6 +682,7 @@ details > summary > span:first-of-type:not(:only-child) { flex: 1; }
 
 .standings .rank { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; text-align: center; min-width: 32px; }
 .standings th:first-child { text-align: center; }
+.standings th.num { white-space: normal; } /* zweiwortige Spaltenköpfe ("Richtiger Sieger") dürfen umbrechen */
 .standings .total { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--gold-bright); }
 /* Plätze 1–3: Medaille hinter der Platzzahl; geteilte Plätze bekommen dieselbe Medaille */
 .podium-1 { --medal: #e3c77f; }
