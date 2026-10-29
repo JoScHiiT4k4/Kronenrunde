@@ -67,11 +67,11 @@ async function profilePage(ctx: Ctx): Promise<Res> {
     <h1>${person.first_name && sameName ? person.first_name : person.display_name} <span class="profile-rank">(${row.rank}. Platz)</span></h1>
     <p class="muted">${person.first_name && !sameName ? html`${person.first_name} · ` : nothing}Mitglied in ${league.name}</p>
     <p class="profile-presence">
-      ${presenceDot(online)}${online
+      ${presenceDot(online)}<span>${online
         ? html`Online`
         : person.last_seen_at
-          ? html`Zuletzt online: ${formatDateTime(person.last_seen_at, ctx.deps.config.timeZone)} Uhr`
-          : html`Noch nicht online gewesen`}
+          ? html`Zuletzt online: <span class="nowrap">${formatDateTime(person.last_seen_at, ctx.deps.config.timeZone)} Uhr</span>`
+          : html`Noch nicht online gewesen`}</span>
     </p>
   </div>
   ${
