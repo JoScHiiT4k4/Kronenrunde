@@ -1,6 +1,6 @@
 // Wer hat die anstehenden Spiele noch nicht getippt? Nur Anzahl und Frist – nie der Inhalt der Tipps.
 
-import { isOpen, lockTime } from './locking.ts';
+import { arePredictionsPublic, isOpen, lockTime } from './locking.ts';
 import type { LockMode, Match } from './types.ts';
 
 export interface MissingTips {
@@ -24,6 +24,15 @@ export function missingTips(userIds: string[], matches: Match[], tipped: Set<str
     out.push({ userId, missing: todo.length, matchIds: todo.map((m) => m.id), nextLock: new Date(Math.min(...locks)) });
   }
   return out.sort((a, b) => a.nextLock.getTime() - b.nextLock.getTime() || b.missing - a.missing);
+}
+
+/**
+ * Verpasste Tipps je Person: Spiele mit feststehenden Teams, bei denen der Tippschluss vorbei ist
+ * (oder die schon abgeschlossen sind) und für die es keinen Tipp gibt. `tipped` wie bei missingTips.
+ */
+export function missedTips(userIds: string[], matches: Match[], tipped: Set<string>, mode: LockMode, now: Date): Map<string, number> {
+  const closed = matches.filter((m) => m.teamA !== null && m.teamB !== null && (m.finished || arePredictionsPublic(m, mode, now)));
+  return new Map(userIds.map((userId) => [userId, closed.filter((m) => !tipped.has(`${userId}:${m.id}`)).length]));
 }
 
 export interface MissingAnswers {
