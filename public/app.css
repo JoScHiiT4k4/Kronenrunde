@@ -1317,10 +1317,14 @@ a.sw-match:focus-visible { outline: 2px solid var(--gold-bright); outline-offset
 .profile-rank { color: var(--muted); font-weight: 400; font-size: 0.65em; white-space: nowrap; }
 .profile-head p { margin: 0; }
 .profile-share { flex: none; white-space: nowrap; }
-@media (max-width: 460px) {
-  /* Handy: Platz ist knapp – Name/Status dürfen umbrechen, der Teilen-Knopf bleibt in der freien Zeile neben dem Profilbild */
-  .profile-head { align-items: flex-start; }
-  .profile-share { font-size: 0.85rem; padding: 7px 10px; }
+@media (max-width: 640px) {
+  /* Handy: Bild links, Infos daneben über die volle Restbreite; der Teilen-Knopf steht unter dem Online-Status.
+     Umbrochen wird nur, wenn ein Wort sonst nicht passt – nie mitten im Namen, solange er in eine Zeile passt. */
+  .profile-head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; row-gap: 10px; align-items: center; }
+  .profile-head > .avatar-lg { width: 72px; height: 72px; }
+  .profile-head > .avatar-lg.avatar-ph { font-size: 1.7rem; }
+  .profile-head h1 { font-size: 1.55rem; overflow-wrap: break-word; }
+  .profile-share { grid-column: 2; justify-self: start; font-size: 0.85rem; padding: 7px 10px; }
 }
 .profile-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; }
 .who-link { color: inherit; text-decoration: none; }
