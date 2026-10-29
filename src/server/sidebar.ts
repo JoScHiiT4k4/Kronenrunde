@@ -1,5 +1,6 @@
 // Rangliste in der rechten Seitenleiste: auf jeder Seite die Tipprunde, in der man gerade ist (sonst die zuletzt beigetretene).
 
+import type { ScaleParts } from '../domain/possible.ts';
 import type { StandingRow } from '../domain/scoring.ts';
 import type { Db } from './db/index.ts';
 import { loadStandings } from './routes/standings-data.ts';
@@ -12,6 +13,7 @@ export interface Sidebar {
   /** Wann jeder zuletzt angemeldet eine Seite aufgerufen hat (für die Online-Anzeige) */
   lastSeenOf: Map<string, Date | null>;
   possible: number;
+  parts: Map<string, ScaleParts>;
   /** Chat stummgeschaltet (Standard) – false, wenn Push-Hinweise für Chat-Nachrichten an sind */
   chatMuted: boolean;
   /** Alle Tipprunden des Teilnehmers (für das Dropdown in der Kopfzeile) */
@@ -57,6 +59,7 @@ export async function loadSidebar(db: Db, userId: string, slug: string | null, i
     avatarOf: s.avatarOf,
     lastSeenOf: s.lastSeenOf,
     possible: s.possible,
+    parts: s.parts,
     chatMuted: !prefs?.chat_push,
     leagues,
     isTest: league.is_test,

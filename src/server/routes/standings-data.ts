@@ -1,6 +1,6 @@
 // Rangliste einer Tipprunde berechnen (für die Seite "Rangliste" und die Seitenleiste).
 
-import { possiblePoints } from '../../domain/possible.ts';
+import { possiblePoints, type ScaleParts, scaleParts } from '../../domain/possible.ts';
 import { type StandingRow, computeStandings } from '../../domain/scoring.ts';
 import type { BonusAnswer, BonusQuestion, LeagueRules, Match, Member, Prediction } from '../../domain/types.ts';
 import { matchResult } from '../../domain/results.ts';
@@ -16,6 +16,8 @@ export interface StandingsData {
   /** Bisher überhaupt mögliche Punkte (gewertete Spiele + Sonderfragen mit Lösung) */
   possible: number;
   hasBonus: boolean;
+  /** Aufteilung des farbigen Strahls je Person */
+  parts: Map<string, ScaleParts>;
   /** Rohdaten der Berechnung (z. B. für die Abzeichen im Profil) */
   raw: { members: Member[]; matches: Match[]; predictions: Prediction[]; rules: LeagueRules; bonusQuestions: BonusQuestion[]; bonusAnswers: BonusAnswer[] };
 }
@@ -55,6 +57,7 @@ export async function loadStandings(db: Queryable, league: Pick<League, 'id' | '
     finished: domainMatches.filter((m) => matchResult(m)).length,
     possible: possiblePoints(domainMatches, rules, bonusQuestions),
     hasBonus: questions.some((q) => q.correct_answers.length > 0),
+    parts: scaleParts(rows, domainMatches, raw.predictions, rules, bonusQuestions),
     raw,
   };
 }

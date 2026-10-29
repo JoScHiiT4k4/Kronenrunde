@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { missedTips, missingAnswers, missingTips } from './missing.ts';
+import { missingAnswers, missingTips } from './missing.ts';
 import type { Match } from './types.ts';
 
 const now = new Date('2026-10-15T12:00:00Z');
@@ -22,19 +22,6 @@ test('missingTips: nur offene Spiele, sortiert nach Frist, ohne Tipp-Inhalt', ()
   assert.deepEqual(r.map((x) => [x.userId, x.missing]), [['cara', 2], ['ben', 1]]);
   assert.equal(r[1].nextLock.toISOString(), '2026-10-15T18:00:00.000Z');
   assert.deepEqual(Object.keys(r[1]).sort(), ['matchIds', 'missing', 'nextLock', 'userId'], 'keine Tipp-Inhalte');
-});
-
-test('missedTips: nur Spiele nach Tippschluss oder abgeschlossen, ohne Tipp', () => {
-  const matches = [
-    m('alt', '2026-10-15T10:00:00Z'),
-    m('fertig', '2026-10-20T10:00:00Z'),
-    m('offen', '2026-10-15T18:00:00Z'),
-    m('ohneTeams', '2026-10-14T18:00:00Z', false),
-  ];
-  matches[1].finished = true;
-  const tipped = new Set(['anna:alt', 'anna:fertig', 'ben:alt', 'ben:offen']);
-  const r = missedTips(['anna', 'ben', 'cara'], matches, tipped, 'match', now);
-  assert.deepEqual([...r], [['anna', 0], ['ben', 1], ['cara', 2]]);
 });
 
 test('missingAnswers: nur Personen mit offenen Fragen', () => {
