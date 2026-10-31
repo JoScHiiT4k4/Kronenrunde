@@ -41,3 +41,35 @@ export function missingAnswers(userIds: string[], questions: { id: string; quest
   }
   return out;
 }
+
+/** Wie lange nach Tippschluss ein noch nicht beendetes Spiel als „läuft“ gilt (ältere ohne Ergebnis sind veraltet). */
+export const CATCH_UP_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Darf der Administrator für dieses Spiel einen Tipp nachtragen (z. B. bei technischen Problemen)?
+ * Teams stehen fest, das Spiel ist nicht beendet, und es ist entweder noch tippbar oder läuft gerade
+ * (Tippschluss vor höchstens 12 Stunden). Der Tippschluss selbst spielt dabei keine Rolle.
+ */
+export function canCatchUp(match: Match, mode: LockMode, now: Date): boolean {
+  if (match.finished || match.teamA === null || match.teamB === null) return false;
+  const lock = lockTime(match, mode);
+  return lock !== null && lock.getTime() > now.getTime() - CATCH_UP_WINDOW_MS;
+}
+
+export interface CatchUpTips {
+  userId: string;
+  /** Spiele ohne Tipp, für die nachgetragen werden darf – nach Anstoß sortiert */
+  matchIds: string[];
+}
+
+/** Für wen und welche Spiele der Administrator einen Tipp nachtragen kann. `tipped` wie bei missingTips. */
+export function catchUpTips(userIds: string[], matches: Match[], tipped: Set<string>, mode: LockMode, now: Date): CatchUpTips[] {
+  const time = (m: Match) => lockTime(m, mode)?.getTime() ?? 0;
+  const candidates = matches.filter((m) => canCatchUp(m, mode, now)).sort((a, b) => time(a) - time(b));
+  const out: CatchUpTips[] = [];
+  for (const userId of userIds) {
+    const todo = candidates.filter((m) => !tipped.has(`${userId}:${m.id}`));
+    if (todo.length) out.push({ userId, matchIds: todo.map((m) => m.id) });
+  }
+  return out;
+}

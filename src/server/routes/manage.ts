@@ -2,7 +2,10 @@
 
 import type { Ctx } from '../app.ts';
 import { ANSWER_TYPE_LABELS, type AnswerType, QUESTION_CATALOG } from '../../domain/questions.ts';
-import { missingAnswers, missingTips } from '../../domain/missing.ts';
+import { canCatchUp, catchUpTips, missingAnswers, missingTips } from '../../domain/missing.ts';
+import { lockTime } from '../../domain/locking.ts';
+import { isValidResult, resultOptions } from '../../domain/results.ts';
+import { PgError } from '../db/index.ts';
 import { encodeQr } from '../../domain/qrcode.ts';
 import { formatDateTime, formatRemaining } from '../format.ts';
 import { attr, type Html, html, nothing } from '../html.ts';
@@ -10,9 +13,9 @@ import { HttpError, htmlResponse, redirect, type Res, type Router } from '../htt
 import { csrfField, layout, postButton, progress, tabMenu } from '../views/layout.ts';
 import { qrSvg } from '../views/qr-svg.ts';
 import { cleanName, intField, isUuid, loginRedirect } from './common.ts';
-import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, shortA, shortB, toDomainMatch } from './league-data.ts';
+import { type LeagueAccess, leagueMatches, leagueTournaments, loadLeague, type MatchRow, shortA, shortB, toDomainMatch } from './league-data.ts';
 import { clearChat } from './chat.ts';
-import { lockModeOptions, parseLockMode } from './leagues.ts';
+import { lockModeOptions, parseLockMode, parsePick, pickValue } from './leagues.ts';
 
 async function manageAccess(ctx: Ctx): Promise<LeagueAccess> {
   const access = await loadLeague(ctx, ctx.params.slug, { allowAdmin: true });
@@ -124,6 +127,9 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
   let missing: ReturnType<typeof missingTips> = [];
   let missingQ: ReturnType<typeof missingAnswers> = [];
   let openQuestions = 0;
+  // Nur für den Administrator: Tipps nachtragen (auch bei laufenden Spielen)
+  let catchUp: ReturnType<typeof catchUpTips> = [];
+  const matchById = new Map<string, MatchRow>();
   const matchLabel = new Map<string, string>();
   if (area === 'uebersicht') {
     const [matches, tipped, answered] = await Promise.all([
@@ -131,7 +137,10 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
       db.query<{ user_id: string; match_id: string }>('select user_id, match_id from predictions where league_id = $1', [league.id]),
       db.query<{ user_id: string; question_id: string }>('select user_id, question_id from bonus_answers where league_id = $1', [league.id]),
     ]);
-    for (const m of matches) matchLabel.set(m.id, `${shortA(m)} – ${shortB(m)}`);
+    for (const m of matches) {
+      matchLabel.set(m.id, `${shortA(m)} – ${shortB(m)}`);
+      matchById.set(m.id, m);
+    }
     const openIds = new Set(tournaments.filter((t) => !t.bonus_deadline_at || t.bonus_deadline_at > ctx.now).map((t) => t.id));
     const open = questions.filter((q) => openIds.has(q.tournament_id));
     openQuestions = open.length;
@@ -143,6 +152,15 @@ async function managePage(ctx: Ctx, error?: string, forcedArea?: Area): Promise<
       league.lock_mode,
       ctx.now,
     );
+    if (ctx.isAdmin) {
+      catchUp = catchUpTips(
+        members.map((m) => m.user_id),
+        matches.map(toDomainMatch),
+        new Set(tipped.map((t) => `${t.user_id}:${t.match_id}`)),
+        league.lock_mode,
+        ctx.now,
+      );
+    }
   }
   const nameOf = new Map(members.map((m) => [m.user_id, m.display_name]));
 
@@ -174,6 +192,41 @@ ${area === 'uebersicht' ? html`
       : html`<p class="muted">Alle haben die anstehenden Spiele getippt – oder es steht gerade kein Spiel zum Tippen an.</p>`
   }
 </section>
+
+${ctx.isAdmin ? html`
+<section class="panel" id="nachtragen">
+  <h2>Tipp nachtragen <span class="tab-badge">Admin</span></h2>
+  ${
+    catchUp.length
+      ? html`<p class="muted">Bei technischen Problemen kannst du als Administrator für Mitspieler einen fehlenden Tipp eintragen – auch wenn das Spiel schon läuft. Der Tipp wird als nachgetragen gekennzeichnet und lässt sich danach nicht mehr ändern.</p>
+  <div class="stack">
+  ${catchUp.map(
+    (r) => html`<form method="post" action="${base}/tipp-nachtragen" class="row catch-up">
+    ${csrfField(ctx)}
+    <input type="hidden" name="user_id" value="${r.userId}">
+    <label class="field"><span>Tipp für ${nameOf.get(r.userId) ?? ''}</span>
+      <select name="tipp" required>
+        <option value="">Spiel und Tipp wählen …</option>
+        ${r.matchIds.map((id) => {
+          const m = matchById.get(id)!;
+          const lock = lockTime(toDomainMatch(m), league.lock_mode);
+          const state = lock && lock <= ctx.now ? 'läuft' : lock ? `Tippschluss ${formatDateTime(lock, tz)} Uhr` : '';
+          return html`<optgroup label="${matchLabel.get(id) ?? '?'}${state ? ` (${state})` : ''}">
+          ${resultOptions(m.best_of).map((o) => {
+            const team = o.winner === 'A' ? shortA(m) : shortB(m);
+            return html`<option value="${id}:${pickValue(o)}">${o.winnerWins === null ? `${team} gewinnt` : `${team} gewinnt ${o.winnerWins}:${o.loserWins}`}</option>`;
+          })}
+          </optgroup>`;
+        })}
+      </select></label>
+    <button type="submit" class="btn" data-confirm="Tipp für ${nameOf.get(r.userId) ?? ''} wirklich nachtragen? Er lässt sich danach nicht mehr ändern.">Nachtragen</button>
+  </form>`,
+  )}
+  </div>`
+      : html`<p class="muted">Gerade fehlt niemandem ein Tipp für ein anstehendes oder laufendes Spiel.</p>`
+  }
+</section>
+` : nothing}
 
 <section class="panel">
   <h2>Sonderfragen ${openQuestions ? progress(members.length - missingQ.length, members.length, 'Teilnehmer haben alle Fragen beantwortet') : nothing}</h2>
@@ -448,6 +501,41 @@ export function registerManageRoutes(router: Router<Ctx>) {
   };
   post('/anfrage/:id/bestaetigen', decide(true));
   post('/anfrage/:id/ablehnen', decide(false));
+
+  // Administrator trägt für einen Mitspieler einen fehlenden Tipp nach – auch nach Tippschluss
+  post('/tipp-nachtragen', async (ctx, { league }) => {
+    if (!ctx.isAdmin) throw new HttpError(403, 'Nur der Administrator kann Tipps für andere nachtragen.');
+    const uid = ctx.form.get('user_id') ?? '';
+    const [matchId, value] = (ctx.form.get('tipp') ?? '').split(':');
+    if (!isUuid(uid) || !isUuid(matchId)) return 'Bitte wähle ein Spiel und einen Tipp aus.';
+    const { db } = ctx.deps;
+    const member = await db.one('select 1 from league_members where league_id = $1 and user_id = $2', [league.id, uid]);
+    if (!member) return 'Diese Person ist kein Mitglied der Tipprunde.';
+    const m = (await leagueMatches(db, league.id)).find((x) => x.id === matchId);
+    const pick = parsePick(value ?? '');
+    if (!m || !pick || !isValidResult(m.best_of, pick)) return 'Bitte wähle ein Spiel und einen Tipp aus.';
+    if (!canCatchUp(toDomainMatch(m), league.lock_mode, ctx.now)) return 'Für dieses Spiel kann kein Tipp mehr nachgetragen werden (schon beendet oder Teams stehen noch nicht fest).';
+    let inserted = false;
+    try {
+      inserted = await db.tx(async (q) => {
+        await q.exec(`set local app.bypass_lock = 'on'`);
+        const row = await q.one(
+          `insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins, entered_by)
+           values ($1, $2, $3, $4, $5, $6, $7)
+           on conflict (league_id, match_id, user_id) do nothing
+           returning 1`,
+          [league.id, m.id, uid, pick.winner, pick.winnerWins, pick.loserWins, ctx.user!.id],
+        );
+        return !!row;
+      });
+    } catch (e) {
+      if (e instanceof PgError && e.code === 'P0001') return `Der Tipp wurde nicht gespeichert: ${e.message}`;
+      throw e;
+    }
+    if (!inserted) return 'Für dieses Spiel gibt es schon einen Tipp. Nachgetragen wird nur, wo noch keiner ist.';
+    ctx.deps.log(`Tipp nachgetragen: Tipprunde ${league.slug}, Spiel ${m.id}, Mitglied ${uid}, durch Administrator ${ctx.user!.id}`);
+    return redirect(`${areaHref(league.slug, 'uebersicht')}&hinweis=tipp-nachgetragen#nachtragen`);
+  });
 
   post('/chat-leeren', async (ctx, { league }) => {
     await clearChat(ctx.deps.db, league.id);

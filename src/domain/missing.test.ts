@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { missingAnswers, missingTips } from './missing.ts';
+import { canCatchUp, catchUpTips, missingAnswers, missingTips } from './missing.ts';
 import type { Match } from './types.ts';
 
 const now = new Date('2026-10-15T12:00:00Z');
@@ -28,4 +28,19 @@ test('missingAnswers: nur Personen mit offenen Fragen', () => {
   const qs = [{ id: 'q1', question: 'Wer wird Weltmeister?' }, { id: 'q2', question: 'Finals-MVP?' }];
   const r = missingAnswers(['anna', 'ben'], qs, new Set(['anna:q1', 'anna:q2', 'ben:q1']));
   assert.deepEqual(r, [{ userId: 'ben', questions: ['Finals-MVP?'] }]);
+});
+
+test('catchUpTips: offene und laufende Spiele ohne Tipp, keine beendeten oder veralteten', () => {
+  const matches: Match[] = [
+    m('spaeter', '2026-10-16T18:00:00Z'),
+    m('laeuft', '2026-10-15T11:00:00Z'),
+    { ...m('vorbei', '2026-10-15T09:00:00Z'), finished: true, winsA: 2, winsB: 0 },
+    m('veraltet', '2026-10-14T20:00:00Z'),
+    m('offen', '2026-10-17T18:00:00Z', false),
+  ];
+  const r = catchUpTips(['anna', 'ben'], matches, new Set(['anna:spaeter', 'anna:laeuft']), 'match', now);
+  assert.deepEqual(r, [{ userId: 'ben', matchIds: ['laeuft', 'spaeter'] }]);
+  assert.equal(canCatchUp(matches[1], 'match', now), true);
+  assert.equal(canCatchUp(matches[2], 'match', now), false);
+  assert.equal(canCatchUp(matches[3], 'match', now), false);
 });

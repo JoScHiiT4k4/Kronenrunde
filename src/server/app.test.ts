@@ -824,6 +824,48 @@ describe('Web-App (mit Datenbank)', { skip: !DB_URL && 'TEST_DATABASE_URL nicht 
     await restore();
   });
 
+  test('Verwalten: Administrator trägt fehlenden Tipp nach, auch bei laufendem Spiel; Spielleiter darf das nicht', async () => {
+    const id = match['T1-KC'];
+    const saved = await db.one<{ scheduled_at: Date }>('select scheduled_at from matches where id = $1', [id]);
+    await db.run(`update matches set scheduled_at = now() - interval '1 hour' where id = $1`, [id]); // läuft, Tippschluss vorbei
+    const benId = (await db.one<{ id: string }>(`select id from users where email = 'ben@example.de'`))!.id;
+    const adminId = (await db.one<{ id: string }>(`select id from users where email = 'admin@example.de'`))!.id;
+    const url = `/r/${slug}/verwalten/tipp-nachtragen`;
+
+    // Spielleiter ohne Administrator-Rechte: kein Bereich, kein Zugriff
+    assert.doesNotMatch((await anna.get(`/r/${slug}/verwalten`)).text, /id="nachtragen"/);
+    assert.equal((await anna.post(url, { user_id: benId, tipp: `${id}:B` })).status, 403);
+
+    const page = await admin.get(`/r/${slug}/verwalten`);
+    assert.match(page.text, /id="nachtragen"/);
+    assert.match(page.text, new RegExp(`<input type="hidden" name="user_id" value="${benId}">`));
+    assert.match(page.text, new RegExp(`value="${id}:B"`));
+    assert.match(page.text, /\(läuft\)/);
+    assert.doesNotMatch(page.text, new RegExp(`value="${match['GEN-T1']}:`), 'beendete Spiele nicht');
+
+    // Ungültig: Bo1 mit Ergebnis, beendetes Spiel, kein Mitglied
+    assert.equal((await admin.post(url, { user_id: benId, tipp: `${id}:B-2-1` })).status, 400);
+    const done = await admin.post(url, { user_id: benId, tipp: `${match['GEN-T1']}:A-3-0` });
+    assert.equal(done.status, 400);
+    assert.match(done.text, /kann kein Tipp mehr nachgetragen werden/);
+    assert.equal((await admin.post(url, { user_id: adminId, tipp: `${id}:B` })).status, 400);
+
+    const ok = await admin.post(url, { user_id: benId, tipp: `${id}:B` });
+    assert.equal(ok.status, 303, ok.text);
+    assert.match(ok.location ?? '', /bereich=uebersicht&hinweis=tipp-nachgetragen/);
+    const row = await db.one<{ winner: string; entered_by: string }>('select winner, entered_by from predictions where match_id = $1 and user_id = $2', [id, benId]);
+    assert.deepEqual(row, { winner: 'B', entered_by: adminId });
+    // Kein Überschreiben vorhandener Tipps
+    const twice = await admin.post(url, { user_id: benId, tipp: `${id}:A` });
+    assert.equal(twice.status, 400);
+    assert.match(twice.text, /schon einen Tipp/);
+    // Für alle sichtbar als nachgetragen gekennzeichnet
+    assert.match((await anna.get(`/r/${slug}/spiel/${id}`)).text, /<td>KC <small class="muted late-mark"[^>]*>\(nachgetragen\)<\/small><\/td>/);
+
+    await db.run('delete from predictions where match_id = $1 and user_id = $2', [id, benId]);
+    await db.run('update matches set scheduled_at = $2 where id = $1', [id, saved!.scheduled_at]);
+  });
+
   test('Sonderfragen: auswählen, beantworten, Frist, Auflösung', async () => {
     // Frist = Start des ersten Spiels; hier noch in der Zukunft, damit die Auswahl offen ist
     const restore = await postponeTournament(tournamentId);
