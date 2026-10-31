@@ -58,6 +58,11 @@ function pickLabel(m: MatchRow, winner: 'A' | 'B', winnerWins: number | null, lo
   return winnerWins === null ? team : `${team} ${winnerWins}:${loserWins}`;
 }
 
+/** Hinweis an Tipps, die der Administrator nachgetragen hat (z. B. nach technischen Problemen). */
+function lateMark(late: boolean | null | undefined): Html {
+  return late ? html` <small class="muted late-mark" title="Vom Administrator nachgetragen">(nachgetragen)</small>` : nothing;
+}
+
 function predictionLabel(m: MatchRow, p: { winner: 'A' | 'B'; winner_wins: number | null; loser_wins: number | null }): string {
   return pickLabel(m, p.winner, p.winner_wins, p.loser_wins);
 }
@@ -451,7 +456,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
       `select u.id as user_id, u.display_name from league_members lm join users u on u.id = lm.user_id where lm.league_id = $1 order by u.display_name, u.id`,
       [league.id],
     ),
-    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1`, [league.id]),
+    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins, entered_by is not null as late from predictions where league_id = $1`, [league.id]),
   ]);
   const own = new Map(preds.map((p) => [p.match_id, p]));
   // Nur für Spiele, deren Tipps schon öffentlich sind (nach Tippschluss) – vorher bleibt alles geheim
@@ -478,7 +483,7 @@ async function tipsPage(ctx: Ctx): Promise<Res> {
       }).sort(byPointsDesc).map(({ u, p, points }) => {
         return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
           <td>${u.display_name}</td>
-          <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
+          <td>${p ? html`${pickLabel(m, p.winner, p.winner_wins, p.loser_wins)}${lateMark(p.late)}` : html`<span class="muted">kein Tipp</span>`}</td>
           <td class="num${points ? ' hit' : ''}">${points ?? ''}</td>
         </tr>`;
       })}
@@ -695,7 +700,7 @@ async function saveTips(ctx: Ctx): Promise<Res> {
         `insert into predictions (league_id, match_id, user_id, winner, winner_wins, loser_wins)
          values ($1, $2, $3, $4, $5, $6)
          on conflict (league_id, match_id, user_id)
-         do update set winner = excluded.winner, winner_wins = excluded.winner_wins, loser_wins = excluded.loser_wins`,
+         do update set winner = excluded.winner, winner_wins = excluded.winner_wins, loser_wins = excluded.loser_wins, entered_by = null`,
         [league.id, m.id, user.id, pick.winner, pick.winnerWins, pick.loserWins],
       );
       saved++;
@@ -735,8 +740,8 @@ async function matchPage(ctx: Ctx): Promise<Res> {
       lock ? html` (${early ? 'sobald das Spiel davor vorbei ist, spätestens ' : ''}${formatDateTime(lock, config.timeZone)} Uhr)` : nothing
     }. So kann niemand abschreiben.</p>`;
   } else {
-    const rows = await db.query<{ display_name: string; user_id: string; winner: 'A' | 'B' | null; winner_wins: number | null; loser_wins: number | null }>(
-      `select u.display_name, u.id as user_id, p.winner, p.winner_wins, p.loser_wins
+    const rows = await db.query<{ display_name: string; user_id: string; winner: 'A' | 'B' | null; winner_wins: number | null; loser_wins: number | null; late: boolean | null }>(
+      `select u.display_name, u.id as user_id, p.winner, p.winner_wins, p.loser_wins, p.entered_by is not null as late
          from league_members lm
          join users u on u.id = lm.user_id
          left join predictions p on p.league_id = lm.league_id and p.user_id = lm.user_id and p.match_id = $2
@@ -774,7 +779,7 @@ ${
       : null;
     return html`<tr${attr(r.user_id === ctx.user!.id, 'class="me"')}>
       <td>${r.display_name}</td>
-      <td>${r.winner ? pickLabel(m, r.winner, r.winner_wins, r.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
+      <td>${r.winner ? html`${pickLabel(m, r.winner, r.winner_wins, r.loser_wins)}${lateMark(r.late)}` : html`<span class="muted">kein Tipp</span>`}</td>
       <td class="num">${score?.points ?? ''}</td>
     </tr>`;
   })}
@@ -809,7 +814,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
         where lm.league_id = $1 order by u.display_name, u.id`,
       [league.id],
     ),
-    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins from predictions where league_id = $1`, [league.id]),
+    db.query<PredictionRow>(`select match_id, user_id, winner, winner_wins, loser_wins, entered_by is not null as late from predictions where league_id = $1`, [league.id]),
   ]);
   const time = (m: MatchRow) => m.scheduled_at?.getTime() ?? 0;
   // Nur Spiele, deren Tippschluss vorbei ist – alles andere bleibt verborgen, damit niemand abschreibt
@@ -871,7 +876,7 @@ async function allTipsPage(ctx: Ctx): Promise<Res> {
     }).sort(byPointsDesc).map(({ u, p, points }) => {
       return html`<tr${attr(u.user_id === ctx.user!.id, 'class="me"')}>
         <td>${u.display_name}</td>
-        <td>${p ? pickLabel(m, p.winner, p.winner_wins, p.loser_wins) : html`<span class="muted">kein Tipp</span>`}</td>
+        <td>${p ? html`${pickLabel(m, p.winner, p.winner_wins, p.loser_wins)}${lateMark(p.late)}` : html`<span class="muted">kein Tipp</span>`}</td>
         <td class="num${points ? ' hit' : ''}">${points ?? ''}</td>
       </tr>`;
     })}

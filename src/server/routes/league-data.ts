@@ -185,6 +185,8 @@ export interface PredictionRow {
   winner: 'A' | 'B';
   winner_wins: number | null;
   loser_wins: number | null;
+  /** Vom Administrator nachgetragen (nur wo abgefragt) */
+  late?: boolean;
 }
 
 export function toDomainPrediction(p: PredictionRow) {

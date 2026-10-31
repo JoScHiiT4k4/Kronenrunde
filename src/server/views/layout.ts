@@ -38,6 +38,7 @@ const NOTICES: Record<string, { text: string; kind: 'ok' | 'warn' }> = {
   erstellt: { text: 'Die Tipprunde ist angelegt. Lade jetzt deine Leute mit dem Einladungslink ein.', kind: 'ok' },
   'tipps-gespeichert': { text: 'Deine Tipps sind gespeichert.', kind: 'ok' },
   'tipps-teilweise': { text: 'Einige Tipps kamen zu spät: Der Tippschluss für diese Spiele ist vorbei.', kind: 'warn' },
+  'tipp-nachgetragen': { text: 'Tipp nachgetragen. Er ist für alle als nachgetragen gekennzeichnet.', kind: 'ok' },
   'keine-aenderung': { text: 'Keine Änderungen.', kind: 'ok' },
   'antworten-gespeichert': { text: 'Deine Antworten sind gespeichert.', kind: 'ok' },
   'antworten-zu-spaet': { text: 'Die Sonderfragen sind schon geschlossen.', kind: 'warn' },
